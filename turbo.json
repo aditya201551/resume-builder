@@ -1,0 +1,21 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalEnv": ["GOCACHE", "GOPATH", "GOROOT", "HOME", "LOCALAPPDATA"],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["bin/**", "dist/**"]
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": ["coverage/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

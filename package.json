@@ -1,0 +1,21 @@
+{
+  "name": "resume-builder-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "npm@11.12.1",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "shared/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test"
+  },
+  "devDependencies": {
+    "shadcn": "^4.13.1",
+    "turbo": "^2.9.0"
+  }
+}

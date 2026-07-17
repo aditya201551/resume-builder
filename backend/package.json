@@ -1,0 +1,12 @@
+{
+  "name": "@resume-builder/backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:api": "go build -o bin/api ./cmd/api",
+    "build": "npm run build:api",
+    "dev": "go run ./cmd/api",
+    "lint": "go vet ./...",
+    "test": "go test ./..."
+  }
+}

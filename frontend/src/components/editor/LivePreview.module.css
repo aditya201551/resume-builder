@@ -1,0 +1,97 @@
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+}
+
+.page {
+  position: relative;
+  width: 680px;
+  height: 880px;
+  flex-shrink: 0;
+  overflow: hidden;
+  background: #ffffff;
+  color: #14181d;
+  padding: 48px 56px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 13px;
+  line-height: 1.55;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.name {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.headline {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: #4a4a4a;
+}
+
+.metaRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: #4a4a4a;
+}
+
+.rule {
+  border: none;
+  border-top: 1px solid #c9603e;
+  margin: 14px 0 18px;
+}
+
+.sectionTitle {
+  margin: 0 0 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #14181d;
+}
+
+.entryHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.entryTitle {
+  font-weight: 700;
+}
+
+.entrySub {
+  font-style: italic;
+  color: #333;
+}
+
+.entryDates {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.richText :global(p) {
+  margin: 4px 0;
+}
+
+.richText :global(ul),
+.richText :global(ol) {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+.skillGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}

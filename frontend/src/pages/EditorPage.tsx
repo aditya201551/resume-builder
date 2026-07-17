@@ -16,8 +16,11 @@ import {
 import { Accordion } from '@/components/ui/accordion'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
-import { useFullResume, useEntityMutations } from '@/hooks/useResumeEditor'
+import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useSectionConfigReorder } from '@/hooks/useSectionConfigReorder'
+import { ResumeDraftProvider, useResumeDraftContext, useResumeDraftData } from '@/hooks/useResumeDraft'
+import { isDraftDirty } from '@/lib/resumeDraftSync'
+import { cn } from '@/lib/utils'
 import SortableList from '@/components/editor/SortableList'
 import SectionAccordionItem from '@/components/editor/SectionAccordionItem'
 import AddSectionDialog, { type AddSectionOption } from '@/components/editor/AddSectionDialog'
@@ -33,6 +36,37 @@ import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSe
 import LayoutMode from '@/components/editor/LayoutMode'
 import LivePreview from '@/components/editor/LivePreview'
 import type { FullResume, SectionConfig } from '@/types/resume'
+
+function GlobalSyncStatus() {
+  const { state, syncStatus } = useResumeDraftContext()
+  const dirty = isDraftDirty(state.data, state.lastSynced)
+  const label =
+    syncStatus === 'syncing'
+      ? 'Saving…'
+      : syncStatus === 'error'
+        ? "Couldn't save — retrying"
+        : dirty
+          ? 'Unsaved changes'
+          : 'All changes saved'
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 text-xs',
+        syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
+      )}
+    >
+      <span
+        className={cn(
+          'size-1.5 rounded-full',
+          syncStatus === 'syncing' && 'animate-pulse bg-accent',
+          syncStatus === 'error' && 'bg-destructive',
+          syncStatus === 'idle' && (dirty ? 'bg-muted-foreground/50' : 'bg-accent'),
+        )}
+      />
+      {label}
+    </span>
+  )
+}
 
 const PINNED_TYPES = new Set(['contact', 'summary'])
 const DEFAULT_SLOT_ORDER = [
@@ -300,19 +334,14 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   )
 }
 
-export default function EditorPage() {
-  const { id } = useParams<{ id: string }>()
-  const resumeQuery = useFullResume(id ?? '')
+function EditorPageContent() {
+  const { data, isLoading } = useResumeDraftData()
 
-  if (resumeQuery.isLoading) {
+  if (isLoading || !data) {
     return <div className="p-10 text-sm text-muted-foreground">Loading resume…</div>
   }
 
-  if (!resumeQuery.data || !id) {
-    return <div className="p-10 text-sm text-muted-foreground">Resume not found.</div>
-  }
-
-  const data = resumeQuery.data
+  const resumeId = data.resume.id
 
   const editPane = (
     <Tabs defaultValue="content" className="flex h-full flex-col gap-4">
@@ -324,9 +353,12 @@ export default function EditorPage() {
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="layout">Layout</TabsTrigger>
         </TabsList>
+        <div className="ml-auto">
+          <GlobalSyncStatus />
+        </div>
       </div>
       <TabsContent value="content" className="flex-1 overflow-y-auto pb-10">
-        <ContentMode resumeId={id} data={data} />
+        <ContentMode resumeId={resumeId} data={data} />
       </TabsContent>
       <TabsContent value="layout" className="flex-1 overflow-y-auto pb-10">
         <LayoutMode data={data} />
@@ -366,5 +398,19 @@ export default function EditorPage() {
         </Tabs>
       </div>
     </>
+  )
+}
+
+export default function EditorPage() {
+  const { id } = useParams<{ id: string }>()
+
+  if (!id) {
+    return <div className="p-10 text-sm text-muted-foreground">Resume not found.</div>
+  }
+
+  return (
+    <ResumeDraftProvider resumeId={id}>
+      <EditorPageContent />
+    </ResumeDraftProvider>
   )
 }

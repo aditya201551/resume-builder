@@ -4,15 +4,12 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import AutosaveStatus from '@/components/editor/AutosaveStatus'
 import { useAutosave } from '@/hooks/useAutosave'
-import { apiPatch } from '@/lib/http'
-import { fullResumeKey } from '@/hooks/useResumeEditor'
-import { useQueryClient } from '@tanstack/react-query'
+import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import type { Resume, ResumeLink } from '@/types/resume'
 
 export default function ContactSection({ resume }: { resume: Resume }) {
-  const queryClient = useQueryClient()
+  const { dispatch } = useResumeDraftContext()
   const [form, setForm] = useState({
     full_name: resume.full_name,
     headline: resume.headline ?? '',
@@ -23,17 +20,19 @@ export default function ContactSection({ resume }: { resume: Resume }) {
     links: resume.links,
   })
 
-  const status = useAutosave(form, async (value) => {
-    await apiPatch(`/api/resumes/${resume.id}`, {
-      full_name: value.full_name,
-      headline: value.headline || null,
-      email: value.email || null,
-      phone: value.phone || null,
-      location: value.location || null,
-      summary: value.summary || null,
-      links: value.links,
+  useAutosave(form, async (value) => {
+    dispatch({
+      type: 'update_meta',
+      patch: {
+        full_name: value.full_name,
+        headline: value.headline || null,
+        email: value.email || null,
+        phone: value.phone || null,
+        location: value.location || null,
+        summary: value.summary || null,
+        links: value.links,
+      },
     })
-    queryClient.invalidateQueries({ queryKey: fullResumeKey(resume.id) })
   })
 
   function setLink(index: number, patch: Partial<ResumeLink>) {
@@ -45,9 +44,6 @@ export default function ContactSection({ resume }: { resume: Resume }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex justify-end">
-        <AutosaveStatus status={status} />
-      </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="full_name">Full name</Label>

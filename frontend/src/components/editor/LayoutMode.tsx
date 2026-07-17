@@ -1,44 +1,44 @@
 import { useState } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiGet, apiPatch, apiPut } from '@/lib/http'
-import { fullResumeKey } from '@/hooks/useResumeEditor'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { apiGet, apiPut } from '@/lib/http'
+import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { useSectionConfigReorder } from '@/hooks/useSectionConfigReorder'
 import { useAutosave } from '@/hooks/useAutosave'
 import SortableList from '@/components/editor/SortableList'
-import AutosaveStatus from '@/components/editor/AutosaveStatus'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { SECTION_LABELS, sectionConfigKey, sectionConfigUrl } from '@/lib/sectionConfig'
-import type { CustomSection, FullResume, SectionConfig, Template } from '@/types/resume'
+import { SECTION_LABELS, sectionConfigKey } from '@/lib/sectionConfig'
+import type { CustomSection, FullResume, Resume, SectionConfig, Template } from '@/types/resume'
 
 function ConfigRow({
-  resumeId,
   config,
   regions,
   customSections,
 }: {
-  resumeId: string
   config: SectionConfig
   regions: string[]
   customSections: CustomSection[]
 }) {
-  const queryClient = useQueryClient()
+  const { dispatch } = useResumeDraftContext()
   const [form, setForm] = useState({
     region: config.region ?? regions[0] ?? '',
     is_visible: config.is_visible,
     display_title_override: config.display_title_override ?? '',
   })
 
-  const status = useAutosave(form, async (value) => {
-    await apiPatch(sectionConfigUrl(resumeId, config), {
-      region: value.region || null,
-      is_visible: value.is_visible,
-      display_title_override: value.display_title_override || null,
-      sort_order: config.sort_order,
+  useAutosave(form, async (value) => {
+    dispatch({
+      type: 'section_config_update',
+      sectionType: config.section_type,
+      customSectionId: config.custom_section_id,
+      patch: {
+        region: value.region || null,
+        is_visible: value.is_visible,
+        display_title_override: value.display_title_override || null,
+      },
     })
-    queryClient.invalidateQueries({ queryKey: fullResumeKey(resumeId) })
   })
 
   const label =
@@ -68,23 +68,30 @@ function ConfigRow({
           ))}
         </SelectContent>
       </Select>
-      <AutosaveStatus status={status} compact className="shrink-0" />
     </div>
   )
 }
 
 export default function LayoutMode({ data }: { data: FullResume }) {
   const resumeId = data.resume.id
-  const queryClient = useQueryClient()
+  const { dispatch, flushNow } = useResumeDraftContext()
 
   const templatesQuery = useQuery({
     queryKey: ['templates'],
     queryFn: () => apiGet<Template[]>('/api/templates'),
   })
 
+  // Template switching re-derives every section's region server-side, so
+  // unlike everything else in the editor it stays an immediate network
+  // call — flush any pending local edits first so the switch doesn't race
+  // against (and get clobbered by) an unsynced change.
   const switchTemplate = useMutation({
-    mutationFn: (templateId: string) => apiPut(`/api/resumes/${resumeId}/template`, { template_id: templateId }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: fullResumeKey(resumeId) }),
+    mutationFn: async (templateId: string) => {
+      await flushNow()
+      await apiPut<Resume>(`/api/resumes/${resumeId}/template`, { template_id: templateId })
+      return apiGet<FullResume>(`/api/resumes/${resumeId}/full`)
+    },
+    onSuccess: (fresh) => dispatch({ type: 'replace_all', data: fresh }),
   })
 
   const reorder = useSectionConfigReorder(resumeId)
@@ -125,9 +132,7 @@ export default function LayoutMode({ data }: { data: FullResume }) {
             const ordered = orderedKeys.map((key) => configs.find((c) => sectionConfigKey(c) === key)!)
             reorder.mutate(ordered)
           }}
-          renderItem={(item) => (
-            <ConfigRow resumeId={resumeId} config={item} regions={regions} customSections={data.custom_sections} />
-          )}
+          renderItem={(item) => <ConfigRow config={item} regions={regions} customSections={data.custom_sections} />}
         />
       </div>
     </div>

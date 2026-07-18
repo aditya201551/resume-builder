@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Briefcase, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -8,24 +8,17 @@ import RowCard from '@/components/editor/RowCard'
 import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
 import RichTextEditor from '@/components/editor/RichTextEditor'
-import { useAutosave } from '@/hooks/useAutosave'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
+import { useEntryPanel } from '@/hooks/useEntryPanel'
+import { usePreviewOverride } from '@/hooks/usePreviewOverride'
 import type { WorkExperience } from '@/types/resume'
 
 function toDateInput(v: string | null) {
   return v ? v.slice(0, 10) : ''
 }
 
-function WorkExperienceRow({
-  entry,
-  onSave,
-  onDelete,
-}: {
-  entry: WorkExperience
-  onSave: (input: Partial<WorkExperience>) => Promise<unknown>
-  onDelete: () => void
-}) {
-  const [form, setForm] = useState({
+function formFromEntry(entry: WorkExperience) {
+  return {
     company: entry.company,
     title: entry.title,
     location: entry.location ?? '',
@@ -35,28 +28,76 @@ function WorkExperienceRow({
     is_current: entry.is_current,
     content: entry.content,
     technologies: entry.technologies.join(', '),
-  })
+  }
+}
 
-  const status = useAutosave(form, (value) =>
-    onSave({
-      company: value.company,
-      title: value.title,
-      location: value.location || null,
-      employment_type: value.employment_type || null,
-      start_date: value.start_date ? new Date(value.start_date).toISOString() : null,
-      end_date: value.is_current || !value.end_date ? null : new Date(value.end_date).toISOString(),
-      is_current: value.is_current,
-      content: value.content,
-      technologies: value.technologies
-        .split(',')
-        .map((t) => t.trim())
-        .filter(Boolean),
-      sort_order: entry.sort_order,
-    }),
-  )
+function toPatch(form: ReturnType<typeof formFromEntry>) {
+  return {
+    company: form.company,
+    title: form.title,
+    location: form.location || null,
+    employment_type: form.employment_type || null,
+    start_date: form.start_date ? new Date(form.start_date).toISOString() : null,
+    end_date: form.is_current || !form.end_date ? null : new Date(form.end_date).toISOString(),
+    is_current: form.is_current,
+    content: form.content,
+    technologies: form.technologies
+      .split(',')
+      .map((t) => t.trim())
+      .filter(Boolean),
+  }
+}
+
+function WorkExperienceRow({
+  entry,
+  onSave,
+  onDelete,
+  dragHandle,
+  open,
+  isNew,
+  onOpenChange,
+}: {
+  entry: WorkExperience
+  onSave: (input: Partial<WorkExperience>) => Promise<unknown>
+  onDelete: () => void
+  dragHandle?: ReactNode
+  open: boolean
+  isNew: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [form, setForm] = useState(() => formFromEntry(entry))
+  const isDirty = JSON.stringify(form) !== JSON.stringify(formFromEntry(entry))
+
+  const { setOverride, clearOverride } = usePreviewOverride()
+  useEffect(() => {
+    if (!open) return
+    return () => clearOverride(entry.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, entry.id])
+  useEffect(() => {
+    if (!open) return
+    setOverride(entry.id, toPatch(form))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form, entry.id])
+
+  function handleDone() {
+    onSave({ ...toPatch(form), sort_order: entry.sort_order })
+  }
 
   return (
-    <RowCard status={status} onDelete={onDelete}>
+    <RowCard
+      onDone={handleDone}
+      onDiscard={() => setForm(formFromEntry(entry))}
+      isDirty={isDirty}
+      onDelete={onDelete}
+      title={form.title}
+      subtitle={form.company}
+      dragHandle={dragHandle}
+      editorTitle="Edit work experience"
+      open={open}
+      isNew={isNew}
+      onOpenChange={onOpenChange}
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label>Company</Label>
@@ -124,6 +165,7 @@ function WorkExperienceRow({
 
 export default function WorkExperienceSection({ resumeId, items }: { resumeId: string; items: WorkExperience[] }) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/work-experiences`)
+  const { openNew, getPanelProps } = useEntryPanel(items.map((i) => i.id))
 
   if (items.length === 0) {
     return (
@@ -131,7 +173,10 @@ export default function WorkExperienceSection({ resumeId, items }: { resumeId: s
         icon={Briefcase}
         message="No work experience added yet."
         ctaLabel="Add work experience"
-        onClick={() => create.mutate({ company: '', title: '', content: '', technologies: [], sort_order: items.length })}
+        onClick={() => {
+          const id = create.mutate({ company: '', title: '', content: '', technologies: [], sort_order: items.length })
+          openNew(id)
+        }}
       />
     )
   }
@@ -141,11 +186,14 @@ export default function WorkExperienceSection({ resumeId, items }: { resumeId: s
       <SortableList
         items={items}
         onReorder={(ids) => reorder.mutate(ids)}
-        renderItem={(entry) => (
+        dragHandlePlacement="inline"
+        renderItem={(entry, _index, dragHandle) => (
           <WorkExperienceRow
             entry={entry}
             onSave={(input) => update.mutateAsync({ id: entry.id, input })}
             onDelete={() => remove.mutate(entry.id)}
+            dragHandle={dragHandle}
+            {...getPanelProps(entry.id)}
           />
         )}
       />
@@ -154,7 +202,10 @@ export default function WorkExperienceSection({ resumeId, items }: { resumeId: s
         variant="secondary"
         size="sm"
         className="w-fit"
-        onClick={() => create.mutate({ company: '', title: '', content: '', technologies: [], sort_order: items.length })}
+        onClick={() => {
+          const id = create.mutate({ company: '', title: '', content: '', technologies: [], sort_order: items.length })
+          openNew(id)
+        }}
       >
         <Plus className="size-3.5" /> Add work experience
       </Button>

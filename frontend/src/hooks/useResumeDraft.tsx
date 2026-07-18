@@ -74,12 +74,15 @@ export function ResumeDraftProvider({ resumeId, children }: { resumeId: string; 
     }
   }
 
+  // Idle-debounced, not a fixed interval: every dispatch (an edit, a delete, a
+  // reorder…) pushes the flush back out by FLUSH_INTERVAL_MS, so the backend
+  // sync only fires once activity actually stops, not on a metronome.
   useEffect(() => {
     if (!ready) return
-    const timer = setInterval(runFlush, FLUSH_INTERVAL_MS)
-    return () => clearInterval(timer)
+    const timer = setTimeout(runFlush, FLUSH_INTERVAL_MS)
+    return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, resumeId])
+  }, [ready, resumeId, state])
 
   // Best-effort: flush on navigating away from the editor so a page close
   // right before the next interval tick doesn't strand up to 5s of edits.
@@ -89,6 +92,9 @@ export function ResumeDraftProvider({ resumeId, children }: { resumeId: string; 
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeId])
+
+  // Ctrl+S / Cmd+S is handled in EditPane (frontend/src/pages/EditorPage.tsx),
+  // which also needs to commit any currently open entry editor first.
 
   if (!ready || !state) return null
 

@@ -1,5 +1,8 @@
-import { useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useParams } from 'react-router'
+import { EditorPanelContext, type OpenPanelHandle } from '@/hooks/useEditorPanel'
+import { PreviewOverrideContext } from '@/hooks/usePreviewOverride'
+import { applyPreviewOverrides } from '@/lib/applyPreviewOverrides'
 import {
   Award,
   Briefcase,
@@ -300,24 +303,25 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <Accordion type="single" collapsible defaultValue="contact" className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
+      <Accordion type="single" collapsible className="flex flex-col gap-3">
         <SectionAccordionItem value="contact" title="Contact & Summary" count={0}>
           <ContactSection resume={data.resume} />
         </SectionAccordionItem>
       </Accordion>
 
-      <Accordion type="single" collapsible className="flex flex-col gap-2">
+      <Accordion type="single" collapsible className="flex flex-col gap-3">
         <SortableList
+          dragHandlePlacement="inline"
           items={sections.map((s) => ({ id: s.key }))}
           onReorder={(orderedKeys) => {
             if (!canPersist) return
             reorder.mutate(buildFlatOrder(orderedKeys))
           }}
-          renderItem={(item) => {
+          renderItem={(item, _index, dragHandle) => {
             const section = sections.find((s) => s.key === item.id)!
             return (
-              <SectionAccordionItem value={section.key} title={section.title} count={section.count}>
+              <SectionAccordionItem value={section.key} title={section.title} count={section.count} dragHandle={dragHandle}>
                 {section.node}
               </SectionAccordionItem>
             )
@@ -334,46 +338,105 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   )
 }
 
+function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
+  const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
+  const openStack = useRef<OpenPanelHandle[]>([])
+  const { flushNow } = useResumeDraftContext()
+
+  const pushOpen = useCallback((handle: OpenPanelHandle) => {
+    openStack.current.push(handle)
+    return () => {
+      openStack.current = openStack.current.filter((h) => h !== handle)
+    }
+  }, [])
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') {
+        const top = openStack.current[openStack.current.length - 1]
+        top?.close()
+        return
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        // Commit every currently open editor's in-progress fields (without
+        // closing them), then push the whole draft to the backend right away.
+        // The commits dispatch React state updates that only land on the next
+        // render, so defer the flush a tick — otherwise it reads stale state.
+        for (const handle of openStack.current) handle.commit?.()
+        setTimeout(() => void flushNow(), 0)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [flushNow])
+
+  const panelContext = useMemo(() => ({ slot: panelSlot, pushOpen }), [panelSlot, pushOpen])
+
+  return (
+    <EditorPanelContext.Provider value={panelContext}>
+      <Tabs defaultValue="content" className="flex h-full flex-col gap-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="sm" asChild>
+            <Link to="/resumes">← Dashboard</Link>
+          </Button>
+          <TabsList>
+            <TabsTrigger value="content">Content</TabsTrigger>
+            <TabsTrigger value="layout">Layout</TabsTrigger>
+          </TabsList>
+          <div className="ml-auto">
+            <GlobalSyncStatus />
+          </div>
+        </div>
+        <div className="relative min-h-0 flex-1">
+          <TabsContent value="content" className="absolute inset-0 overflow-y-auto pb-10">
+            <ContentMode resumeId={resumeId} data={data} />
+          </TabsContent>
+          <TabsContent value="layout" className="absolute inset-0 overflow-y-auto pb-10">
+            <LayoutMode data={data} />
+          </TabsContent>
+          {/* Entry editors portal in here, replacing the list in place while it's open. */}
+          <div ref={setPanelSlot} className="absolute inset-0 z-10 empty:pointer-events-none" />
+        </div>
+      </Tabs>
+    </EditorPanelContext.Provider>
+  )
+}
+
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
+  const [overrides, setOverrides] = useState<Record<string, Record<string, unknown>>>({})
+
+  const setOverride = useCallback((id: string, patch: Record<string, unknown>) => {
+    setOverrides((prev) => ({ ...prev, [id]: patch }))
+  }, [])
+  const clearOverride = useCallback((id: string) => {
+    setOverrides((prev) => {
+      if (!(id in prev)) return prev
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+  }, [])
+  const panelContextValue = useMemo(() => ({ overrides, setOverride, clearOverride }), [overrides, setOverride, clearOverride])
 
   if (isLoading || !data) {
     return <div className="p-10 text-sm text-muted-foreground">Loading resume…</div>
   }
 
   const resumeId = data.resume.id
+  const previewData = applyPreviewOverrides(data, overrides)
 
-  const editPane = (
-    <Tabs defaultValue="content" className="flex h-full flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" asChild>
-          <Link to="/resumes">← Dashboard</Link>
-        </Button>
-        <TabsList>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="layout">Layout</TabsTrigger>
-        </TabsList>
-        <div className="ml-auto">
-          <GlobalSyncStatus />
-        </div>
-      </div>
-      <TabsContent value="content" className="flex-1 overflow-y-auto pb-10">
-        <ContentMode resumeId={resumeId} data={data} />
-      </TabsContent>
-      <TabsContent value="layout" className="flex-1 overflow-y-auto pb-10">
-        <LayoutMode data={data} />
-      </TabsContent>
-    </Tabs>
-  )
+  const editPane = <EditPane resumeId={resumeId} data={data} />
 
   const previewPane = (
     <div className="h-full overflow-y-auto bg-secondary/40 p-6">
-      <LivePreview data={data} />
+      <LivePreview data={previewData} />
     </div>
   )
 
   return (
-    <>
+    <PreviewOverrideContext.Provider value={panelContextValue}>
       {/* Desktop split pane */}
       <div className="hidden min-[900px]:grid min-[900px]:h-svh min-[900px]:grid-cols-2">
         <div className="overflow-y-auto px-6 py-6">{editPane}</div>
@@ -393,11 +456,11 @@ function EditorPageContent() {
             {editPane}
           </TabsContent>
           <TabsContent value="preview" className="bg-secondary/40 p-4">
-            <LivePreview data={data} />
+            <LivePreview data={previewData} />
           </TabsContent>
         </Tabs>
       </div>
-    </>
+    </PreviewOverrideContext.Provider>
   )
 }
 

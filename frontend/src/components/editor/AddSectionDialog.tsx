@@ -26,7 +26,7 @@ interface AddSectionDialogProps {
 export default function AddSectionDialog({ open, onOpenChange, options, onSelect }: AddSectionDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[95vw] gap-6 p-6 sm:max-w-3xl sm:p-8 lg:max-w-4xl">
+      <DialogContent className="max-h-[85vh] w-full max-w-[95vw] gap-6 overflow-y-auto p-6 sm:max-w-4xl sm:p-8 lg:max-w-6xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Add content</DialogTitle>
           <DialogDescription className="sr-only">Choose a section to add to your resume</DialogDescription>

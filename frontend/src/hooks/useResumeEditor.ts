@@ -53,7 +53,7 @@ function parseBasePath(basePath: string): ParsedPath {
   throw new Error(`useEntityMutations: cannot parse basePath "${basePath}"`)
 }
 
-function localMutation<TArg>(fn: (arg: TArg) => void) {
+function localMutation<TArg, TResult = void>(fn: (arg: TArg) => TResult) {
   return {
     mutate: (arg: TArg) => fn(arg),
     mutateAsync: async (arg: TArg) => fn(arg),
@@ -94,6 +94,7 @@ export function useEntityMutations(resumeId: string, basePath: string) {
         dispatch({ type: 'custom_entry_create', sectionId: parsed.sectionId, tempId: id, fields })
         break
     }
+    return id
   })
 
   const update = localMutation(({ id, input }: { id: string; input: Record<string, unknown> }) => {

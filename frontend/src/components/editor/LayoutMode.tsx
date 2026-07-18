@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { apiGet, apiPut } from '@/lib/http'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
@@ -16,10 +16,12 @@ function ConfigRow({
   config,
   regions,
   customSections,
+  dragHandle,
 }: {
   config: SectionConfig
   regions: string[]
   customSections: CustomSection[]
+  dragHandle?: ReactNode
 }) {
   const { dispatch } = useResumeDraftContext()
   const [form, setForm] = useState({
@@ -48,6 +50,7 @@ function ConfigRow({
 
   return (
     <div className="flex items-center gap-3 rounded-md border border-border bg-card px-3 py-2.5">
+      {dragHandle}
       <Switch checked={form.is_visible} onCheckedChange={(v) => setForm((f) => ({ ...f, is_visible: v }))} />
       <span className={cn('w-40 shrink-0 text-sm', !form.is_visible && 'text-muted-foreground')}>{label}</span>
       <Input
@@ -127,12 +130,15 @@ export default function LayoutMode({ data }: { data: FullResume }) {
       <div>
         <h3 className="mb-2 text-sm font-medium text-foreground">Sections</h3>
         <SortableList
+          dragHandlePlacement="inline"
           items={configs.map((c) => ({ ...c, id: sectionConfigKey(c) }))}
           onReorder={(orderedKeys) => {
             const ordered = orderedKeys.map((key) => configs.find((c) => sectionConfigKey(c) === key)!)
             reorder.mutate(ordered)
           }}
-          renderItem={(item) => <ConfigRow config={item} regions={regions} customSections={data.custom_sections} />}
+          renderItem={(item, _index, dragHandle) => (
+            <ConfigRow config={item} regions={regions} customSections={data.custom_sections} dragHandle={dragHandle} />
+          )}
         />
       </div>
     </div>

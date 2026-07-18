@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Layers, Plus, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
+import RowCard from '@/components/editor/RowCard'
 import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
 import AutosaveStatus from '@/components/editor/AutosaveStatus'
 import { useAutosave } from '@/hooks/useAutosave'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
+import { useEntryPanel } from '@/hooks/useEntryPanel'
+import { usePreviewOverride } from '@/hooks/usePreviewOverride'
 import type { SkillGroup, SkillItem } from '@/types/resume'
 
 function SkillItemRow({
@@ -56,38 +60,61 @@ function SkillGroupCard({
   group,
   onSaveGroup,
   onDeleteGroup,
+  dragHandle,
+  open,
+  isNew,
+  onOpenChange,
 }: {
   resumeId: string
   group: SkillGroup
   onSaveGroup: (input: Partial<SkillGroup>) => Promise<unknown>
   onDeleteGroup: () => void
+  dragHandle?: ReactNode
+  open: boolean
+  isNew: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   const [groupName, setGroupName] = useState(group.group_name)
-  const status = useAutosave(groupName, (value) => onSaveGroup({ group_name: value, sort_order: group.sort_order }))
+  const isDirty = groupName !== group.group_name
   const items = useEntityMutations(
     resumeId,
     `/api/resumes/${resumeId}/skill-groups/${group.id}/items`,
   )
 
+  const { setOverride, clearOverride } = usePreviewOverride()
+  useEffect(() => {
+    if (!open) return
+    return () => clearOverride(group.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, group.id])
+  useEffect(() => {
+    if (!open) return
+    setOverride(group.id, { group_name: groupName })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, groupName, group.id])
+
   return (
-    <div className="rounded-md border border-border bg-card p-4">
-      <div className="mb-3 flex items-center gap-2">
+    <RowCard
+      onDone={() => onSaveGroup({ group_name: groupName, sort_order: group.sort_order })}
+      onDiscard={() => setGroupName(group.group_name)}
+      isDirty={isDirty}
+      onDelete={onDeleteGroup}
+      title={groupName}
+      subtitle={group.items.length > 0 ? `${group.items.length} skill${group.items.length === 1 ? '' : 's'}` : undefined}
+      dragHandle={dragHandle}
+      editorTitle="Edit skill group"
+      open={open}
+      isNew={isNew}
+      onOpenChange={onOpenChange}
+    >
+      <div className="flex flex-col gap-1.5">
+        <Label>Group name</Label>
         <Input
           className="font-medium"
           value={groupName}
           onChange={(e) => setGroupName(e.target.value)}
           placeholder="Group name (e.g. Languages & Frameworks)"
         />
-        <AutosaveStatus status={status} className="shrink-0" />
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-          onClick={onDeleteGroup}
-        >
-          <Trash2 className="size-3.5" />
-        </Button>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -112,12 +139,13 @@ function SkillGroupCard({
           <Plus className="size-3.5" /> Add skill
         </Button>
       </div>
-    </div>
+    </RowCard>
   )
 }
 
 export default function SkillsSection({ resumeId, items }: { resumeId: string; items: SkillGroup[] }) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/skill-groups`)
+  const { openNew, getPanelProps } = useEntryPanel(items.map((i) => i.id))
 
   if (items.length === 0) {
     return (
@@ -125,7 +153,10 @@ export default function SkillsSection({ resumeId, items }: { resumeId: string; i
         icon={Layers}
         message="No skill groups added yet."
         ctaLabel="Add skill group"
-        onClick={() => create.mutate({ group_name: '', sort_order: items.length })}
+        onClick={() => {
+          const id = create.mutate({ group_name: '', sort_order: items.length })
+          openNew(id)
+        }}
       />
     )
   }
@@ -135,12 +166,15 @@ export default function SkillsSection({ resumeId, items }: { resumeId: string; i
       <SortableList
         items={items}
         onReorder={(ids) => reorder.mutate(ids)}
-        renderItem={(group) => (
+        dragHandlePlacement="inline"
+        renderItem={(group, _index, dragHandle) => (
           <SkillGroupCard
             resumeId={resumeId}
             group={group}
             onSaveGroup={(input) => update.mutateAsync({ id: group.id, input })}
             onDeleteGroup={() => remove.mutate(group.id)}
+            dragHandle={dragHandle}
+            {...getPanelProps(group.id)}
           />
         )}
       />
@@ -149,7 +183,10 @@ export default function SkillsSection({ resumeId, items }: { resumeId: string; i
         variant="secondary"
         size="sm"
         className="w-fit"
-        onClick={() => create.mutate({ group_name: '', sort_order: items.length })}
+        onClick={() => {
+          const id = create.mutate({ group_name: '', sort_order: items.length })
+          openNew(id)
+        }}
       >
         <Plus className="size-3.5" /> Add skill group
       </Button>

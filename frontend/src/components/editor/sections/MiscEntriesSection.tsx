@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -8,44 +8,85 @@ import { Button } from '@/components/ui/button'
 import RowCard from '@/components/editor/RowCard'
 import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
-import { useAutosave } from '@/hooks/useAutosave'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
+import { useEntryPanel } from '@/hooks/useEntryPanel'
+import { usePreviewOverride } from '@/hooks/usePreviewOverride'
 import type { MiscEntry } from '@/types/resume'
 
 function toDateInput(v: string | null) {
   return v ? v.slice(0, 10) : ''
 }
 
-function MiscEntryRow({
-  entry,
-  onSave,
-  onDelete,
-}: {
-  entry: MiscEntry
-  onSave: (input: Partial<MiscEntry>) => Promise<unknown>
-  onDelete: () => void
-}) {
-  const [form, setForm] = useState({
+function formFromEntry(entry: MiscEntry) {
+  return {
     title: entry.title,
     issuer_or_org: entry.issuer_or_org ?? '',
     url: entry.url ?? '',
     entry_date: toDateInput(entry.entry_date),
     description: entry.description ?? '',
-  })
+  }
+}
 
-  const status = useAutosave(form, (value) =>
-    onSave({
-      title: value.title,
-      issuer_or_org: value.issuer_or_org || null,
-      url: value.url || null,
-      entry_date: value.entry_date ? new Date(value.entry_date).toISOString() : null,
-      description: value.description || null,
-      sort_order: entry.sort_order,
-    }),
-  )
+function toPatch(form: ReturnType<typeof formFromEntry>) {
+  return {
+    title: form.title,
+    issuer_or_org: form.issuer_or_org || null,
+    url: form.url || null,
+    entry_date: form.entry_date ? new Date(form.entry_date).toISOString() : null,
+    description: form.description || null,
+  }
+}
+
+function MiscEntryRow({
+  entry,
+  onSave,
+  onDelete,
+  dragHandle,
+  open,
+  isNew,
+  onOpenChange,
+}: {
+  entry: MiscEntry
+  onSave: (input: Partial<MiscEntry>) => Promise<unknown>
+  onDelete: () => void
+  dragHandle?: ReactNode
+  open: boolean
+  isNew: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const [form, setForm] = useState(() => formFromEntry(entry))
+  const isDirty = JSON.stringify(form) !== JSON.stringify(formFromEntry(entry))
+
+  const { setOverride, clearOverride } = usePreviewOverride()
+  useEffect(() => {
+    if (!open) return
+    return () => clearOverride(entry.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, entry.id])
+  useEffect(() => {
+    if (!open) return
+    setOverride(entry.id, toPatch(form))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, form, entry.id])
+
+  function handleDone() {
+    onSave({ ...toPatch(form), sort_order: entry.sort_order })
+  }
 
   return (
-    <RowCard status={status} onDelete={onDelete}>
+    <RowCard
+      onDone={handleDone}
+      onDiscard={() => setForm(formFromEntry(entry))}
+      isDirty={isDirty}
+      onDelete={onDelete}
+      title={form.title}
+      subtitle={form.issuer_or_org}
+      dragHandle={dragHandle}
+      editorTitle="Edit entry"
+      open={open}
+      isNew={isNew}
+      onOpenChange={onOpenChange}
+    >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
           <Label>Title</Label>
@@ -102,6 +143,7 @@ export default function MiscEntriesSection({
 }: MiscEntriesSectionProps) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/misc-entries`)
   const entries = items.filter((e) => e.kind === kind)
+  const { openNew, getPanelProps } = useEntryPanel(entries.map((e) => e.id))
 
   if (entries.length === 0) {
     return (
@@ -109,7 +151,10 @@ export default function MiscEntriesSection({
         icon={icon}
         message={emptyMessage}
         ctaLabel={addLabel}
-        onClick={() => create.mutate({ kind, title: '', sort_order: entries.length })}
+        onClick={() => {
+          const id = create.mutate({ kind, title: '', sort_order: entries.length })
+          openNew(id)
+        }}
       />
     )
   }
@@ -119,11 +164,14 @@ export default function MiscEntriesSection({
       <SortableList
         items={entries}
         onReorder={(ids) => reorder.mutate(ids)}
-        renderItem={(entry) => (
+        dragHandlePlacement="inline"
+        renderItem={(entry, _index, dragHandle) => (
           <MiscEntryRow
             entry={entry}
             onSave={(input) => update.mutateAsync({ id: entry.id, input })}
             onDelete={() => remove.mutate(entry.id)}
+            dragHandle={dragHandle}
+            {...getPanelProps(entry.id)}
           />
         )}
       />
@@ -132,7 +180,10 @@ export default function MiscEntriesSection({
         variant="secondary"
         size="sm"
         className="w-fit"
-        onClick={() => create.mutate({ kind, title: '', sort_order: entries.length })}
+        onClick={() => {
+          const id = create.mutate({ kind, title: '', sort_order: entries.length })
+          openNew(id)
+        }}
       >
         <Plus className="size-3.5" /> {addLabel}
       </Button>

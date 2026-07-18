@@ -25,7 +25,12 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
     content: value,
     editorProps: {
       attributes: {
-        class: 'prose-sm max-w-none focus:outline-none min-h-20 text-sm text-foreground',
+        class:
+          'max-w-none focus:outline-none min-h-20 text-sm text-foreground ' +
+          '[&_p]:my-1 ' +
+          '[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 ' +
+          '[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 ' +
+          '[&_li]:my-0.5 [&_li]:pl-0.5',
       },
     },
     onUpdate: ({ editor }) => {

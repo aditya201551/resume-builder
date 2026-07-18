@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Link, useParams } from 'react-router'
+import { useParams } from 'react-router'
 import { EditorPanelContext, type OpenPanelHandle } from '@/hooks/useEditorPanel'
 import { PreviewOverrideContext } from '@/hooks/usePreviewOverride'
 import { applyPreviewOverrides } from '@/lib/applyPreviewOverrides'
@@ -22,8 +22,6 @@ import { Button } from '@/components/ui/button'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useSectionConfigReorder } from '@/hooks/useSectionConfigReorder'
 import { ResumeDraftProvider, useResumeDraftContext, useResumeDraftData } from '@/hooks/useResumeDraft'
-import { isDraftDirty } from '@/lib/resumeDraftSync'
-import { cn } from '@/lib/utils'
 import SortableList from '@/components/editor/SortableList'
 import SectionAccordionItem from '@/components/editor/SectionAccordionItem'
 import AddSectionDialog, { type AddSectionOption } from '@/components/editor/AddSectionDialog'
@@ -38,38 +36,10 @@ import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
 import LayoutMode from '@/components/editor/LayoutMode'
 import LivePreview from '@/components/editor/LivePreview'
+import EditorNavbar from '@/components/editor/EditorNavbar'
 import type { FullResume, SectionConfig } from '@/types/resume'
 
-function GlobalSyncStatus() {
-  const { state, syncStatus } = useResumeDraftContext()
-  const dirty = isDraftDirty(state.data, state.lastSynced)
-  const label =
-    syncStatus === 'syncing'
-      ? 'Saving…'
-      : syncStatus === 'error'
-        ? "Couldn't save — retrying"
-        : dirty
-          ? 'Unsaved changes'
-          : 'All changes saved'
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 text-xs',
-        syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
-      )}
-    >
-      <span
-        className={cn(
-          'size-1.5 rounded-full',
-          syncStatus === 'syncing' && 'animate-pulse bg-accent',
-          syncStatus === 'error' && 'bg-destructive',
-          syncStatus === 'idle' && (dirty ? 'bg-muted-foreground/50' : 'bg-accent'),
-        )}
-      />
-      {label}
-    </span>
-  )
-}
+type EditorMode = 'content' | 'layout'
 
 const PINNED_TYPES = new Set(['contact', 'summary'])
 const DEFAULT_SLOT_ORDER = [
@@ -338,7 +308,17 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   )
 }
 
-function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
+function EditPane({
+  resumeId,
+  data,
+  mode,
+  onModeChange,
+}: {
+  resumeId: string
+  data: FullResume
+  mode: EditorMode
+  onModeChange: (mode: EditorMode) => void
+}) {
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
   const openStack = useRef<OpenPanelHandle[]>([])
   const { flushNow } = useResumeDraftContext()
@@ -375,19 +355,7 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
 
   return (
     <EditorPanelContext.Provider value={panelContext}>
-      <Tabs defaultValue="content" className="flex h-full flex-col gap-4">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/resumes">← Dashboard</Link>
-          </Button>
-          <TabsList>
-            <TabsTrigger value="content">Content</TabsTrigger>
-            <TabsTrigger value="layout">Layout</TabsTrigger>
-          </TabsList>
-          <div className="ml-auto">
-            <GlobalSyncStatus />
-          </div>
-        </div>
+      <Tabs value={mode} onValueChange={(v) => onModeChange(v as EditorMode)} className="flex h-full flex-col gap-4">
         <div className="relative min-h-0 flex-1">
           <TabsContent value="content" className="absolute inset-0 overflow-y-auto pb-10">
             <ContentMode resumeId={resumeId} data={data} />
@@ -406,6 +374,7 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
   const [overrides, setOverrides] = useState<Record<string, Record<string, unknown>>>({})
+  const [mode, setMode] = useState<EditorMode>('content')
 
   const setOverride = useCallback((id: string, patch: Record<string, unknown>) => {
     setOverrides((prev) => ({ ...prev, [id]: patch }))
@@ -427,7 +396,7 @@ function EditorPageContent() {
   const resumeId = data.resume.id
   const previewData = applyPreviewOverrides(data, overrides)
 
-  const editPane = <EditPane resumeId={resumeId} data={data} />
+  const editPane = <EditPane resumeId={resumeId} data={data} mode={mode} onModeChange={setMode} />
 
   const previewPane = (
     <div className="h-full overflow-y-auto bg-secondary/40 p-6">
@@ -437,28 +406,34 @@ function EditorPageContent() {
 
   return (
     <PreviewOverrideContext.Provider value={panelContextValue}>
-      {/* Desktop split pane */}
-      <div className="hidden min-[900px]:grid min-[900px]:h-svh min-[900px]:grid-cols-2">
-        <div className="overflow-y-auto px-6 py-6">{editPane}</div>
-        {previewPane}
-      </div>
+      <div className="flex h-svh flex-col">
+        <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
 
-      {/* Mobile: Edit/Preview tab switcher */}
-      <div className="min-[900px]:hidden">
-        <Tabs defaultValue="edit">
-          <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
-            <TabsList>
-              <TabsTrigger value="edit">Edit</TabsTrigger>
-              <TabsTrigger value="preview">Preview</TabsTrigger>
-            </TabsList>
+        <div className="min-h-0 flex-1">
+          {/* Desktop split pane */}
+          <div className="hidden min-[900px]:grid min-[900px]:h-full min-[900px]:grid-cols-2">
+            <div className="overflow-y-auto px-6 py-6">{editPane}</div>
+            {previewPane}
           </div>
-          <TabsContent value="edit" className="px-4 py-4">
-            {editPane}
-          </TabsContent>
-          <TabsContent value="preview" className="bg-secondary/40 p-4">
-            <LivePreview data={previewData} />
-          </TabsContent>
-        </Tabs>
+
+          {/* Mobile: Edit/Preview tab switcher */}
+          <div className="h-full overflow-y-auto min-[900px]:hidden">
+            <Tabs defaultValue="edit">
+              <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
+                <TabsList>
+                  <TabsTrigger value="edit">Edit</TabsTrigger>
+                  <TabsTrigger value="preview">Preview</TabsTrigger>
+                </TabsList>
+              </div>
+              <TabsContent value="edit" className="px-4 py-4">
+                {editPane}
+              </TabsContent>
+              <TabsContent value="preview" className="bg-secondary/40 p-4">
+                <LivePreview data={previewData} />
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
     </PreviewOverrideContext.Provider>
   )

@@ -90,6 +90,19 @@
   padding-left: 18px;
 }
 
+.richText :global(ul) {
+  list-style: disc outside;
+}
+
+.richText :global(ol) {
+  list-style: decimal outside;
+}
+
+.richText :global(li) {
+  display: list-item;
+  margin: 2px 0;
+}
+
 .skillGroups {
   display: flex;
   flex-direction: column;

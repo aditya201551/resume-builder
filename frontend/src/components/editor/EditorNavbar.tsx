@@ -84,27 +84,40 @@ function EditableResumeName({ resume }: { resume: Resume }) {
 }
 
 function DownloadButton({ resume }: { resume: Resume }) {
-  const [isDownloading, setIsDownloading] = useState(false)
-  const [error, setError] = useState(false)
+  const { flushNow, commitDirtyPanels } = useResumeDraftContext()
+  const [phase, setPhase] = useState<'idle' | 'saving' | 'generating'>('idle')
+  const [error, setError] = useState<string | null>(null)
 
   async function handleDownload() {
-    setIsDownloading(true)
-    setError(false)
+    setError(null)
     try {
+      // The export renders whatever the backend already has — commit any
+      // open panel's in-progress edits and flush the draft first (same as
+      // Ctrl+S/"Save & leave"), so the PDF reflects what's on screen instead
+      // of stale, previously-saved data.
+      setPhase('saving')
+      commitDirtyPanels()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      const saved = await flushNow()
+      if (!saved) {
+        setError("Couldn't save your latest changes — try again before downloading.")
+        return
+      }
+      setPhase('generating')
       await apiDownload(`/api/resumes/${resume.id}/export/pdf`, `${resume.label || 'resume'}.pdf`)
     } catch {
-      setError(true)
+      setError("Couldn't generate PDF")
     } finally {
-      setIsDownloading(false)
+      setPhase('idle')
     }
   }
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-xs text-destructive">Couldn&apos;t generate PDF</span>}
-      <Button type="button" variant="secondary" size="sm" disabled={isDownloading} onClick={handleDownload}>
-        {isDownloading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-        {isDownloading ? 'Generating…' : 'Download'}
+      {error && <span className="text-xs text-destructive">{error}</span>}
+      <Button type="button" variant="secondary" size="sm" disabled={phase !== 'idle'} onClick={handleDownload}>
+        {phase !== 'idle' ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+        {phase === 'saving' ? 'Saving…' : phase === 'generating' ? 'Generating…' : 'Download'}
       </Button>
     </div>
   )

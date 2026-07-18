@@ -256,7 +256,11 @@ async function syncSectionConfigs(resumeId: string, apply: (a: DraftAction) => v
 
   for (const c of cur) {
     const prevConfig = prevByKey.get(key(c))
-    if (prevConfig && JSON.stringify(c) !== JSON.stringify(prevConfig)) {
+    // No prevConfig means this section type has never been persisted before
+    // (e.g. reordered for the first time) — the backend's Update endpoint
+    // upserts, so it's fine to always PATCH here rather than only patching
+    // rows that already existed, which used to silently skip brand new ones.
+    if (!prevConfig || JSON.stringify(c) !== JSON.stringify(prevConfig)) {
       const base = `/api/resumes/${resumeId}/section-configs/${c.section_type}`
       const url = c.custom_section_id ? `${base}?custom_section_id=${c.custom_section_id}` : base
       await apiPatch(url, omit(c, ['id', 'resume_id', 'section_type', 'custom_section_id']))

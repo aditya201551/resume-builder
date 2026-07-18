@@ -53,15 +53,33 @@ func (r *SectionConfigRepository) List(ctx context.Context, resumeID string) ([]
 	return items, rows.Err()
 }
 
-// Update updates by (resume_id, section_type, custom_section_id) rather than
+// Update upserts by (resume_id, section_type, custom_section_id) rather than
 // a row id — that triple is the config's real identity (see the schema's
 // UNIQUE constraint), and it's what a client naturally has in hand after
-// listing sections rather than a synthetic config row id.
+// listing sections rather than a synthetic config row id. It upserts (not a
+// plain UPDATE) because resume_section_configs is only ever seeded for
+// section types a resume happened to already have data in — a section type
+// that's never been touched before (e.g. reordering a section that's never
+// been dragged) has no row yet, and a plain UPDATE would silently affect 0
+// rows instead of persisting the change.
 func (r *SectionConfigRepository) Update(ctx context.Context, resumeID, sectionType string, customSectionID *string, in SectionConfigInput) (*SectionConfig, error) {
-	const q = `
-		UPDATE resume_section_configs SET region = $4, is_visible = $5, display_title_override = $6, sort_order = $7
-		WHERE resume_id = $1 AND section_type = $2 AND custom_section_id IS NOT DISTINCT FROM $3
+	// Two conflict targets because a plain UNIQUE constraint treats NULL
+	// custom_section_id as always distinct — ON CONFLICT can't target it for
+	// the non-custom case, hence the partial unique index + branch here.
+	q := `
+		INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, region, is_visible, display_title_override, sort_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		ON CONFLICT (resume_id, section_type, custom_section_id) DO UPDATE SET
+			region = $4, is_visible = $5, display_title_override = $6, sort_order = $7
 		RETURNING ` + sectionConfigColumns
+	if customSectionID == nil {
+		q = `
+			INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, region, is_visible, display_title_override, sort_order)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (resume_id, section_type) WHERE custom_section_id IS NULL DO UPDATE SET
+				region = $4, is_visible = $5, display_title_override = $6, sort_order = $7
+			RETURNING ` + sectionConfigColumns
+	}
 
 	var c SectionConfig
 	err := r.pool.QueryRow(ctx, q, resumeID, sectionType, customSectionID, in.Region, in.IsVisible, in.DisplayTitleOverride, in.SortOrder).

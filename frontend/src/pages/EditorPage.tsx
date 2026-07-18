@@ -241,7 +241,23 @@ function useContentSlotOrder(data: FullResume) {
         flat.push(...customRows)
       } else {
         const row = nonCustom.find((c) => c.section_type === key)
-        if (row) flat.push(row)
+        // A type reordered for the first time has no persisted row yet —
+        // synthesize one instead of silently dropping it from the list we
+        // persist, or it would never actually save its new position (and
+        // reappear at the end next render, since useContentSlotOrder's own
+        // fallback above re-adds anything missing from section_configs).
+        flat.push(
+          row ?? {
+            id: `pending-${key}`,
+            resume_id: data.resume.id,
+            section_type: key,
+            custom_section_id: null,
+            region: null,
+            is_visible: true,
+            display_title_override: null,
+            sort_order: 0,
+          },
+        )
       }
     })
     return [...pinned, ...flat]

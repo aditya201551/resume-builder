@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button'
 import RowCard from '@/components/editor/RowCard'
 import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
-import AutosaveStatus from '@/components/editor/AutosaveStatus'
 import { useAutosave } from '@/hooks/useAutosave'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useEntryPanel } from '@/hooks/useEntryPanel'
@@ -23,7 +22,7 @@ function SkillItemRow({
   onDelete: () => void
 }) {
   const [form, setForm] = useState({ name: item.name, proficiency: item.proficiency ?? '' })
-  const status = useAutosave(form, (value) =>
+  useAutosave(form, (value) =>
     onSave({ name: value.name, proficiency: value.proficiency || null, sort_order: item.sort_order }),
   )
 
@@ -41,7 +40,6 @@ function SkillItemRow({
         onChange={(e) => setForm((f) => ({ ...f, proficiency: e.target.value }))}
         placeholder="Proficiency"
       />
-      <AutosaveStatus status={status} compact className="shrink-0" />
       <Button
         type="button"
         variant="ghost"

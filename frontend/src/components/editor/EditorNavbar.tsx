@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useBlocker } from 'react-router'
 import { ArrowLeft, Check, Download, Loader2, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
 import { apiDownload } from '@/lib/http'
@@ -12,7 +21,7 @@ import type { Resume } from '@/types/resume'
 type EditorMode = 'content' | 'layout'
 
 function EditableResumeName({ resume }: { resume: Resume }) {
-  const { dispatch, flushNow } = useResumeDraftContext()
+  const { dispatch } = useResumeDraftContext()
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(resume.label)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -30,9 +39,6 @@ function EditableResumeName({ resume }: { resume: Resume }) {
     const trimmed = value.trim()
     if (trimmed && trimmed !== resume.label) {
       dispatch({ type: 'update_meta', patch: { label: trimmed } })
-      // dispatch's state update lands on the next render, so defer the flush
-      // a tick — otherwise it reads the pre-rename state.
-      setTimeout(() => void flushNow(), 0)
     }
     setEditing(false)
   }
@@ -130,15 +136,15 @@ function EditorNavItems({ mode, onModeChange }: { mode: EditorMode; onModeChange
 }
 
 function SyncStatus() {
-  const { state, syncStatus } = useResumeDraftContext()
-  const dirty = isDraftDirty(state.data, state.lastSynced)
+  const { state, syncStatus, hasDirtyPanel } = useResumeDraftContext()
+  const dirty = isDraftDirty(state.data, state.lastSynced) || hasDirtyPanel
   const label =
     syncStatus === 'syncing'
       ? 'Saving…'
       : syncStatus === 'error'
-        ? "Couldn't save — retrying"
+        ? "Couldn't save — press Ctrl+S to retry"
         : dirty
-          ? 'Unsaved changes'
+          ? 'Unsaved changes — press Ctrl+S to save'
           : 'All changes saved'
   return (
     <span
@@ -160,6 +166,84 @@ function SyncStatus() {
   )
 }
 
+function BackButton() {
+  const { state, flushNow, hasDirtyPanel, commitDirtyPanels } = useResumeDraftContext()
+  const dirty = isDraftDirty(state.data, state.lastSynced) || hasDirtyPanel
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+
+  async function saveAndLeave() {
+    setSaving(true)
+    setSaveError(false)
+    // Commit any open panel's in-progress edits first — same thing Ctrl+S
+    // does — then wait a tick for that dispatch to land before flushing,
+    // otherwise flushNow reads the pre-commit state.
+    commitDirtyPanels()
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    const ok = await flushNow()
+    setSaving(false)
+    if (ok) {
+      blocker.proceed?.()
+    } else {
+      setSaveError(true)
+    }
+  }
+
+  return (
+    <>
+      <Button variant="ghost" size="icon" asChild>
+        <Link to="/resumes">
+          <ArrowLeft className="size-4" />
+        </Link>
+      </Button>
+
+      <AlertDialog
+        open={blocker.state === 'blocked'}
+        onOpenChange={(open) => {
+          // AlertDialogAction/Cancel auto-close on click, which would fire
+          // this and reset the blocker mid-save — Save & leave is a plain
+          // Button (below) specifically so its async work can't race this.
+          if (!open && !saving) {
+            blocker.reset?.()
+            setSaveError(false)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changes before leaving?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved changes that haven&apos;t been saved to the server yet.
+              {saveError && (
+                <span className="mt-1.5 block text-destructive">Couldn&apos;t save — check your connection and try again.</span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving} onClick={() => blocker.reset?.()}>
+              Cancel
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              className="text-destructive hover:text-destructive"
+              onClick={() => blocker.proceed?.()}
+            >
+              Discard &amp; leave
+            </Button>
+            <Button type="button" disabled={saving} onClick={saveAndLeave}>
+              {saving && <Loader2 className="size-3.5 animate-spin" />}
+              {saving ? 'Saving…' : 'Save & leave'}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  )
+}
+
 export default function EditorNavbar({
   resume,
   mode,
@@ -171,11 +255,7 @@ export default function EditorNavbar({
 }) {
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-6 py-3">
-      <Button variant="ghost" size="icon" asChild>
-        <Link to="/resumes">
-          <ArrowLeft className="size-4" />
-        </Link>
-      </Button>
+      <BackButton />
 
       <EditorNavItems mode={mode} onModeChange={onModeChange} />
 

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,8 +18,9 @@ import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 interface RowCardProps {
   /** Commits the currently edited fields — called only when the user clicks Done. */
   onDone?: () => void
-  /** Reverts in-progress edits — called when the panel closes any other way (X, Escape,
-   * opening a different entry) so the next open starts from the last-saved values again. */
+  /** Reverts in-progress edits — called when the panel closes without saving (confirmed
+   * discard via X/Escape, or opening a different entry) so the next open starts from the
+   * last-saved values again. */
   onDiscard?: () => void
   isDirty?: boolean
   onDelete: () => void
@@ -36,6 +37,12 @@ interface RowCardProps {
   children: ReactNode
 }
 
+// NOTE: X/Escape now confirm before discarding dirty edits (see
+// attemptCloseRef below). Switching to a *different* entry while this one is
+// dirty still silently discards — that path closes this panel via a prop
+// change from the parent's shared open-id state, not a call this component
+// makes, so there's no point to intercept a confirmation at.
+
 export default function RowCard({
   onDone,
   onDiscard,
@@ -51,8 +58,10 @@ export default function RowCard({
   children,
 }: RowCardProps) {
   const { slot, pushOpen } = useEditorPanel()
-  const { flushNow } = useResumeDraftContext()
+  const { registerPanel } = useResumeDraftContext()
+  const panelKey = useId()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
 
   const committedRef = useRef(false)
 
@@ -64,11 +73,31 @@ export default function RowCard({
     onDone?.()
   }
 
+  // X / Escape close with unsaved form edits go through this instead of
+  // closing straight away, so work isn't silently lost — see attemptClose.
+  const attemptCloseRef = useRef(() => {})
+  attemptCloseRef.current = () => {
+    if (isDirty) setConfirmCloseOpen(true)
+    else onOpenChange(false)
+  }
+
   useEffect(() => {
     if (!open) return
-    return pushOpen({ close: () => onOpenChange(false), commit: () => commitRef.current() })
+    return pushOpen({ close: () => attemptCloseRef.current(), commit: () => commitRef.current() })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pushOpen])
+
+  // Uncommitted form edits are real unsaved work even though they haven't
+  // reached the draft yet — register a commit callback so the app-wide
+  // "unsaved changes" signal (EditorNavbar's SyncStatus) knows about it, and
+  // "Save & leave" (also in EditorNavbar) can commit this panel the same way
+  // Ctrl+S already does via the panel stack above.
+  useEffect(() => {
+    if (open && isDirty) registerPanel(panelKey, () => commitRef.current())
+    else registerPanel(panelKey, null)
+    return () => registerPanel(panelKey, null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isDirty, panelKey, registerPanel])
 
   const wasOpenRef = useRef(open)
   useEffect(() => {
@@ -91,9 +120,6 @@ export default function RowCard({
   function handleDone() {
     commitRef.current()
     onOpenChange(false)
-    // commitRef's dispatch lands on the next render, so defer the flush a
-    // tick — otherwise it reads the pre-commit state.
-    setTimeout(() => void flushNow(), 0)
   }
 
   function handleDelete() {
@@ -105,6 +131,16 @@ export default function RowCard({
   function confirmDelete() {
     setConfirmOpen(false)
     handleDelete()
+  }
+
+  function discardAndClose() {
+    setConfirmCloseOpen(false)
+    onOpenChange(false)
+  }
+
+  function saveAndClose() {
+    setConfirmCloseOpen(false)
+    handleDone()
   }
 
   return (
@@ -155,7 +191,7 @@ export default function RowCard({
                   variant="ghost"
                   size="icon"
                   aria-label="Close editor"
-                  onClick={() => onOpenChange(false)}
+                  onClick={() => attemptCloseRef.current()}
                 >
                   <X className="size-4" />
                 </Button>
@@ -181,6 +217,24 @@ export default function RowCard({
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Save changes to {typeof title === 'string' && title ? `"${title}"` : 'this entry'}?</AlertDialogTitle>
+            <AlertDialogDescription>You have unsaved edits in this entry.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <Button type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={discardAndClose}>
+              Discard
+            </Button>
+            <AlertDialogAction variant="default" onClick={saveAndClose}>
+              Save changes
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

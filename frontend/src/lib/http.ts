@@ -1,3 +1,12 @@
+export class HttpError extends Error {
+  status: number
+  constructor(method: string, url: string, status: number, body: string) {
+    super(`${method} ${url} failed: ${status} ${body}`)
+    this.name = 'HttpError'
+    this.status = status
+  }
+}
+
 async function request<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
@@ -7,7 +16,7 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   })
   if (!res.ok) {
     const text = await res.text().catch(() => '')
-    throw new Error(`${method} ${url} failed: ${res.status} ${text}`)
+    throw new HttpError(method, url, res.status, text)
   }
   if (res.status === 204) return undefined as T
   return res.json()

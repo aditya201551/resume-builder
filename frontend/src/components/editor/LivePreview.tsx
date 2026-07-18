@@ -219,7 +219,7 @@ function buildRawBlocks(data: FullResume): RawBlock[] {
                       href={w.company_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={styles.companyLink}
+                      className={styles.entryLinkIcon}
                       aria-label={`Open ${w.company} website`}
                     >
                       <ExternalLink />
@@ -331,6 +331,17 @@ function buildRawBlocks(data: FullResume): RawBlock[] {
                 <span className={styles.entryTitle}>
                   {e.title}
                   {e.issuer_or_org ? ` · ${e.issuer_or_org}` : ''}
+                  {e.url && (
+                    <a
+                      href={/^https?:\/\//i.test(e.url) ? e.url : `https://${e.url}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.entryLinkIcon}
+                      aria-label={`Open ${e.title} link`}
+                    >
+                      <ExternalLink />
+                    </a>
+                  )}
                 </span>
                 <span className={styles.entryDates}>{formatMonthYear(e.entry_date)}</span>
               </div>

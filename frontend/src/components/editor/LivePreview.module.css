@@ -97,7 +97,7 @@
   font-weight: 700;
 }
 
-.companyLink {
+.entryLinkIcon {
   display: inline-flex;
   align-items: center;
   margin-left: 4px;
@@ -105,11 +105,11 @@
   vertical-align: middle;
 }
 
-.companyLink:hover {
+.entryLinkIcon:hover {
   color: #c9603e;
 }
 
-.companyLink svg {
+.entryLinkIcon svg {
   width: 11px;
   height: 11px;
 }

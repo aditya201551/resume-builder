@@ -1,4 +1,4 @@
-import { apiDelete, apiPatch, apiPost } from '@/lib/http'
+import { apiDelete, apiPatch, apiPost, HttpError } from '@/lib/http'
 import { draftReducer, type DraftAction, type DraftState, type FlatKind } from '@/hooks/resumeDraftReducer'
 import type { FullResume } from '@/types/resume'
 
@@ -24,6 +24,22 @@ function isTempId(id: string) {
 }
 
 /**
+ * A delete's goal is for the row to not exist — if it's already gone (404,
+ * e.g. a previous flush attempt's delete actually succeeded but a later
+ * step in that same attempt threw before `mark_synced_entity` recorded it),
+ * that's success, not failure. Without this, the same doomed delete would
+ * retry identically forever.
+ */
+async function deleteIfExists(url: string) {
+  try {
+    await apiDelete(url)
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return
+    throw err
+  }
+}
+
+/**
  * Diffs `state.data` against `state.lastSynced` and replays only what
  * changed against the backend, in an order where parents (skill groups,
  * custom sections) sync — and get their temp IDs resolved to real ones —
@@ -31,6 +47,14 @@ function isTempId(id: string) {
  *
  * `apply` both updates the local working copy (so later steps in this same
  * flush see the resolved IDs immediately) and dispatches to React state.
+ *
+ * Each step below is isolated in its own try/catch: one entity type failing
+ * (network blip, a stale delete, a validation error) must not prevent every
+ * *other* entity type from syncing — previously a single throw anywhere
+ * aborted the whole function, and since it always aborted at the same
+ * point, later entity types (misc_entries, skill groups, custom sections…)
+ * could never sync on any subsequent retry either. We still throw at the
+ * end if anything failed, so the UI's "Couldn't save" status is accurate.
  */
 export async function flushDraft(resumeId: string, snapshot: DraftState, dispatch: (action: DraftAction) => void) {
   let state = snapshot
@@ -39,14 +63,26 @@ export async function flushDraft(resumeId: string, snapshot: DraftState, dispatc
     dispatch(action)
   }
 
-  for (const { entity, path } of FLAT_ENTITIES) {
-    await syncFlatCollection(entity, path(resumeId), apply, () => state)
+  let hadError = false
+  async function step(fn: () => Promise<void>) {
+    try {
+      await fn()
+    } catch (err) {
+      hadError = true
+      console.error('draft sync step failed:', err)
+    }
   }
 
-  await syncSkillGroups(resumeId, apply, () => state)
-  await syncCustomSections(resumeId, apply, () => state)
-  await syncSectionConfigs(resumeId, apply, () => state)
-  await syncResumeMeta(resumeId, apply, () => state)
+  for (const { entity, path } of FLAT_ENTITIES) {
+    await step(() => syncFlatCollection(entity, path(resumeId), apply, () => state))
+  }
+
+  await step(() => syncSkillGroups(resumeId, apply, () => state))
+  await step(() => syncCustomSections(resumeId, apply, () => state))
+  await step(() => syncSectionConfigs(resumeId, apply, () => state))
+  await step(() => syncResumeMeta(resumeId, apply, () => state))
+
+  if (hadError) throw new Error('one or more draft sync steps failed')
 }
 
 async function syncFlatCollection(
@@ -61,7 +97,7 @@ async function syncFlatCollection(
   const prevById = new Map(prev.map((i) => [i.id, i]))
 
   for (const item of prev) {
-    if (!curIds.has(item.id)) await apiDelete(`${path}/${item.id}`)
+    if (!curIds.has(item.id)) await deleteIfExists(`${path}/${item.id}`)
   }
 
   const idMap: Record<string, string> = {}
@@ -91,7 +127,7 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
   const prevById = new Map(prev.map((g) => [g.id, g]))
 
   for (const g of prev) {
-    if (!curIds.has(g.id)) await apiDelete(`${basePath}/${g.id}`)
+    if (!curIds.has(g.id)) await deleteIfExists(`${basePath}/${g.id}`)
   }
 
   const idMap: Record<string, string> = {}
@@ -126,7 +162,7 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
     const prevItemById = new Map(prevItems.map((i) => [i.id, i]))
 
     for (const item of prevItems) {
-      if (!curItemIds.has(item.id)) await apiDelete(`${itemsPath}/${item.id}`)
+      if (!curItemIds.has(item.id)) await deleteIfExists(`${itemsPath}/${item.id}`)
     }
 
     const itemIdMap: Record<string, string> = {}
@@ -156,7 +192,7 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
   const prevById = new Map(prev.map((s) => [s.id, s]))
 
   for (const s of prev) {
-    if (!curIds.has(s.id)) await apiDelete(`${basePath}/${s.id}`)
+    if (!curIds.has(s.id)) await deleteIfExists(`${basePath}/${s.id}`)
   }
 
   const idMap: Record<string, string> = {}
@@ -190,7 +226,7 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
     const prevEntryById = new Map(prevEntries.map((e) => [e.id, e]))
 
     for (const entry of prevEntries) {
-      if (!curEntryIds.has(entry.id)) await apiDelete(`${entriesPath}/${entry.id}`)
+      if (!curEntryIds.has(entry.id)) await deleteIfExists(`${entriesPath}/${entry.id}`)
     }
 
     const entryIdMap: Record<string, string> = {}

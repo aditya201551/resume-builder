@@ -47,6 +47,10 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("GET /api/resumes/{resumeID}/full", h.Resume.GetFull)
 	handle("POST /api/resumes/{resumeID}/duplicate", h.Resume.Duplicate)
 	handle("PUT /api/resumes/{resumeID}/template", h.Resume.SwitchTemplate)
+	handle("GET /api/resumes/{resumeID}/export/pdf", h.Resume.ExportPDF)
+	// Not wrapped by `protect` — headless Chrome has no session cookie and
+	// self-validates via the short-lived export_token query param instead.
+	mux.HandleFunc("GET /api/resumes/{resumeID}/export/data", h.Resume.ExportData)
 
 	registerEntityRoutes(handle, "/api/resumes/{resumeID}/work-experiences", h.WorkExperience)
 	registerEntityRoutes(handle, "/api/resumes/{resumeID}/educations", h.Education)

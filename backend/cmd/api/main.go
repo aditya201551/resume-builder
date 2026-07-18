@@ -69,11 +69,12 @@ func main() {
 	sectionConfigService := service.NewSectionConfigService(resumes, sectionConfigs)
 	templateService := service.NewTemplateService(templates)
 	contentBlockService := service.NewContentBlockService(resumes, contentBlocks)
+	exportService := service.NewExportService(cfg.ChromeExecPath)
 
 	// Handlers
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
-		Resume:         handlers.NewResumeHandler(resumeService),
+		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.FrontendURL),
 		WorkExperience: handlers.NewEntityHandler(workExperienceService),
 		Education:      handlers.NewEntityHandler(educationService),
 		Project:        handlers.NewEntityHandler(projectService),

@@ -1,7 +1,13 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
+	"net/url"
+	"regexp"
+	"strings"
+	"time"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/repository"
@@ -9,11 +15,86 @@ import (
 )
 
 type ResumeHandler struct {
-	svc *service.ResumeService
+	svc         *service.ResumeService
+	export      *service.ExportService
+	jwtIssuer   *auth.JWTIssuer
+	frontendURL string
 }
 
-func NewResumeHandler(svc *service.ResumeService) *ResumeHandler {
-	return &ResumeHandler{svc: svc}
+func NewResumeHandler(svc *service.ResumeService, export *service.ExportService, jwtIssuer *auth.JWTIssuer, frontendURL string) *ResumeHandler {
+	return &ResumeHandler{svc: svc, export: export, jwtIssuer: jwtIssuer, frontendURL: frontendURL}
+}
+
+// exportTokenTTL is intentionally short — the token only needs to live long
+// enough for the handler to hand it to chromedp and for the headless
+// navigation + one data fetch to complete.
+const exportTokenTTL = 60 * time.Second
+
+var filenameUnsafeChars = regexp.MustCompile(`[^a-zA-Z0-9-_ ]+`)
+
+func slugifyFilename(label string) string {
+	cleaned := strings.TrimSpace(filenameUnsafeChars.ReplaceAllString(label, ""))
+	if cleaned == "" {
+		return "resume"
+	}
+	return strings.ReplaceAll(cleaned, " ", "-")
+}
+
+// ExportPDF is called by the logged-in user's browser (normal session
+// auth). It mints a short-lived, resume-scoped token and drives a headless
+// Chrome render of the print-only route, which authenticates with that
+// token instead of a session cookie — see ExportData.
+func (h *ResumeHandler) ExportPDF(w http.ResponseWriter, r *http.Request) {
+	userID, _ := auth.UserIDFromContext(r.Context())
+	resumeID := r.PathValue("resumeID")
+
+	full, err := h.svc.GetFullResume(r.Context(), userID, resumeID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+
+	token, err := h.jwtIssuer.IssueExportToken(userID, resumeID, exportTokenTTL)
+	if err != nil {
+		log.Printf("issue export token: %v", err)
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	printURL := fmt.Sprintf("%s/resumes/%s/print?export_token=%s", h.frontendURL, resumeID, url.QueryEscape(token))
+
+	pdfBytes, err := h.export.RenderPDF(r.Context(), printURL)
+	if err != nil {
+		log.Printf("render pdf: %v", err)
+		http.Error(w, "failed to generate pdf", http.StatusInternalServerError)
+		return
+	}
+
+	filename := slugifyFilename(full.Resume.Label) + ".pdf"
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, filename))
+	w.Write(pdfBytes)
+}
+
+// ExportData is fetched by the print-only page itself, loaded inside
+// headless Chrome with no session cookie — it authenticates via a one-time
+// export_token instead, scoped to exactly the resume that minted it, and
+// isn't wrapped by the normal session middleware.
+func (h *ResumeHandler) ExportData(w http.ResponseWriter, r *http.Request) {
+	resumeID := r.PathValue("resumeID")
+
+	claims, err := h.jwtIssuer.ParseExportToken(r.URL.Query().Get("export_token"))
+	if err != nil || claims.ResumeID != resumeID {
+		http.Error(w, "invalid or expired export token", http.StatusUnauthorized)
+		return
+	}
+
+	full, err := h.svc.GetFullResume(r.Context(), claims.UserID, resumeID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, full)
 }
 
 func (h *ResumeHandler) List(w http.ResponseWriter, r *http.Request) {

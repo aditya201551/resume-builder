@@ -18,3 +18,23 @@ export const apiPost = <T>(url: string, body?: unknown) => request<T>('POST', ur
 export const apiPatch = <T>(url: string, body?: unknown) => request<T>('PATCH', url, body)
 export const apiPut = <T>(url: string, body?: unknown) => request<T>('PUT', url, body)
 export const apiDelete = (url: string) => request<void>('DELETE', url)
+
+/** Downloads a binary response (e.g. a generated PDF) and saves it via the browser's normal download flow. */
+export async function apiDownload(url: string, fallbackFilename: string): Promise<void> {
+  const res = await fetch(url, { credentials: 'include' })
+  if (!res.ok) {
+    const text = await res.text().catch(() => '')
+    throw new Error(`GET ${url} failed: ${res.status} ${text}`)
+  }
+  const disposition = res.headers.get('Content-Disposition')
+  const filename = disposition?.match(/filename="(.+)"/)?.[1] ?? fallbackFilename
+  const blob = await res.blob()
+  const objectUrl = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = objectUrl
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(objectUrl)
+}

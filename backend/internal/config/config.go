@@ -22,6 +22,11 @@ type Config struct {
 	GoogleClientSecret   string
 	GithubClientID       string
 	GithubClientSecret   string
+
+	// ChromeExecPath points chromedp at a specific Chrome/headless-shell
+	// binary (set to /headless-shell/headless-shell in the Docker image).
+	// Left empty in local dev so chromedp auto-detects an installed browser.
+	ChromeExecPath string
 }
 
 func (c *Config) CookieSecure() bool {
@@ -82,5 +87,6 @@ func Load() (*Config, error) {
 		GoogleClientSecret:   os.Getenv("GOOGLE_CLIENT_SECRET"),
 		GithubClientID:       os.Getenv("GITHUB_CLIENT_ID"),
 		GithubClientSecret:   os.Getenv("GITHUB_CLIENT_SECRET"),
+		ChromeExecPath:       os.Getenv("CHROME_EXEC_PATH"),
 	}, nil
 }

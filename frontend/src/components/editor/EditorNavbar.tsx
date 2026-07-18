@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router'
-import { ArrowLeft, Check, Download, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Check, Download, Loader2, Pencil, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
+import { apiDownload } from '@/lib/http'
 import { cn } from '@/lib/utils'
 import type { Resume } from '@/types/resume'
 
@@ -76,11 +77,30 @@ function EditableResumeName({ resume }: { resume: Resume }) {
   )
 }
 
-function DownloadButton() {
+function DownloadButton({ resume }: { resume: Resume }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+  const [error, setError] = useState(false)
+
+  async function handleDownload() {
+    setIsDownloading(true)
+    setError(false)
+    try {
+      await apiDownload(`/api/resumes/${resume.id}/export/pdf`, `${resume.label || 'resume'}.pdf`)
+    } catch {
+      setError(true)
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
   return (
-    <Button type="button" variant="secondary" size="sm">
-      <Download className="size-3.5" /> Download
-    </Button>
+    <div className="flex items-center gap-2">
+      {error && <span className="text-xs text-destructive">Couldn&apos;t generate PDF</span>}
+      <Button type="button" variant="secondary" size="sm" disabled={isDownloading} onClick={handleDownload}>
+        {isDownloading ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
+        {isDownloading ? 'Generating…' : 'Download'}
+      </Button>
+    </div>
   )
 }
 
@@ -163,7 +183,7 @@ export default function EditorNavbar({
 
       <EditableResumeName resume={resume} />
 
-      <DownloadButton />
+      <DownloadButton resume={resume} />
 
       <SyncStatus />
     </div>

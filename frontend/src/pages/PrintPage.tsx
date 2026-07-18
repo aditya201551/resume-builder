@@ -1,26 +1,44 @@
-import { useParams } from 'react-router'
+import { useState } from 'react'
+import { useParams, useSearchParams } from 'react-router'
 import { useQuery } from '@tanstack/react-query'
 import { apiGet } from '@/lib/http'
+import LivePreview from '@/components/editor/LivePreview'
 import type { FullResume } from '@/types/resume'
 
 /**
  * System route only — navigated by the headless export browser (chromedp),
- * never linked from app navigation. Renders chrome-less, print-ready output.
+ * never linked from app navigation. Auth here is a short-lived export_token
+ * query param (headless Chrome has no session cookie), not the normal
+ * logged-in session — see ExportPDF/ExportData in the Go backend.
  */
 export default function PrintPage() {
   const { id } = useParams<{ id: string }>()
+  const [searchParams] = useSearchParams()
+  const exportToken = searchParams.get('export_token')
+  const [ready, setReady] = useState(false)
 
   const resumeQuery = useQuery({
-    queryKey: ['resumes', id, 'full'],
-    queryFn: () => apiGet<FullResume>(`/api/resumes/${id}/full`),
-    enabled: Boolean(id),
+    queryKey: ['resumes', id, 'export', exportToken],
+    queryFn: () => apiGet<FullResume>(`/api/resumes/${id}/export/data?export_token=${encodeURIComponent(exportToken!)}`),
+    enabled: Boolean(id) && Boolean(exportToken),
   })
 
-  if (resumeQuery.isLoading) return null
+  if (!resumeQuery.data) return null
 
   return (
     <div className="bg-white p-0 text-black">
-      {resumeQuery.data?.resume.full_name ?? 'Resume not found'}
+      <LivePreview data={resumeQuery.data} onReady={() => setReady(true)} />
+      {/* chromedp waits on this marker before calling Page.printToPDF — it
+          only mounts once LivePreview's pagination has actually settled.
+          visibility:hidden (not display:none) so it still has a bounding
+          box — chromedp.WaitVisible checks dimensions, not the CSS
+          `visibility` property, so display:none would never resolve. */}
+      {ready && (
+        <div
+          data-print-ready="true"
+          style={{ position: 'fixed', top: 0, left: 0, width: 1, height: 1, visibility: 'hidden' }}
+        />
+      )}
     </div>
   )
 }

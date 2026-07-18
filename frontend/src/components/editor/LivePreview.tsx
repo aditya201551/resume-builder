@@ -159,7 +159,15 @@ function buildRawBlocks(data: FullResume): RawBlock[] {
             <span key={v}>{v}</span>
           ))}
           {resume.links.map((l) => (
-            <span key={l.url}>{l.label || l.url}</span>
+            <a
+              key={l.url}
+              href={/^https?:\/\//i.test(l.url) ? l.url : `https://${l.url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={styles.metaLink}
+            >
+              {l.label || l.url}
+            </a>
           ))}
         </div>
         <hr className={styles.rule} />
@@ -371,7 +379,7 @@ function withSpacing(raw: RawBlock[]) {
   })
 }
 
-export default function LivePreview({ data }: { data: FullResume }) {
+export default function LivePreview({ data, onReady }: { data: FullResume; onReady?: () => void }) {
   const blocks = useMemo(() => withSpacing(buildRawBlocks(data)), [data])
   const measureRefs = useRef(new Map<string, HTMLDivElement>())
   const [pageGroups, setPageGroups] = useState<string[][]>(() => [blocks.map((b) => b.key)])
@@ -393,11 +401,13 @@ export default function LivePreview({ data }: { data: FullResume }) {
       }
       if (current.length > 0) groups.push(current)
       setPageGroups(groups.length > 0 ? groups : [[]])
+      onReady?.()
     }
     recompute()
     const observer = new ResizeObserver(recompute)
     measureRefs.current.forEach((el) => observer.observe(el))
     return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [blocks])
 
   const byKey = new Map(blocks.map((b) => [b.key, b.node]))

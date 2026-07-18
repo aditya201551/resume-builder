@@ -1,4 +1,5 @@
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ExternalLink } from 'lucide-react'
 import type { FullResume, MiscEntry } from '@/types/resume'
 import { markdownToHtml } from '@/lib/markdown'
 import styles from './LivePreview.module.css'
@@ -205,6 +206,17 @@ function buildRawBlocks(data: FullResume): RawBlock[] {
               <div className={styles.entryHead}>
                 <span className={styles.entryTitle}>
                   {w.title} · {w.company}
+                  {w.company_url && (
+                    <a
+                      href={w.company_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={styles.companyLink}
+                      aria-label={`Open ${w.company} website`}
+                    >
+                      <ExternalLink />
+                    </a>
+                  )}
                 </span>
                 <span className={styles.entryDates}>{dateRange(w.start_date, w.end_date, w.is_current)}</span>
               </div>

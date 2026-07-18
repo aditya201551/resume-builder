@@ -20,6 +20,7 @@ function toDateInput(v: string | null) {
 function formFromEntry(entry: WorkExperience) {
   return {
     company: entry.company,
+    company_url: entry.company_url ?? '',
     title: entry.title,
     location: entry.location ?? '',
     employment_type: entry.employment_type ?? '',
@@ -34,6 +35,7 @@ function formFromEntry(entry: WorkExperience) {
 function toPatch(form: ReturnType<typeof formFromEntry>) {
   return {
     company: form.company,
+    company_url: form.company_url || null,
     title: form.title,
     location: form.location || null,
     employment_type: form.employment_type || null,
@@ -106,6 +108,15 @@ function WorkExperienceRow({
         <div className="flex flex-col gap-1.5">
           <Label>Title</Label>
           <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label>Company link</Label>
+          <Input
+            type="url"
+            value={form.company_url}
+            onChange={(e) => setForm((f) => ({ ...f, company_url: e.target.value }))}
+            placeholder="https://company.com"
+          />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label>Location</Label>

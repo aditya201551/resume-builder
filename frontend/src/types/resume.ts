@@ -35,6 +35,7 @@ export interface WorkExperience {
   id: string
   resume_id: string
   company: string
+  company_url: string | null
   title: string
   location: string | null
   employment_type: string | null

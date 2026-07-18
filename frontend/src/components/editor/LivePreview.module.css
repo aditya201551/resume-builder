@@ -68,6 +68,23 @@
   font-weight: 700;
 }
 
+.companyLink {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+  color: #888;
+  vertical-align: middle;
+}
+
+.companyLink:hover {
+  color: #c9603e;
+}
+
+.companyLink svg {
+  width: 11px;
+  height: 11px;
+}
+
 .entrySub {
   font-style: italic;
   color: #333;
@@ -101,6 +118,12 @@
 .richText :global(li) {
   display: list-item;
   margin: 2px 0;
+}
+
+.richText :global(a) {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: #c9603e;
 }
 
 .skillGroups {

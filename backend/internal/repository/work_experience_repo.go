@@ -15,6 +15,7 @@ type WorkExperience struct {
 	ID             string          `json:"id"`
 	ResumeID       string          `json:"resume_id"`
 	Company        string          `json:"company"`
+	CompanyURL     *string         `json:"company_url"`
 	Title          string          `json:"title"`
 	Location       *string         `json:"location"`
 	EmploymentType *string         `json:"employment_type"`
@@ -30,6 +31,7 @@ type WorkExperience struct {
 
 type WorkExperienceInput struct {
 	Company        string          `json:"company"`
+	CompanyURL     *string         `json:"company_url"`
 	Title          string          `json:"title"`
 	Location       *string         `json:"location"`
 	EmploymentType *string         `json:"employment_type"`
@@ -49,11 +51,11 @@ func NewWorkExperienceRepository(pool *pgxpool.Pool) *WorkExperienceRepository {
 	return &WorkExperienceRepository{pool: pool}
 }
 
-const workExperienceColumns = `id, resume_id, company, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order, created_at, updated_at`
+const workExperienceColumns = `id, resume_id, company, company_url, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order, created_at, updated_at`
 
 func scanWorkExperience(row pgx.Row) (*WorkExperience, error) {
 	var w WorkExperience
-	err := row.Scan(&w.ID, &w.ResumeID, &w.Company, &w.Title, &w.Location, &w.EmploymentType, &w.StartDate,
+	err := row.Scan(&w.ID, &w.ResumeID, &w.Company, &w.CompanyURL, &w.Title, &w.Location, &w.EmploymentType, &w.StartDate,
 		&w.EndDate, &w.IsCurrent, &w.Content, &w.Technologies, &w.SortOrder, &w.CreatedAt, &w.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -85,11 +87,11 @@ func (r *WorkExperienceRepository) List(ctx context.Context, resumeID string) ([
 
 func (r *WorkExperienceRepository) Create(ctx context.Context, resumeID string, in WorkExperienceInput) (*WorkExperience, error) {
 	const q = `
-		INSERT INTO work_experiences (resume_id, company, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO work_experiences (resume_id, company, company_url, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING ` + workExperienceColumns
 
-	w, err := scanWorkExperience(r.pool.QueryRow(ctx, q, resumeID, in.Company, in.Title, in.Location, in.EmploymentType,
+	w, err := scanWorkExperience(r.pool.QueryRow(ctx, q, resumeID, in.Company, in.CompanyURL, in.Title, in.Location, in.EmploymentType,
 		in.StartDate, in.EndDate, in.IsCurrent, in.Content, defaultJSON(in.Technologies, `[]`), in.SortOrder))
 	if err != nil {
 		return nil, fmt.Errorf("create work experience: %w", err)
@@ -100,12 +102,12 @@ func (r *WorkExperienceRepository) Create(ctx context.Context, resumeID string, 
 func (r *WorkExperienceRepository) Update(ctx context.Context, resumeID, id string, in WorkExperienceInput) (*WorkExperience, error) {
 	const q = `
 		UPDATE work_experiences SET
-			company = $3, title = $4, location = $5, employment_type = $6, start_date = $7, end_date = $8,
-			is_current = $9, content = $10, technologies = $11, sort_order = $12, updated_at = now()
+			company = $3, company_url = $4, title = $5, location = $6, employment_type = $7, start_date = $8, end_date = $9,
+			is_current = $10, content = $11, technologies = $12, sort_order = $13, updated_at = now()
 		WHERE id = $1 AND resume_id = $2
 		RETURNING ` + workExperienceColumns
 
-	w, err := scanWorkExperience(r.pool.QueryRow(ctx, q, id, resumeID, in.Company, in.Title, in.Location,
+	w, err := scanWorkExperience(r.pool.QueryRow(ctx, q, id, resumeID, in.Company, in.CompanyURL, in.Title, in.Location,
 		in.EmploymentType, in.StartDate, in.EndDate, in.IsCurrent, in.Content, defaultJSON(in.Technologies, `[]`), in.SortOrder))
 	if err != nil {
 		return nil, fmt.Errorf("update work experience: %w", err)

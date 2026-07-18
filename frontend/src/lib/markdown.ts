@@ -10,7 +10,17 @@ export function markdownToHtml(markdown: string): string {
   if (!markdown.trim()) return ''
   const editor = new Editor({
     extensions: [
-      StarterKit.configure({ heading: false, blockquote: false, codeBlock: false, horizontalRule: false }),
+      StarterKit.configure({
+        heading: false,
+        blockquote: false,
+        codeBlock: false,
+        horizontalRule: false,
+        link: {
+          openOnClick: false,
+          autolink: true,
+          HTMLAttributes: { rel: 'noopener noreferrer', target: '_blank' },
+        },
+      }),
       Markdown.configure({ html: false }),
     ],
     content: markdown,

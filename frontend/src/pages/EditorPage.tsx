@@ -212,18 +212,26 @@ function useContentSlotOrder(data: FullResume) {
   const nonCustom = reorderable.filter((c) => c.section_type !== 'custom').sort((a, b) => a.sort_order - b.sort_order)
   const customRows = reorderable.filter((c) => c.section_type === 'custom').sort((a, b) => a.sort_order - b.sort_order)
 
-  let slotKeys: SlotKey[]
-  if (reorderable.length > 0) {
-    const customSortOrder = customRows[0]?.sort_order ?? Infinity
-    const slots: { key: SlotKey; sortOrder: number }[] = nonCustom.map((c) => ({
-      key: c.section_type as SlotKey,
-      sortOrder: c.sort_order,
-    }))
-    if (data.custom_sections.length > 0) slots.push({ key: 'custom', sortOrder: customSortOrder })
-    slotKeys = slots.sort((a, b) => a.sortOrder - b.sortOrder).map((s) => s.key)
-  } else {
-    slotKeys = [...DEFAULT_SLOT_ORDER]
+  const customSortOrder = customRows[0]?.sort_order ?? Infinity
+  const slots: { key: SlotKey; sortOrder: number }[] = nonCustom.map((c) => ({
+    key: c.section_type as SlotKey,
+    sortOrder: c.sort_order,
+  }))
+  if (data.custom_sections.length > 0) slots.push({ key: 'custom', sortOrder: customSortOrder })
+
+  // resume_section_configs only ever gets a row for a section type once it's
+  // been persisted (reordered, or a custom section created) — a default type
+  // that was never touched has no row yet. Without this fallback, such a
+  // type could never be revealed via "Add section" on a resume that already
+  // has *some* persisted rows, since slotKeys would silently exclude it.
+  const known = new Set(slots.map((s) => s.key))
+  let nextSortOrder = slots.reduce((max, s) => Math.max(max, s.sortOrder), -1) + 1
+  for (const key of DEFAULT_SLOT_ORDER) {
+    if (key === 'custom' || known.has(key)) continue
+    slots.push({ key, sortOrder: nextSortOrder++ })
   }
+
+  const slotKeys = slots.sort((a, b) => a.sortOrder - b.sortOrder).map((s) => s.key)
 
   function buildFlatOrder(newSlotKeys: string[]): SectionConfig[] {
     const pinned = data.section_configs.filter((c) => PINNED_TYPES.has(c.section_type)).sort((a, b) => a.sort_order - b.sort_order)

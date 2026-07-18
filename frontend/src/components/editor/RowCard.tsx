@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { useEditorPanel } from '@/hooks/useEditorPanel'
+import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 
 interface RowCardProps {
   /** Commits the currently edited fields — called only when the user clicks Done. */
@@ -50,6 +51,7 @@ export default function RowCard({
   children,
 }: RowCardProps) {
   const { slot, pushOpen } = useEditorPanel()
+  const { flushNow } = useResumeDraftContext()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const committedRef = useRef(false)
@@ -89,6 +91,9 @@ export default function RowCard({
   function handleDone() {
     commitRef.current()
     onOpenChange(false)
+    // commitRef's dispatch lands on the next render, so defer the flush a
+    // tick — otherwise it reads the pre-commit state.
+    setTimeout(() => void flushNow(), 0)
   }
 
   function handleDelete() {

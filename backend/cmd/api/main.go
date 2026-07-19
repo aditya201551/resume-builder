@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"resume-builder/backend/internal/agent"
 	"resume-builder/backend/internal/api"
 	"resume-builder/backend/internal/api/handlers"
 	"resume-builder/backend/internal/auth"
@@ -71,6 +72,20 @@ func main() {
 	contentBlockService := service.NewContentBlockService(resumes, contentBlocks)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
+	// AI assistant (Phase 2) — optional. Runs in-process inside this binary;
+	// see internal/agent/doc.go for the plan to split it into its own
+	// service later. Absent ANTHROPIC_API_KEY, the API runs without it.
+	var agentHandler *handlers.AgentHandler
+	if agentCfg, err := agent.LoadConfig(); err != nil {
+		log.Printf("warning: AI assistant disabled (%v)", err)
+	} else {
+		aiAgent, err := agent.New(ctx, agentCfg, resumeService)
+		if err != nil {
+			log.Fatalf("create agent: %v", err)
+		}
+		agentHandler = handlers.NewAgentHandler(aiAgent, resumeService)
+	}
+
 	// Handlers
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
@@ -86,6 +101,7 @@ func main() {
 		SectionConfig:  handlers.NewSectionConfigHandler(sectionConfigService),
 		Template:       handlers.NewTemplateHandler(templateService),
 		ContentBlock:   handlers.NewContentBlockHandler(contentBlockService),
+		Agent:          agentHandler,
 	}
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {

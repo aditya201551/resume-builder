@@ -23,6 +23,9 @@ type Handlers struct {
 	SectionConfig  *handlers.SectionConfigHandler
 	Template       *handlers.TemplateHandler
 	ContentBlock   *handlers.ContentBlockHandler
+	// Agent is nil when ANTHROPIC_API_KEY isn't configured — see NewRouter,
+	// which skips registering its routes in that case.
+	Agent *handlers.AgentHandler
 }
 
 func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc) http.Handler {
@@ -84,6 +87,10 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	handle("GET /api/resumes/{resumeID}/content-blocks", h.ContentBlock.List)
 	handle("PATCH /api/resumes/{resumeID}/content-blocks/{kind}/{id}", h.ContentBlock.UpdateContent)
+
+	if h.Agent != nil {
+		handle("POST /api/resumes/{resumeID}/agent/rewrite", h.Agent.SuggestContentRewrite)
+	}
 
 	return mux
 }

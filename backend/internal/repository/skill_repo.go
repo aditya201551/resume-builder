@@ -21,6 +21,7 @@ type SkillItemInput struct {
 	Name        string  `json:"name"`
 	Proficiency *string `json:"proficiency"`
 	SortOrder   int     `json:"sort_order"`
+	ClientID    *string `json:"client_id"`
 }
 
 type SkillGroup struct {
@@ -32,8 +33,9 @@ type SkillGroup struct {
 }
 
 type SkillGroupInput struct {
-	GroupName string `json:"group_name"`
-	SortOrder int    `json:"sort_order"`
+	GroupName string  `json:"group_name"`
+	SortOrder int     `json:"sort_order"`
+	ClientID  *string `json:"client_id"`
 }
 
 type SkillRepository struct {
@@ -96,10 +98,11 @@ func (r *SkillRepository) listItems(ctx context.Context, groupID string) ([]Skil
 }
 
 func (r *SkillRepository) CreateGroup(ctx context.Context, resumeID string, in SkillGroupInput) (*SkillGroup, error) {
+	q := `INSERT INTO skill_groups (resume_id, group_name, sort_order, client_id) VALUES ($1, $2, $3, $4)
+		` + onConflictClientID("resume_id") + `
+		RETURNING id, resume_id, group_name, sort_order`
 	var g SkillGroup
-	err := r.pool.QueryRow(ctx,
-		`INSERT INTO skill_groups (resume_id, group_name, sort_order) VALUES ($1, $2, $3) RETURNING id, resume_id, group_name, sort_order`,
-		resumeID, in.GroupName, in.SortOrder).Scan(&g.ID, &g.ResumeID, &g.GroupName, &g.SortOrder)
+	err := r.pool.QueryRow(ctx, q, resumeID, in.GroupName, in.SortOrder, in.ClientID).Scan(&g.ID, &g.ResumeID, &g.GroupName, &g.SortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create skill group: %w", err)
 	}
@@ -161,10 +164,11 @@ func (r *SkillRepository) CreateItem(ctx context.Context, resumeID, groupID stri
 		return nil, ErrNotFound
 	}
 
+	q := `INSERT INTO skill_items (skill_group_id, name, proficiency, sort_order, client_id) VALUES ($1, $2, $3, $4, $5)
+		` + onConflictClientID("skill_group_id") + `
+		RETURNING id, skill_group_id, name, proficiency, sort_order`
 	var it SkillItem
-	err = r.pool.QueryRow(ctx,
-		`INSERT INTO skill_items (skill_group_id, name, proficiency, sort_order) VALUES ($1, $2, $3, $4) RETURNING id, skill_group_id, name, proficiency, sort_order`,
-		groupID, in.Name, in.Proficiency, in.SortOrder).Scan(&it.ID, &it.GroupID, &it.Name, &it.Proficiency, &it.SortOrder)
+	err = r.pool.QueryRow(ctx, q, groupID, in.Name, in.Proficiency, in.SortOrder, in.ClientID).Scan(&it.ID, &it.GroupID, &it.Name, &it.Proficiency, &it.SortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create skill item: %w", err)
 	}

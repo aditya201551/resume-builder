@@ -24,6 +24,19 @@ function isTempId(id: string) {
 }
 
 /**
+ * Every create body carries its local tempId as client_id. If the browser
+ * dies between the server creating the row and this draft durably recording
+ * the resolved real id (resolve_ids below), the tempId never gets marked
+ * synced — so the next flush sees the same not-yet-synced entity and POSTs
+ * it again. Without client_id that retry creates a second row server-side;
+ * with it, the backend's create is an upsert keyed on client_id that
+ * returns the original row instead (see backend's onConflictClientID).
+ */
+function createBody(item: { id: string }, omitKeys: string[]): Record<string, unknown> {
+  return { ...omit(item, omitKeys), client_id: item.id }
+}
+
+/**
  * A delete's goal is for the row to not exist — if it's already gone (404,
  * e.g. a previous flush attempt's delete actually succeeded but a later
  * step in that same attempt threw before `mark_synced_entity` recorded it),
@@ -103,7 +116,7 @@ async function syncFlatCollection(
   const idMap: Record<string, string> = {}
   for (const item of cur) {
     if (!prevById.has(item.id)) {
-      const created = await apiPost<{ id: string }>(path, omit(item, ['id', 'resume_id']))
+      const created = await apiPost<{ id: string }>(path, createBody(item, ['id', 'resume_id']))
       idMap[item.id] = created.id
     }
   }
@@ -133,7 +146,7 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
   const idMap: Record<string, string> = {}
   for (const g of cur) {
     if (!prevById.has(g.id)) {
-      const created = await apiPost<{ id: string }>(basePath, omit(g, ['id', 'resume_id', 'items']))
+      const created = await apiPost<{ id: string }>(basePath, createBody(g, ['id', 'resume_id', 'items']))
       idMap[g.id] = created.id
     }
   }
@@ -150,9 +163,13 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
       void curItems
     }
   }
-  apply({ type: 'mark_synced_entity', slice: 'skill_groups' })
 
-  // Items, per (now-real-id) group.
+  // Items, per (now-real-id) group. mark_synced_entity for 'skill_groups'
+  // happens once, after this loop too — not here — because it snapshots the
+  // *whole* current skill_groups array, items included. Marking it synced
+  // before items are actually synced would make lastSynced claim items were
+  // persisted when they weren't; if this loop then throws, the next retry's
+  // diff would see no difference and silently never retry the failed items.
   for (const g of getState().data.skill_groups) {
     const itemsPath = `${basePath}/${g.id}/items`
     const curItems = g.items
@@ -168,7 +185,7 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
     const itemIdMap: Record<string, string> = {}
     for (const item of curItems) {
       if (!prevItemById.has(item.id)) {
-        const created = await apiPost<{ id: string }>(itemsPath, omit(item, ['id', 'skill_group_id']))
+        const created = await apiPost<{ id: string }>(itemsPath, createBody(item, ['id', 'skill_group_id']))
         itemIdMap[item.id] = created.id
       }
     }
@@ -198,7 +215,7 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
   const idMap: Record<string, string> = {}
   for (const s of cur) {
     if (!prevById.has(s.id)) {
-      const created = await apiPost<{ id: string }>(basePath, omit(s, ['id', 'resume_id', 'entries']))
+      const created = await apiPost<{ id: string }>(basePath, createBody(s, ['id', 'resume_id', 'entries']))
       idMap[s.id] = created.id
     }
   }
@@ -215,8 +232,9 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
       void curEntries
     }
   }
-  apply({ type: 'mark_synced_entity', slice: 'custom_sections' })
 
+  // Same reasoning as syncSkillGroups above: mark_synced_entity for
+  // 'custom_sections' happens once, after entries are synced too.
   for (const s of getState().data.custom_sections) {
     const entriesPath = `${basePath}/${s.id}/entries`
     const curEntries = s.entries
@@ -232,7 +250,7 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
     const entryIdMap: Record<string, string> = {}
     for (const entry of curEntries) {
       if (!prevEntryById.has(entry.id)) {
-        const created = await apiPost<{ id: string }>(entriesPath, omit(entry, ['id', 'custom_section_id']))
+        const created = await apiPost<{ id: string }>(entriesPath, createBody(entry, ['id', 'custom_section_id']))
         entryIdMap[entry.id] = created.id
       }
     }

@@ -21,6 +21,7 @@ type LanguageInput struct {
 	Name        string  `json:"name"`
 	Proficiency *string `json:"proficiency"`
 	SortOrder   int     `json:"sort_order"`
+	ClientID    *string `json:"client_id"`
 }
 
 type LanguageRepository struct {
@@ -65,12 +66,13 @@ func (r *LanguageRepository) List(ctx context.Context, resumeID string) ([]Langu
 }
 
 func (r *LanguageRepository) Create(ctx context.Context, resumeID string, in LanguageInput) (*Language, error) {
-	const q = `
-		INSERT INTO languages (resume_id, name, proficiency, sort_order)
-		VALUES ($1, $2, $3, $4)
+	q := `
+		INSERT INTO languages (resume_id, name, proficiency, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + languageColumns
 
-	l, err := scanLanguage(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Proficiency, in.SortOrder))
+	l, err := scanLanguage(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Proficiency, in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create language: %w", err)
 	}

@@ -24,6 +24,7 @@ type CustomSectionEntryInput struct {
 	Description *string    `json:"description"`
 	EntryDate   *time.Time `json:"entry_date"`
 	SortOrder   int        `json:"sort_order"`
+	ClientID    *string    `json:"client_id"`
 }
 
 type CustomSection struct {
@@ -35,8 +36,9 @@ type CustomSection struct {
 }
 
 type CustomSectionInput struct {
-	Title     string `json:"title"`
-	SortOrder int    `json:"sort_order"`
+	Title     string  `json:"title"`
+	SortOrder int     `json:"sort_order"`
+	ClientID  *string `json:"client_id"`
 }
 
 type CustomSectionRepository struct {
@@ -98,10 +100,11 @@ func (r *CustomSectionRepository) listEntries(ctx context.Context, sectionID str
 }
 
 func (r *CustomSectionRepository) CreateSection(ctx context.Context, resumeID string, in CustomSectionInput) (*CustomSection, error) {
+	q := `INSERT INTO custom_sections (resume_id, title, sort_order, client_id) VALUES ($1, $2, $3, $4)
+		` + onConflictClientID("resume_id") + `
+		RETURNING id, resume_id, title, sort_order`
 	var s CustomSection
-	err := r.pool.QueryRow(ctx,
-		`INSERT INTO custom_sections (resume_id, title, sort_order) VALUES ($1, $2, $3) RETURNING id, resume_id, title, sort_order`,
-		resumeID, in.Title, in.SortOrder).Scan(&s.ID, &s.ResumeID, &s.Title, &s.SortOrder)
+	err := r.pool.QueryRow(ctx, q, resumeID, in.Title, in.SortOrder, in.ClientID).Scan(&s.ID, &s.ResumeID, &s.Title, &s.SortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create custom section: %w", err)
 	}
@@ -161,12 +164,11 @@ func (r *CustomSectionRepository) CreateEntry(ctx context.Context, resumeID, sec
 		return nil, ErrNotFound
 	}
 
+	q := `INSERT INTO custom_section_entries (custom_section_id, title, description, entry_date, sort_order, client_id) VALUES ($1, $2, $3, $4, $5, $6)
+		 ` + onConflictClientID("custom_section_id") + `
+		 RETURNING id, custom_section_id, title, description, entry_date, sort_order`
 	var e CustomSectionEntry
-	err = r.pool.QueryRow(ctx,
-		`INSERT INTO custom_section_entries (custom_section_id, title, description, entry_date, sort_order) VALUES ($1, $2, $3, $4, $5)
-		 RETURNING id, custom_section_id, title, description, entry_date, sort_order`,
-		sectionID, in.Title, in.Description, in.EntryDate, in.SortOrder,
-	).Scan(&e.ID, &e.SectionID, &e.Title, &e.Description, &e.EntryDate, &e.SortOrder)
+	err = r.pool.QueryRow(ctx, q, sectionID, in.Title, in.Description, in.EntryDate, in.SortOrder, in.ClientID).Scan(&e.ID, &e.SectionID, &e.Title, &e.Description, &e.EntryDate, &e.SortOrder)
 	if err != nil {
 		return nil, fmt.Errorf("create custom section entry: %w", err)
 	}

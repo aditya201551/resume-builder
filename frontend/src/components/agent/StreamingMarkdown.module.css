@@ -1,0 +1,37 @@
+.response {
+  min-width: 0;
+}
+
+.response > :first-child {
+  display: inline;
+}
+
+.tail {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cursor {
+  display: inline-block;
+  width: 0.42em;
+  height: 1em;
+  margin-left: 0.12em;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: -0.12em;
+  opacity: 0.55;
+  animation: stream-cursor-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes stream-cursor-pulse {
+  0%,
+  100% {
+    opacity: 0.2;
+    transform: scaleY(0.72);
+  }
+
+  50% {
+    opacity: 0.72;
+    transform: scaleY(1);
+  }
+}

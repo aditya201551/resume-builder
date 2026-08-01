@@ -36,6 +36,7 @@ type EducationInput struct {
 	GPA               *string    `json:"gpa"`
 	HonorsDescription *string    `json:"honors_description"`
 	SortOrder         int        `json:"sort_order"`
+	ClientID          *string    `json:"client_id"`
 }
 
 type EducationRepository struct {
@@ -81,13 +82,14 @@ func (r *EducationRepository) List(ctx context.Context, resumeID string) ([]Educ
 }
 
 func (r *EducationRepository) Create(ctx context.Context, resumeID string, in EducationInput) (*Education, error) {
-	const q = `
-		INSERT INTO educations (resume_id, institution, degree, field_of_study, location, start_date, end_date, gpa, honors_description, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+	q := `
+		INSERT INTO educations (resume_id, institution, degree, field_of_study, location, start_date, end_date, gpa, honors_description, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + educationColumns
 
 	e, err := scanEducation(r.pool.QueryRow(ctx, q, resumeID, in.Institution, in.Degree, in.FieldOfStudy, in.Location,
-		in.StartDate, in.EndDate, in.GPA, in.HonorsDescription, in.SortOrder))
+		in.StartDate, in.EndDate, in.GPA, in.HonorsDescription, in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create education: %w", err)
 	}

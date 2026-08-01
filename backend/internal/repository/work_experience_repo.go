@@ -41,6 +41,9 @@ type WorkExperienceInput struct {
 	Content        string          `json:"content"`
 	Technologies   json.RawMessage `json:"technologies"`
 	SortOrder      int             `json:"sort_order"`
+	// ClientID is the tempId the frontend draft used before this row had a
+	// real id — see idempotent.go for why Create keys off it.
+	ClientID *string `json:"client_id"`
 }
 
 type WorkExperienceRepository struct {
@@ -86,13 +89,14 @@ func (r *WorkExperienceRepository) List(ctx context.Context, resumeID string) ([
 }
 
 func (r *WorkExperienceRepository) Create(ctx context.Context, resumeID string, in WorkExperienceInput) (*WorkExperience, error) {
-	const q = `
-		INSERT INTO work_experiences (resume_id, company, company_url, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+	q := `
+		INSERT INTO work_experiences (resume_id, company, company_url, title, location, employment_type, start_date, end_date, is_current, content, technologies, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + workExperienceColumns
 
 	w, err := scanWorkExperience(r.pool.QueryRow(ctx, q, resumeID, in.Company, in.CompanyURL, in.Title, in.Location, in.EmploymentType,
-		in.StartDate, in.EndDate, in.IsCurrent, in.Content, defaultJSON(in.Technologies, `[]`), in.SortOrder))
+		in.StartDate, in.EndDate, in.IsCurrent, in.Content, defaultJSON(in.Technologies, `[]`), in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create work experience: %w", err)
 	}
@@ -128,17 +132,4 @@ func (r *WorkExperienceRepository) Delete(ctx context.Context, resumeID, id stri
 
 func (r *WorkExperienceRepository) Reorder(ctx context.Context, resumeID string, orderedIDs []string) error {
 	return reorder(ctx, r.pool, "work_experiences", "resume_id", resumeID, orderedIDs)
-}
-
-// UpdateContent is a narrow write path used by the shared content-block view
-// (see content_block_repo.go) — only the markdown body changes.
-func (r *WorkExperienceRepository) UpdateContent(ctx context.Context, resumeID, id, content string) error {
-	tag, err := r.pool.Exec(ctx, `UPDATE work_experiences SET content = $3, updated_at = now() WHERE id = $1 AND resume_id = $2`, id, resumeID, content)
-	if err != nil {
-		return fmt.Errorf("update work experience content: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
 }

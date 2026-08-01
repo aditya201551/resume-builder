@@ -137,14 +137,6 @@ export interface SectionConfig {
   sort_order: number
 }
 
-export interface ContentBlock {
-  kind: 'work_experience' | 'project'
-  id: string
-  label: string
-  content: string
-  sort_order: number
-}
-
 export interface FullResume {
   resume: Resume
   work_experiences: WorkExperience[]

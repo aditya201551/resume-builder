@@ -28,6 +28,7 @@ type CertificationInput struct {
 	ExpiryDate    *time.Time `json:"expiry_date"`
 	CredentialURL *string    `json:"credential_url"`
 	SortOrder     int        `json:"sort_order"`
+	ClientID      *string    `json:"client_id"`
 }
 
 type CertificationRepository struct {
@@ -72,12 +73,13 @@ func (r *CertificationRepository) List(ctx context.Context, resumeID string) ([]
 }
 
 func (r *CertificationRepository) Create(ctx context.Context, resumeID string, in CertificationInput) (*Certification, error) {
-	const q = `
-		INSERT INTO certifications (resume_id, name, issuer, issue_date, expiry_date, credential_url, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	q := `
+		INSERT INTO certifications (resume_id, name, issuer, issue_date, expiry_date, credential_url, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + certificationColumns
 
-	c, err := scanCertification(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Issuer, in.IssueDate, in.ExpiryDate, in.CredentialURL, in.SortOrder))
+	c, err := scanCertification(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Issuer, in.IssueDate, in.ExpiryDate, in.CredentialURL, in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create certification: %w", err)
 	}

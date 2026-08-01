@@ -1,0 +1,47 @@
+.richText :global(p) {
+  margin: 0.4em 0;
+}
+
+.richText :global(p:first-child) {
+  margin-top: 0;
+}
+
+.richText :global(p:last-child) {
+  margin-bottom: 0;
+}
+
+.richText :global(ul),
+.richText :global(ol) {
+  margin: 0.4em 0;
+  padding-left: 1.25em;
+}
+
+.richText :global(ul) {
+  list-style: disc outside;
+}
+
+.richText :global(ol) {
+  list-style: decimal outside;
+}
+
+.richText :global(li) {
+  display: list-item;
+  margin: 0.15em 0;
+}
+
+.richText :global(strong) {
+  font-weight: 600;
+}
+
+.richText :global(code) {
+  border-radius: 4px;
+  background: color-mix(in oklch, currentColor 10%, transparent);
+  padding: 0.1em 0.35em;
+  font-size: 0.85em;
+}
+
+.richText :global(a) {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: currentColor;
+}

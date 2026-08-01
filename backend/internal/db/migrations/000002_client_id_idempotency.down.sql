@@ -1,0 +1,10 @@
+ALTER TABLE work_experiences DROP COLUMN client_id;
+ALTER TABLE educations DROP COLUMN client_id;
+ALTER TABLE projects DROP COLUMN client_id;
+ALTER TABLE certifications DROP COLUMN client_id;
+ALTER TABLE languages DROP COLUMN client_id;
+ALTER TABLE misc_entries DROP COLUMN client_id;
+ALTER TABLE skill_groups DROP COLUMN client_id;
+ALTER TABLE skill_items DROP COLUMN client_id;
+ALTER TABLE custom_sections DROP COLUMN client_id;
+ALTER TABLE custom_section_entries DROP COLUMN client_id;

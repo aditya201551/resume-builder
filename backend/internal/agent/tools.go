@@ -5,13 +5,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
-
-	"resume-builder/backend/internal/auth"
-	"resume-builder/backend/internal/service"
 )
 
 // Session value keys set by Agent.Chat (chat.go) via adk.WithSessionValues
@@ -36,61 +35,6 @@ func sinkFromContext(ctx context.Context) (*ProposalSink, error) {
 	return sink, nil
 }
 
-// getFullResumeTool lets the agent read a resume's full content before
-// drafting a rewrite or summary. It wraps ResumeService.GetFullResume
-// directly — no MCP, no network hop, since the agent runs in the same
-// process as the rest of the API (see doc.go). If this package is ever
-// split into its own service, this is the tool that would move behind an
-// MCP server or HTTP call instead of a direct method call.
-type getFullResumeTool struct {
-	resumes *service.ResumeService
-}
-
-func newGetFullResumeTool(resumes *service.ResumeService) tool.InvokableTool {
-	return &getFullResumeTool{resumes: resumes}
-}
-
-func (t *getFullResumeTool) Info(_ context.Context) (*schema.ToolInfo, error) {
-	return &schema.ToolInfo{
-		Name: "get_full_resume",
-		Desc: "Fetch every section of a resume (work experience, education, skills, projects, certifications, languages, misc entries, custom sections) by resume ID.",
-		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-			"resume_id": {
-				Type:     schema.String,
-				Desc:     "UUID of the resume to read",
-				Required: true,
-			},
-		}),
-	}, nil
-}
-
-type getFullResumeArgs struct {
-	ResumeID string `json:"resume_id"`
-}
-
-func (t *getFullResumeTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
-	var args getFullResumeArgs
-	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse get_full_resume arguments: %w", err)
-	}
-
-	userID, ok := auth.UserIDFromContext(ctx)
-	if !ok {
-		return "", fmt.Errorf("no authenticated user in context")
-	}
-
-	full, err := t.resumes.GetFullResume(ctx, userID, args.ResumeID)
-	if err != nil {
-		return "", err
-	}
-
-	out, err := json.Marshal(full)
-	if err != nil {
-		return "", fmt.Errorf("marshal full resume: %w", err)
-	}
-	return string(out), nil
-}
-
 // --- resume_chat tools -----------------------------------------------------
 //
 // Everything below reads/writes via session values (see sinkFromContext and
@@ -101,13 +45,27 @@ func (t *getFullResumeTool) InvokableRun(ctx context.Context, argumentsInJSON st
 // currently have open. propose_* tools never touch storage; they only
 // append a Proposal to the run's sink for the HTTP handler to stream out.
 
-func stripSortOrder(m map[string]any) map[string]any {
-	if m == nil {
-		return m
-	}
-	delete(m, "sort_order")
-	delete(m, "sortOrder")
-	return m
+// Every propose_* payload passes through normalizeFields (fields.go) before
+// it becomes a Proposal — see that file for why an untyped `fields` object
+// can't be trusted as the model sends it.
+
+// toolProblem reports a problem the model itself can fix — bad arguments,
+// unknown fields, a missing id — as the tool's *result* rather than as a Go
+// error.
+//
+// This distinction matters more than it looks: eino treats an error returned
+// from InvokableRun as fatal to the whole run (compose/tool_node.go wraps it
+// as "failed to stream tool call ..." and aborts), so returning an error here
+// would turn one malformed tool call into a dead conversation — exactly what
+// happens when the model's output is truncated mid-JSON by the token limit.
+// Returned as a result, the text lands in the transcript as that tool call's
+// output, and the model reads it and retries.
+//
+// Genuine faults (no proposal sink in context — a wiring bug, not something
+// the model can act on) stay real errors.
+func toolProblem(format string, a ...any) (string, error) {
+	return "ERROR: " + fmt.Sprintf(format, a...) +
+		". Nothing was staged for this call. Fix the arguments and call the tool again.", nil
 }
 
 // readResumeTool returns the client-supplied draft snapshot for this run
@@ -166,8 +124,11 @@ func (t *proposeCreateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"fields": {
-				Type:     schema.Object,
-				Desc:     "The new entry's fields, matching that entity's shape (e.g. for work_experiences: company, title, location, start_date, end_date, is_current, content).",
+				Type: schema.Object,
+				Desc: "The new entry's fields. Use exactly these names for the chosen entity — " +
+					describeFlatEntityFields() +
+					". content is Markdown (use '- ' bullet lines); technologies is an array of strings; " +
+					"is_current is a boolean; dates are strings like \"2023-01\".",
 				Required: true,
 			},
 		}),
@@ -182,10 +143,14 @@ type proposeCreateArgs struct {
 func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeCreateArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_create arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
 	}
 	if err := validateFlatEntity(args.Entity); err != nil {
-		return "", err
+		return toolProblem("%v", err)
+	}
+	fields, err := normalizeFields(args.Entity, flatEntitySpecs[args.Entity], args.Fields, true)
+	if err != nil {
+		return toolProblem("%v", err)
 	}
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
@@ -193,7 +158,7 @@ func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	}
 
 	id := tempID()
-	sink.add(Proposal{Type: "flat_create", Entity: args.Entity, TempID: id, Fields: stripSortOrder(args.Fields)})
+	sink.add(Proposal{Type: "flat_create", Entity: args.Entity, TempID: id, Fields: fields, ToolCallID: compose.GetToolCallID(ctx)})
 	return fmt.Sprintf("proposed: create %s (tempId %s)", args.Entity, id), nil
 }
 
@@ -232,20 +197,24 @@ type proposeUpdateArgs struct {
 func (t *proposeUpdateTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeUpdateArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_update arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
 	}
 	if err := validateFlatEntity(args.Entity); err != nil {
-		return "", err
+		return toolProblem("%v", err)
 	}
 	if args.ID == "" {
-		return "", errors.New("id is required")
+		return toolProblem("id is required — use the id shown by read_resume")
+	}
+	patch, err := normalizeFields(args.Entity, flatEntitySpecs[args.Entity], args.Patch, false)
+	if err != nil {
+		return toolProblem("%v", err)
 	}
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	sink.add(Proposal{Type: "flat_update", Entity: args.Entity, ID: args.ID, Patch: stripSortOrder(args.Patch)})
+	sink.add(Proposal{Type: "flat_update", Entity: args.Entity, ID: args.ID, Patch: patch, ToolCallID: compose.GetToolCallID(ctx)})
 	return fmt.Sprintf("proposed: update %s %s", args.Entity, args.ID), nil
 }
 
@@ -278,20 +247,20 @@ type proposeDeleteArgs struct {
 func (t *proposeDeleteTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeDeleteArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_delete arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v)", err)
 	}
 	if err := validateFlatEntity(args.Entity); err != nil {
-		return "", err
+		return toolProblem("%v", err)
 	}
 	if args.ID == "" {
-		return "", errors.New("id is required")
+		return toolProblem("id is required — use the id shown by read_resume")
 	}
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	sink.add(Proposal{Type: "flat_delete", Entity: args.Entity, ID: args.ID})
+	sink.add(Proposal{Type: "flat_delete", Entity: args.Entity, ID: args.ID, ToolCallID: compose.GetToolCallID(ctx)})
 	return fmt.Sprintf("proposed: delete %s %s", args.Entity, args.ID), nil
 }
 
@@ -334,10 +303,18 @@ func (t *proposeSkillChangeTool) Info(_ context.Context) (*schema.ToolInfo, erro
 			},
 			"data": {
 				Type: schema.Object,
-				Desc: "For create_group: {group_name}. For create_item: {name, proficiency}. For update_group/update_item: only the fields that should change.",
+				Desc: describeSkillChangeFields(),
 			},
 		}),
 	}, nil
+}
+
+// skillSpecFor picks the spec matching the action's target (group vs item).
+func skillSpecFor(action string) entitySpec {
+	if strings.HasSuffix(action, "_item") {
+		return skillItemSpec
+	}
+	return skillGroupSpec
 }
 
 type proposeSkillChangeArgs struct {
@@ -350,40 +327,62 @@ type proposeSkillChangeArgs struct {
 func (t *proposeSkillChangeTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeSkillChangeArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_skill_change arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
 	}
 	proposalType, ok := skillActions[args.Action]
 	if !ok {
-		return "", fmt.Errorf("unknown action %q", args.Action)
+		return toolProblem("unknown action %q", args.Action)
 	}
+
+	// Arguments are fully validated before the sink is touched, so a bad
+	// payload is always reported to the model rather than surfacing as a
+	// context/wiring error.
+	spec := skillSpecFor(args.Action)
+	p := Proposal{Type: proposalType, GroupID: args.GroupID, ID: args.ID, ToolCallID: compose.GetToolCallID(ctx)}
+	switch args.Action {
+	case "create_group":
+		fields, err := normalizeFields("skill group", spec, args.Data, true)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.TempID = tempID()
+		p.Fields = fields
+	case "create_item":
+		if args.GroupID == "" {
+			return toolProblem("group_id is required for create_item — propose the group first and pass back the id it returns")
+		}
+		fields, err := normalizeFields("skill", spec, args.Data, true)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.TempID = tempID()
+		p.Fields = fields
+	case "update_group", "update_item":
+		if args.ID == "" {
+			return toolProblem("id is required for %s", args.Action)
+		}
+		patch, err := normalizeFields("skill", spec, args.Data, false)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.Patch = patch
+	case "delete_group", "delete_item":
+		if args.ID == "" {
+			return toolProblem("id is required for %s", args.Action)
+		}
+	}
+
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	p := Proposal{Type: proposalType, GroupID: args.GroupID, ID: args.ID}
-	switch args.Action {
-	case "create_group":
-		p.TempID = tempID()
-		p.Fields = stripSortOrder(args.Data)
-	case "create_item":
-		if args.GroupID == "" {
-			return "", errors.New("group_id is required for create_item")
-		}
-		p.TempID = tempID()
-		p.Fields = stripSortOrder(args.Data)
-	case "update_group", "update_item":
-		if args.ID == "" {
-			return "", fmt.Errorf("id is required for %s", args.Action)
-		}
-		p.Patch = stripSortOrder(args.Data)
-	case "delete_group", "delete_item":
-		if args.ID == "" {
-			return "", fmt.Errorf("id is required for %s", args.Action)
-		}
-	}
-
 	sink.add(p)
+	// create_group must report its tempId: it's the only way a follow-up
+	// create_item can name the group it belongs to, since the group has no
+	// real ID until the user accepts it client-side.
+	if p.TempID != "" {
+		return fmt.Sprintf("proposed: %s (id %s — use this as group_id for items in this group)", args.Action, p.TempID), nil
+	}
 	return fmt.Sprintf("proposed: %s", args.Action), nil
 }
 
@@ -425,7 +424,7 @@ func (t *proposeCustomSectionChangeTool) Info(_ context.Context) (*schema.ToolIn
 			},
 			"data": {
 				Type: schema.Object,
-				Desc: "For create_section: {title}. For create_entry: {title, description, entry_date}. For update_section/update_entry: only the fields that should change.",
+				Desc: describeCustomSectionChangeFields(),
 			},
 		}),
 	}, nil
@@ -441,40 +440,64 @@ type proposeCustomSectionChangeArgs struct {
 func (t *proposeCustomSectionChangeTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeCustomSectionChangeArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_custom_section_change arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
 	}
 	proposalType, ok := customSectionActions[args.Action]
 	if !ok {
-		return "", fmt.Errorf("unknown action %q", args.Action)
+		return toolProblem("unknown action %q", args.Action)
 	}
+
+	// Validate before touching the sink — see propose_skill_change above.
+	spec := customSectionSpec
+	label := "custom section"
+	if strings.HasSuffix(args.Action, "_entry") {
+		spec, label = customEntrySpec, "custom section entry"
+	}
+
+	p := Proposal{Type: proposalType, SectionID: args.SectionID, ID: args.ID, ToolCallID: compose.GetToolCallID(ctx)}
+	switch args.Action {
+	case "create_section":
+		fields, err := normalizeFields(label, spec, args.Data, true)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.TempID = tempID()
+		p.Fields = fields
+	case "create_entry":
+		if args.SectionID == "" {
+			return toolProblem("section_id is required for create_entry — propose the section first and pass back the id it returns")
+		}
+		fields, err := normalizeFields(label, spec, args.Data, true)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.TempID = tempID()
+		p.Fields = fields
+	case "update_section", "update_entry":
+		if args.ID == "" {
+			return toolProblem("id is required for %s", args.Action)
+		}
+		patch, err := normalizeFields(label, spec, args.Data, false)
+		if err != nil {
+			return toolProblem("%v", err)
+		}
+		p.Patch = patch
+	case "delete_section", "delete_entry":
+		if args.ID == "" {
+			return toolProblem("id is required for %s", args.Action)
+		}
+	}
+
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
-
-	p := Proposal{Type: proposalType, SectionID: args.SectionID, ID: args.ID}
-	switch args.Action {
-	case "create_section":
-		p.TempID = tempID()
-		p.Fields = stripSortOrder(args.Data)
-	case "create_entry":
-		if args.SectionID == "" {
-			return "", errors.New("section_id is required for create_entry")
-		}
-		p.TempID = tempID()
-		p.Fields = stripSortOrder(args.Data)
-	case "update_section", "update_entry":
-		if args.ID == "" {
-			return "", fmt.Errorf("id is required for %s", args.Action)
-		}
-		p.Patch = stripSortOrder(args.Data)
-	case "delete_section", "delete_entry":
-		if args.ID == "" {
-			return "", fmt.Errorf("id is required for %s", args.Action)
-		}
-	}
-
 	sink.add(p)
+	// As with skill groups, a new section's tempId is what a follow-up
+	// create_entry needs for section_id.
+	if p.TempID != "" {
+		return fmt.Sprintf("proposed: %s (id %s — use this as section_id for entries in this section)", args.Action, p.TempID), nil
+	}
 	return fmt.Sprintf("proposed: %s", args.Action), nil
 }
 
@@ -505,13 +528,17 @@ type proposeMetaUpdateArgs struct {
 func (t *proposeMetaUpdateTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeMetaUpdateArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
-		return "", fmt.Errorf("parse propose_meta_update arguments: %w", err)
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
+	}
+	patch, err := normalizeFields("contact info", resumeMetaSpec, args.Patch, false)
+	if err != nil {
+		return toolProblem("%v", err)
 	}
 	sink, err := sinkFromContext(ctx)
 	if err != nil {
 		return "", err
 	}
 
-	sink.add(Proposal{Type: "update_meta", Patch: args.Patch})
+	sink.add(Proposal{Type: "update_meta", Patch: patch, ToolCallID: compose.GetToolCallID(ctx)})
 	return "proposed: update contact info", nil
 }

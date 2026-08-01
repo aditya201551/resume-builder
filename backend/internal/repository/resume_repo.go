@@ -31,15 +31,15 @@ type Resume struct {
 // ResumeMetaInput is the subset of Resume fields a client may set directly;
 // UserID/timestamps/LastExportedAt are server-controlled.
 type ResumeMetaInput struct {
-	Label      string          `json:"label"`
-	FullName   string          `json:"full_name"`
-	Headline   *string         `json:"headline"`
-	Email      *string         `json:"email"`
-	Phone      *string         `json:"phone"`
-	Location   *string         `json:"location"`
-	PhotoURL   *string         `json:"photo_url"`
-	Summary    *string         `json:"summary"`
-	Links      json.RawMessage `json:"links"`
+	Label    string          `json:"label"`
+	FullName string          `json:"full_name"`
+	Headline *string         `json:"headline"`
+	Email    *string         `json:"email"`
+	Phone    *string         `json:"phone"`
+	Location *string         `json:"location"`
+	PhotoURL *string         `json:"photo_url"`
+	Summary  *string         `json:"summary"`
+	Links    json.RawMessage `json:"links"`
 }
 
 type ResumeRepository struct {

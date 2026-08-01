@@ -30,6 +30,7 @@ type MiscEntryInput struct {
 	EntryDate   *time.Time `json:"entry_date"`
 	Description *string    `json:"description"`
 	SortOrder   int        `json:"sort_order"`
+	ClientID    *string    `json:"client_id"`
 }
 
 type MiscEntryRepository struct {
@@ -74,12 +75,13 @@ func (r *MiscEntryRepository) List(ctx context.Context, resumeID string) ([]Misc
 }
 
 func (r *MiscEntryRepository) Create(ctx context.Context, resumeID string, in MiscEntryInput) (*MiscEntry, error) {
-	const q = `
-		INSERT INTO misc_entries (resume_id, kind, title, issuer_or_org, url, entry_date, description, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	q := `
+		INSERT INTO misc_entries (resume_id, kind, title, issuer_or_org, url, entry_date, description, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + miscEntryColumns
 
-	m, err := scanMiscEntry(r.pool.QueryRow(ctx, q, resumeID, in.Kind, in.Title, in.IssuerOrOrg, in.URL, in.EntryDate, in.Description, in.SortOrder))
+	m, err := scanMiscEntry(r.pool.QueryRow(ctx, q, resumeID, in.Kind, in.Title, in.IssuerOrOrg, in.URL, in.EntryDate, in.Description, in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create misc entry: %w", err)
 	}

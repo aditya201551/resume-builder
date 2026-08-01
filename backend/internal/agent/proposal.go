@@ -25,6 +25,15 @@ type Proposal struct {
 	CustomSectionID *string        `json:"customSectionId,omitempty"`
 	Fields          map[string]any `json:"fields,omitempty"`
 	Patch           map[string]any `json:"patch,omitempty"`
+	// ToolCallID is the id of the propose_* call that produced this
+	// proposal (compose.GetToolCallID, stamped by each propose_* tool
+	// before calling sink.add). The "tool" and "proposal" SSE events are
+	// otherwise uncorrelated — when the model fires several propose_* calls
+	// concurrently, their "done" events and proposal events can each arrive
+	// in a different order, so the frontend needs this id to know which
+	// tool call a given proposal belongs to rather than guessing from
+	// stream position.
+	ToolCallID string `json:"toolCallId,omitempty"`
 }
 
 // flatEntities are the entity names the propose_create/update/delete tools

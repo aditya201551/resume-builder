@@ -53,7 +53,6 @@ func main() {
 	miscEntries := repository.NewMiscEntryRepository(pool)
 	customSections := repository.NewCustomSectionRepository(pool)
 	sectionConfigs := repository.NewSectionConfigRepository(pool)
-	contentBlocks := repository.NewContentBlockRepository(pool, workExperiences, projects)
 
 	// Services
 	authService := service.NewAuthService(users)
@@ -67,7 +66,6 @@ func main() {
 	skillService := service.NewSkillService(resumes, skills)
 	customSectionService := service.NewCustomSectionService(resumes, sectionConfigs, customSections)
 	sectionConfigService := service.NewSectionConfigService(resumes, sectionConfigs)
-	contentBlockService := service.NewContentBlockService(resumes, contentBlocks)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
 	// AI assistant (Phase 2) — optional. Runs in-process inside this binary;
@@ -77,7 +75,7 @@ func main() {
 	if agentCfg, err := agent.LoadConfig(); err != nil {
 		log.Printf("warning: AI assistant disabled (%v)", err)
 	} else {
-		aiAgent, err := agent.New(ctx, agentCfg, resumeService)
+		aiAgent, err := agent.New(ctx, agentCfg)
 		if err != nil {
 			log.Fatalf("create agent: %v", err)
 		}
@@ -97,7 +95,6 @@ func main() {
 		Skill:          handlers.NewSkillHandler(skillService),
 		CustomSection:  handlers.NewCustomSectionHandler(customSectionService),
 		SectionConfig:  handlers.NewSectionConfigHandler(sectionConfigService),
-		ContentBlock:   handlers.NewContentBlockHandler(contentBlockService),
 		Agent:          agentHandler,
 	}
 

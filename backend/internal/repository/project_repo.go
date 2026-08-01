@@ -33,6 +33,7 @@ type ProjectInput struct {
 	StartDate    *time.Time      `json:"start_date"`
 	EndDate      *time.Time      `json:"end_date"`
 	SortOrder    int             `json:"sort_order"`
+	ClientID     *string         `json:"client_id"`
 }
 
 type ProjectRepository struct {
@@ -77,12 +78,13 @@ func (r *ProjectRepository) List(ctx context.Context, resumeID string) ([]Projec
 }
 
 func (r *ProjectRepository) Create(ctx context.Context, resumeID string, in ProjectInput) (*Project, error) {
-	const q = `
-		INSERT INTO projects (resume_id, name, content, role, technologies, url, start_date, end_date, sort_order)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+	q := `
+		INSERT INTO projects (resume_id, name, content, role, technologies, url, start_date, end_date, sort_order, client_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		` + onConflictClientID("resume_id") + `
 		RETURNING ` + projectColumns
 
-	p, err := scanProject(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Content, in.Role, defaultJSON(in.Technologies, `[]`), in.URL, in.StartDate, in.EndDate, in.SortOrder))
+	p, err := scanProject(r.pool.QueryRow(ctx, q, resumeID, in.Name, in.Content, in.Role, defaultJSON(in.Technologies, `[]`), in.URL, in.StartDate, in.EndDate, in.SortOrder, in.ClientID))
 	if err != nil {
 		return nil, fmt.Errorf("create project: %w", err)
 	}
@@ -116,17 +118,4 @@ func (r *ProjectRepository) Delete(ctx context.Context, resumeID, id string) err
 
 func (r *ProjectRepository) Reorder(ctx context.Context, resumeID string, orderedIDs []string) error {
 	return reorder(ctx, r.pool, "projects", "resume_id", resumeID, orderedIDs)
-}
-
-// UpdateContent is a narrow write path used by the shared content-block view
-// (see content_block_repo.go) — only the markdown body changes.
-func (r *ProjectRepository) UpdateContent(ctx context.Context, resumeID, id, content string) error {
-	tag, err := r.pool.Exec(ctx, `UPDATE projects SET content = $3 WHERE id = $1 AND resume_id = $2`, id, resumeID, content)
-	if err != nil {
-		return fmt.Errorf("update project content: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return ErrNotFound
-	}
-	return nil
 }

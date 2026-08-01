@@ -37,6 +37,31 @@ const DEFAULT_ORDER = [
   'volunteer',
 ] as const
 
+type PreviewSectionConfig = Pick<FullResume['section_configs'][number], 'section_type' | 'custom_section_id' | 'display_title_override' | 'is_visible' | 'sort_order'>
+
+function previewSectionOrder(data: FullResume): PreviewSectionConfig[] {
+  if (data.section_configs.length === 0) {
+    return DEFAULT_ORDER.map((t) => ({ section_type: t, custom_section_id: null, display_title_override: null, is_visible: true, sort_order: 0 }))
+  }
+
+  const order: PreviewSectionConfig[] = [...data.section_configs].filter((c) => c.section_type !== 'contact').sort((a, b) => a.sort_order - b.sort_order)
+  const known = new Set(order.map((c) => c.section_type))
+  let nextSortOrder = order.reduce((max, c) => Math.max(max, c.sort_order), -1) + 1
+
+  for (const sectionType of DEFAULT_ORDER) {
+    if (known.has(sectionType)) continue
+    order.push({
+      section_type: sectionType,
+      custom_section_id: null,
+      display_title_override: null,
+      is_visible: true,
+      sort_order: nextSortOrder++,
+    })
+  }
+
+  return order.sort((a, b) => a.sort_order - b.sort_order)
+}
+
 function miscByKind(entries: MiscEntry[], kind: MiscEntry['kind']) {
   return entries.filter((e) => e.kind === kind)
 }
@@ -175,20 +200,12 @@ function buildRawBlocks(data: FullResume): RawBlock[] {
     ),
   })
 
-  const visibleTypes = new Set(
-    data.section_configs.length > 0
-      ? data.section_configs.filter((c) => c.is_visible).map((c) => c.section_type)
-      : [...DEFAULT_ORDER, 'custom'],
-  )
-
-  const order =
-    data.section_configs.length > 0
-      ? [...data.section_configs].filter((c) => c.section_type !== 'contact').sort((a, b) => a.sort_order - b.sort_order)
-      : DEFAULT_ORDER.map((t) => ({ section_type: t, custom_section_id: null, display_title_override: null }))
+  const hiddenTypes = new Set(data.section_configs.filter((c) => !c.is_visible).map((c) => c.section_type))
+  const order = previewSectionOrder(data)
 
   for (const cfg of order) {
     const type = cfg.section_type
-    if (!visibleTypes.has(type)) continue
+    if (hiddenTypes.has(type)) continue
 
     if (type === 'summary') {
       if (!resume.summary) continue

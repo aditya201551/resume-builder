@@ -35,7 +35,9 @@ import LanguagesSection from '@/components/editor/sections/LanguagesSection'
 import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
 import LivePreview from '@/components/editor/LivePreview'
-import EditorNavbar from '@/components/editor/EditorNavbar'
+import PreviewErrorBoundary from '@/components/editor/PreviewErrorBoundary'
+import EditorNavbar, { type EditorMode } from '@/components/editor/EditorNavbar'
+import ChatPanel from '@/components/agent/ChatPanel'
 import type { FullResume, SectionConfig } from '@/types/resume'
 
 const PINNED_TYPES = new Set(['contact', 'summary'])
@@ -331,7 +333,6 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
 function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
   const openStack = useRef<OpenPanelHandle[]>([])
-  const { flushNow } = useResumeDraftContext()
 
   const pushOpen = useCallback((handle: OpenPanelHandle) => {
     openStack.current.push(handle)
@@ -347,19 +348,10 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
         top?.close()
         return
       }
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
-        e.preventDefault()
-        // Commit every currently open editor's in-progress fields (without
-        // closing them), then push the whole draft to the backend right away.
-        // The commits dispatch React state updates that only land on the next
-        // render, so defer the flush a tick — otherwise it reads stale state.
-        for (const handle of openStack.current) handle.commit?.()
-        setTimeout(() => void flushNow(), 0)
-      }
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [flushNow])
+  }, [])
 
   const panelContext = useMemo(() => ({ slot: panelSlot, pushOpen }), [panelSlot, pushOpen])
 
@@ -376,6 +368,8 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
 
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
+  const { commitDirtyPanels, flushNow } = useResumeDraftContext()
+  const [mode, setMode] = useState<EditorMode>('content')
   const [overrides, setOverrides] = useState<Record<string, Record<string, unknown>>>({})
   const setOverride = useCallback((id: string, patch: Record<string, unknown>) => {
     setOverrides((prev) => ({ ...prev, [id]: patch }))
@@ -390,6 +384,18 @@ function EditorPageContent() {
   }, [])
   const panelContextValue = useMemo(() => ({ overrides, setOverride, clearOverride }), [overrides, setOverride, clearOverride])
 
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+        e.preventDefault()
+        commitDirtyPanels()
+        setTimeout(() => void flushNow(), 0)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [commitDirtyPanels, flushNow])
+
   if (isLoading || !data) {
     return <div className="p-10 text-sm text-muted-foreground">Loading resume…</div>
   }
@@ -401,36 +407,47 @@ function EditorPageContent() {
 
   const previewPane = (
     <div className="h-full overflow-y-auto bg-secondary/40 p-6">
-      <LivePreview data={previewData} />
+      <PreviewErrorBoundary resetKey={previewData}>
+        <LivePreview data={previewData} />
+      </PreviewErrorBoundary>
     </div>
   )
+
+  // Chat mode swaps the edit pane for the assistant and moves the preview to
+  // the other side, so the user watches the resume update live while
+  // chatting — Content mode's layout (edit pane | preview) is unchanged.
+  const primaryPane =
+    mode === 'chat' ? previewPane : <div className="h-full overflow-y-auto px-6 py-6">{editPane}</div>
+  const secondaryPane = mode === 'chat' ? <ChatPanel /> : previewPane
 
   return (
     <PreviewOverrideContext.Provider value={panelContextValue}>
       <div className="flex h-svh flex-col">
-        <EditorNavbar resume={data.resume} />
+        <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
 
         <div className="min-h-0 flex-1">
           {/* Desktop split pane */}
           <div className="hidden min-[900px]:grid min-[900px]:h-full min-[900px]:grid-cols-2">
-            <div className="overflow-y-auto px-6 py-6">{editPane}</div>
-            {previewPane}
+            {primaryPane}
+            {secondaryPane}
           </div>
 
-          {/* Mobile: Edit/Preview tab switcher */}
+          {/* Mobile: Edit/Chat + Preview tab switcher */}
           <div className="h-full overflow-y-auto min-[900px]:hidden">
             <Tabs defaultValue="edit">
               <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
                 <TabsList>
-                  <TabsTrigger value="edit">Edit</TabsTrigger>
+                  <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : 'Edit'}</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
               </div>
-              <TabsContent value="edit" className="px-4 py-4">
-                {editPane}
+              <TabsContent value="edit" className={mode === 'chat' ? 'h-[calc(100svh-8.5rem)]' : 'px-4 py-4'}>
+                {mode === 'chat' ? <ChatPanel /> : editPane}
               </TabsContent>
               <TabsContent value="preview" className="bg-secondary/40 p-4">
-                <LivePreview data={previewData} />
+                <PreviewErrorBoundary resetKey={previewData}>
+                  <LivePreview data={previewData} />
+                </PreviewErrorBoundary>
               </TabsContent>
             </Tabs>
           </div>

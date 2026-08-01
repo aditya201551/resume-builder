@@ -31,7 +31,13 @@ func LoadConfig() (*Config, error) {
 		model = "claude-sonnet-5"
 	}
 
-	maxTokens := 2048
+	// The chat agent emits structured edits as tool calls, and a request like
+	// "build me a resume end to end" produces a lot of them in one turn. When
+	// the response hits this ceiling mid-tool-call, the provider truncates the
+	// arguments JSON and the tool receives an unparseable fragment — so this
+	// needs enough headroom for a full turn's worth of proposals, not just a
+	// conversational reply. 2048 was not close.
+	maxTokens := 16384
 	if v := os.Getenv("AGENT_MAX_TOKENS"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {

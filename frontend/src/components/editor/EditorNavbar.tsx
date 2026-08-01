@@ -230,10 +230,47 @@ function BackButton() {
   )
 }
 
-export default function EditorNavbar({ resume }: { resume: Resume }) {
+export type EditorMode = 'content' | 'chat'
+
+const NAV_ITEMS: { key: EditorMode; label: string }[] = [
+  { key: 'content', label: 'Content' },
+  { key: 'chat', label: 'Chat' },
+]
+
+function EditorNavItems({ mode, onModeChange }: { mode: EditorMode; onModeChange: (mode: EditorMode) => void }) {
+  return (
+    <div className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1">
+      {NAV_ITEMS.map((item) => (
+        <button
+          key={item.key}
+          type="button"
+          onClick={() => onModeChange(item.key)}
+          className={cn(
+            'rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
+            mode === item.key && 'bg-background text-foreground shadow-sm',
+          )}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+export default function EditorNavbar({
+  resume,
+  mode,
+  onModeChange,
+}: {
+  resume: Resume
+  mode: EditorMode
+  onModeChange: (mode: EditorMode) => void
+}) {
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-6 py-3">
       <BackButton />
+
+      <EditorNavItems mode={mode} onModeChange={onModeChange} />
 
       <div className="flex-1" />
 

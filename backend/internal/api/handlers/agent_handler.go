@@ -8,6 +8,8 @@ import (
 	"resume-builder/backend/internal/agent"
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/service"
+
+	"github.com/cloudwego/eino/schema"
 )
 
 // chatHistoryLimit caps how many prior messages are forwarded to the model
@@ -30,37 +32,6 @@ func NewAgentHandler(a *agent.Agent, resumes *service.ResumeService) *AgentHandl
 	return &AgentHandler{agent: a, resumes: resumes}
 }
 
-// SuggestContentRewrite returns an AI-suggested rewrite for a resume content
-// block. It never writes to storage — the client PATCHes
-// /resumes/{resumeID}/content-blocks/{kind}/{id} separately once the user
-// accepts the suggestion.
-func (h *AgentHandler) SuggestContentRewrite(w http.ResponseWriter, r *http.Request) {
-	userID, _ := auth.UserIDFromContext(r.Context())
-	resumeID := r.PathValue("resumeID")
-
-	var body struct {
-		Content string `json:"content"`
-	}
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-
-	// Ownership check up front so a user can't probe another user's resume
-	// through this endpoint before the agent ever runs.
-	if _, err := h.resumes.Get(r.Context(), userID, resumeID); err != nil {
-		writeError(w, err)
-		return
-	}
-
-	suggestion, err := h.agent.SuggestContentRewrite(r.Context(), resumeID, body.Content)
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-
-	writeJSON(w, http.StatusOK, map[string]string{"suggestion": suggestion})
-}
-
 type chatMessageDTO struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
@@ -69,6 +40,23 @@ type chatMessageDTO struct {
 type chatRequestBody struct {
 	Messages []chatMessageDTO `json:"messages"`
 	Draft    json.RawMessage  `json:"draft"`
+}
+
+type toolEventDTO struct {
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name"`
+	Status    string `json:"status"`
+	Arguments string `json:"arguments,omitempty"`
+	Error     string `json:"error,omitempty"`
+}
+
+func toolEventFromCall(tc schema.ToolCall, status string) toolEventDTO {
+	return toolEventDTO{
+		ID:        tc.ID,
+		Name:      tc.Function.Name,
+		Status:    status,
+		Arguments: tc.Function.Arguments,
+	}
 }
 
 // Chat streams a multi-turn, multi-tool-call conversation over SSE. The
@@ -91,7 +79,8 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ownership check up front, before any SSE headers go out or any model
-	// call is made — same pattern as SuggestContentRewrite above.
+	// call is made — a user can't probe another user's resume through this
+	// endpoint before the agent ever runs.
 	if _, err := h.resumes.Get(r.Context(), userID, resumeID); err != nil {
 		writeError(w, err)
 		return
@@ -148,8 +137,27 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if event.Output != nil && event.Output.MessageOutput != nil {
-			streamErr := agent.StreamAssistantText(event.Output.MessageOutput, func(text string) {
+			mv := event.Output.MessageOutput
+
+			if mv.Role == schema.Tool {
+				name := mv.ToolName
+				id := ""
+				if mv.Message != nil && mv.Message.ToolName != "" {
+					name = mv.Message.ToolName
+				}
+				if mv.Message != nil {
+					id = mv.Message.ToolCallID
+				}
+				if name != "" {
+					send("tool", toolEventDTO{ID: id, Name: name, Status: "done"})
+				}
+				continue
+			}
+
+			streamErr := agent.StreamAssistantOutput(mv, func(text string) {
 				send("token", map[string]string{"text": text})
+			}, func(tc schema.ToolCall) {
+				send("tool", toolEventFromCall(tc, "running"))
 			})
 			if streamErr != nil {
 				send("error", map[string]string{"message": streamErr.Error()})

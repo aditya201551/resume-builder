@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/cloudwego/eino-ext/components/model/claude"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -32,6 +33,19 @@ When the user describes something in natural language (e.g. dictating their work
 	`history), turn it into one or more propose_create calls with well-structured ` +
 	`fields rather than asking them to fill out a form. Write achievement-focused, ` +
 	`ATS-friendly content. Never set sort_order — the client places new entries.
+
+Use exactly the field names each tool documents. If a call comes back with an ` +
+	`error about unknown or missing fields, re-send that same call with the names ` +
+	`it lists — do not tell the user the change was made until a call succeeds.
+
+Skills and custom sections are two-level: the group/section must be proposed ` +
+	`before anything inside it. create_group and create_section return the new ` +
+	`id in their result — pass that back as group_id/section_id when proposing ` +
+	`the items or entries that belong to it, in the same turn. A group with no ` +
+	`items is not useful, so always follow a create_group with its create_item ` +
+	`calls. The user accepts each proposal separately and a child cannot be ` +
+	`applied unless its parent was accepted, so keep parents and children ` +
+	`adjacent and few.
 
 Dates should be plain strings like "2023-01" or "2023-01-15", matching however ` +
 	`the existing resume data represents them.`
@@ -70,10 +84,17 @@ func (a *Agent) Chat(ctx context.Context, history []ChatMessage, draftJSON strin
 	}
 
 	sink := &ProposalSink{}
-	iter := a.chatRunner.Run(ctx, msgs, adk.WithSessionValues(map[string]any{
-		sessionKeyDraft: draftJSON,
-		sessionKeySink:  sink,
-	}))
+	iter := a.chatRunner.Run(ctx, msgs,
+		adk.WithSessionValues(map[string]any{
+			sessionKeyDraft: draftJSON,
+			sessionKeySink:  sink,
+		}),
+		// The system instruction and tool schemas (chat.go/tools.go) are
+		// identical on every call across every user and turn — auto-cache
+		// sets breakpoints on them (plus the last input message) so repeat
+		// calls read from cache instead of reprocessing the full prefix.
+		adk.WithChatModelOptions([]model.Option{claude.WithEnableAutoCache(true)}),
+	)
 	return iter, sink, nil
 }
 
@@ -108,17 +129,31 @@ func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message
 // silently skipped, matching assistantText's behavior. Exported so
 // agent_handler.go's SSE loop can call it per event.
 func StreamAssistantText(mv *adk.MessageVariant, emit func(string)) error {
+	return StreamAssistantOutput(mv, emit, nil)
+}
+
+// StreamAssistantOutput drains an assistant MessageVariant and calls emitText
+// for user-visible text and emitToolCall when the model decides to call a
+// tool. Tool calls are metadata for UI status only; tool results are emitted
+// separately by the HTTP handler when Role == schema.Tool events arrive.
+func StreamAssistantOutput(mv *adk.MessageVariant, emitText func(string), emitToolCall func(schema.ToolCall)) error {
 	if mv == nil || mv.Role != schema.Assistant {
 		return nil
 	}
 
 	if !mv.IsStreaming {
 		if mv.Message != nil && mv.Message.Content != "" {
-			emit(mv.Message.Content)
+			emitText(mv.Message.Content)
+		}
+		if emitToolCall != nil && mv.Message != nil {
+			for _, tc := range mv.Message.ToolCalls {
+				emitToolCall(tc)
+			}
 		}
 		return nil
 	}
 
+	seenToolCalls := map[string]bool{}
 	for {
 		chunk, err := mv.MessageStream.Recv()
 		if errors.Is(err, io.EOF) {
@@ -128,7 +163,21 @@ func StreamAssistantText(mv *adk.MessageVariant, emit func(string)) error {
 			return fmt.Errorf("read message stream: %w", err)
 		}
 		if chunk.Content != "" {
-			emit(chunk.Content)
+			emitText(chunk.Content)
+		}
+		if emitToolCall == nil {
+			continue
+		}
+		for _, tc := range chunk.ToolCalls {
+			key := tc.ID
+			if key == "" {
+				key = tc.Function.Name
+			}
+			if key == "" || seenToolCalls[key] || tc.Function.Name == "" {
+				continue
+			}
+			seenToolCalls[key] = true
+			emitToolCall(tc)
 		}
 	}
 }

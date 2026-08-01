@@ -113,6 +113,10 @@ func main() {
 	router := api.NewRouter(jwtIssuer, h, healthCheck)
 
 	log.Printf("api listening on :%s", cfg.Port)
+	// No ReadTimeout/WriteTimeout/IdleTimeout: the agent chat endpoint
+	// streams SSE responses that can legitimately stay open for the
+	// duration of a multi-tool-call model run, so a WriteTimeout here
+	// would kill long conversations mid-stream.
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatal(err)
 	}

@@ -1,5 +1,5 @@
 package api
-	
+
 import (
 	"net/http"
 
@@ -86,6 +86,7 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	if h.Agent != nil {
 		handle("POST /api/resumes/{resumeID}/agent/rewrite", h.Agent.SuggestContentRewrite)
+		handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 	}
 
 	return mux

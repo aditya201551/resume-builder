@@ -28,7 +28,7 @@ func LoadConfig() (*Config, error) {
 
 	model := os.Getenv("AGENT_CLAUDE_MODEL")
 	if model == "" {
-		model = "claude-sonnet-4-5"
+		model = "claude-sonnet-5"
 	}
 
 	maxTokens := 2048

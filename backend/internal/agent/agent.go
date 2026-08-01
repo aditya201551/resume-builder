@@ -26,19 +26,23 @@ const rewriteInstruction = `You rewrite resume bullet/paragraph content to be co
 	`candidate's role, seniority, and skills when it would improve the rewrite. ` +
 	`Return only the rewritten Markdown content — no preamble, no commentary.`
 
-// Agent is the Phase 2 AI assistant: a single Eino ChatModelAgent wired
-// directly to the existing service layer (see doc.go). It currently
-// exposes one capability, content-block rewriting, and is meant to grow
-// tool-by-tool (professional summary generation, grammar pass, JD
-// keyword-gap analysis) without changing this constructor's shape.
+// Agent is the Phase 2 AI assistant: Eino ChatModelAgents wired directly to
+// the existing service layer (see doc.go), sharing one Claude chat model
+// across two runners with different jobs:
+//   - runner: single-shot content-block rewrite (SuggestContentRewrite)
+//   - chatRunner: multi-turn, multi-tool-call conversation that proposes
+//     structured edits across the resume (Chat, see chat.go)
 type Agent struct {
-	runner *adk.Runner
+	runner     *adk.Runner
+	chatRunner *adk.Runner
 }
 
-// New builds the agent's Claude chat model, tool set, and Eino runner.
-// resumes and contentBlocks are the same *service.ResumeService and
-// *service.ContentBlockService instances cmd/api's HTTP handlers use —
-// the agent shares the service layer rather than duplicating it.
+// New builds the agent's Claude chat model, tool sets, and Eino runners.
+// resumes is the same *service.ResumeService instance cmd/api's HTTP
+// handlers use — the agent shares the service layer rather than
+// duplicating it, but only for the read-only rewrite-agent tool; the chat
+// agent's tools operate on the client-supplied draft, never the database
+// (see chat.go's package comment for why).
 func New(ctx context.Context, cfg *Config, resumes *service.ResumeService) (*Agent, error) {
 	chatModel, err := claude.NewChatModel(ctx, &claude.Config{
 		APIKey:    cfg.AnthropicAPIKey,
@@ -53,7 +57,7 @@ func New(ctx context.Context, cfg *Config, resumes *service.ResumeService) (*Age
 		newGetFullResumeTool(resumes),
 	}
 
-	chatAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+	rewriteAgent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name:        "resume_assistant",
 		Description: "Suggests improved phrasing for resume content blocks.",
 		Instruction: rewriteInstruction,
@@ -67,16 +71,25 @@ func New(ctx context.Context, cfg *Config, resumes *service.ResumeService) (*Age
 	}
 
 	runner := adk.NewRunner(ctx, adk.RunnerConfig{
-		Agent: chatAgent,
-		// Non-streaming for now — SuggestContentRewrite returns one
-		// complete suggestion. Flip this on when the WebSocket push
-		// (planned per PRD) lands, and switch SuggestContentRewrite's
-		// caller to consume the event iterator incrementally instead of
-		// draining it into a single string.
+		Agent: rewriteAgent,
+		// Non-streaming — SuggestContentRewrite returns one complete
+		// suggestion, drained into a single string by assistantText below.
 		EnableStreaming: false,
 	})
 
-	return &Agent{runner: runner}, nil
+	chatAgent, err := newChatAgent(ctx, chatModel)
+	if err != nil {
+		return nil, fmt.Errorf("create chat agent: %w", err)
+	}
+
+	chatRunner := adk.NewRunner(ctx, adk.RunnerConfig{
+		Agent: chatAgent,
+		// Streaming — Chat's caller (agent_handler.go) forwards text as it
+		// arrives over SSE rather than waiting for a complete message.
+		EnableStreaming: true,
+	})
+
+	return &Agent{runner: runner, chatRunner: chatRunner}, nil
 }
 
 // SuggestContentRewrite asks the agent to rewrite one work-experience/project

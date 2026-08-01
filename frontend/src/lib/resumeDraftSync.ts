@@ -272,7 +272,7 @@ async function syncSectionConfigs(resumeId: string, apply: (a: DraftAction) => v
 async function syncResumeMeta(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
   const cur = getState().data.resume
   const prev = getState().lastSynced.resume
-  const metaKeys = ['label', 'template_id', 'full_name', 'headline', 'email', 'phone', 'location', 'photo_url', 'summary', 'links']
+  const metaKeys = ['label', 'full_name', 'headline', 'email', 'phone', 'location', 'photo_url', 'summary', 'links']
   const curMeta = Object.fromEntries(metaKeys.map((k) => [k, (cur as unknown as Record<string, unknown>)[k]]))
   const prevMeta = Object.fromEntries(metaKeys.map((k) => [k, (prev as unknown as Record<string, unknown>)[k]]))
   if (JSON.stringify(curMeta) !== JSON.stringify(prevMeta)) {

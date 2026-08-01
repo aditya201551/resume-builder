@@ -23,10 +23,9 @@ func (s *CustomSectionService) ListSections(ctx context.Context, callerUserID, r
 	return s.repo.ListSections(ctx, resumeID)
 }
 
-// CreateSection also seeds a matching resume_section_configs row (region
-// "main", visible) — custom sections don't exist yet when a resume/template
-// first seeds its layout, so this is the one place a config row is created
-// outside that initial seed.
+// CreateSection also seeds a matching resume_section_configs row (visible)
+// since a config row otherwise doesn't exist until a section type is
+// explicitly touched.
 func (s *CustomSectionService) CreateSection(ctx context.Context, callerUserID, resumeID string, in repository.CustomSectionInput) (*repository.CustomSection, error) {
 	if _, err := ensureResumeOwner(ctx, s.resumes, resumeID, callerUserID); err != nil {
 		return nil, err
@@ -35,7 +34,7 @@ func (s *CustomSectionService) CreateSection(ctx context.Context, callerUserID, 
 	if err != nil {
 		return nil, err
 	}
-	if err := s.configs.EnsureExists(ctx, resumeID, "custom", &section.ID, "main", in.SortOrder); err != nil {
+	if err := s.configs.EnsureExists(ctx, resumeID, "custom", &section.ID, in.SortOrder); err != nil {
 		return nil, err
 	}
 	return section, nil

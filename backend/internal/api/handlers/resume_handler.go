@@ -173,19 +173,3 @@ func (h *ResumeHandler) Duplicate(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusCreated, resume)
 }
-
-func (h *ResumeHandler) SwitchTemplate(w http.ResponseWriter, r *http.Request) {
-	userID, _ := auth.UserIDFromContext(r.Context())
-	var body struct {
-		TemplateID string `json:"template_id"`
-	}
-	if !decodeJSON(w, r, &body) {
-		return
-	}
-	resume, err := h.svc.SwitchTemplate(r.Context(), userID, r.PathValue("resumeID"), body.TemplateID)
-	if err != nil {
-		writeError(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, resume)
-}

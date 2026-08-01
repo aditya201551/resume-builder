@@ -53,7 +53,6 @@ func main() {
 	miscEntries := repository.NewMiscEntryRepository(pool)
 	customSections := repository.NewCustomSectionRepository(pool)
 	sectionConfigs := repository.NewSectionConfigRepository(pool)
-	templates := repository.NewTemplateRepository(pool)
 	contentBlocks := repository.NewContentBlockRepository(pool, workExperiences, projects)
 
 	// Services
@@ -68,7 +67,6 @@ func main() {
 	skillService := service.NewSkillService(resumes, skills)
 	customSectionService := service.NewCustomSectionService(resumes, sectionConfigs, customSections)
 	sectionConfigService := service.NewSectionConfigService(resumes, sectionConfigs)
-	templateService := service.NewTemplateService(templates)
 	contentBlockService := service.NewContentBlockService(resumes, contentBlocks)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
@@ -99,7 +97,6 @@ func main() {
 		Skill:          handlers.NewSkillHandler(skillService),
 		CustomSection:  handlers.NewCustomSectionHandler(customSectionService),
 		SectionConfig:  handlers.NewSectionConfigHandler(sectionConfigService),
-		Template:       handlers.NewTemplateHandler(templateService),
 		ContentBlock:   handlers.NewContentBlockHandler(contentBlockService),
 		Agent:          agentHandler,
 	}

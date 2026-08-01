@@ -21,7 +21,6 @@ type Handlers struct {
 	Skill          *handlers.SkillHandler
 	CustomSection  *handlers.CustomSectionHandler
 	SectionConfig  *handlers.SectionConfigHandler
-	Template       *handlers.TemplateHandler
 	ContentBlock   *handlers.ContentBlockHandler
 	// Agent is nil when ANTHROPIC_API_KEY isn't configured — see NewRouter,
 	// which skips registering its routes in that case.
@@ -40,8 +39,6 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	mux.HandleFunc("POST /api/auth/logout", h.Auth.Logout)
 	handle("GET /api/auth/me", h.Auth.Me)
 
-	handle("GET /api/templates", h.Template.List)
-
 	handle("GET /api/resumes", h.Resume.List)
 	handle("POST /api/resumes", h.Resume.Create)
 	handle("GET /api/resumes/{resumeID}", h.Resume.Get)
@@ -49,7 +46,6 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("DELETE /api/resumes/{resumeID}", h.Resume.Delete)
 	handle("GET /api/resumes/{resumeID}/full", h.Resume.GetFull)
 	handle("POST /api/resumes/{resumeID}/duplicate", h.Resume.Duplicate)
-	handle("PUT /api/resumes/{resumeID}/template", h.Resume.SwitchTemplate)
 	handle("GET /api/resumes/{resumeID}/export/pdf", h.Resume.ExportPDF)
 	// Not wrapped by `protect` — headless Chrome has no session cookie and
 	// self-validates via the short-lived export_token query param instead.

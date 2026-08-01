@@ -95,20 +95,6 @@ func (s *ResumeService) Duplicate(ctx context.Context, callerUserID, resumeID st
 	return s.resumes.Duplicate(ctx, resumeID)
 }
 
-func (s *ResumeService) SwitchTemplate(ctx context.Context, callerUserID, resumeID, templateID string) (*repository.Resume, error) {
-	if _, err := ensureResumeOwner(ctx, s.resumes, resumeID, callerUserID); err != nil {
-		return nil, err
-	}
-	return mapNotFoundResume(s.resumes.SwitchTemplate(ctx, resumeID, templateID))
-}
-
-func mapNotFoundResume(r *repository.Resume, err error) (*repository.Resume, error) {
-	if err != nil {
-		return nil, mapNotFound(err)
-	}
-	return r, nil
-}
-
 // GetFullResume assembles the resume and every child collection into one
 // document — the shape both a "load for editing" call and a future MCP
 // read-only tool want, so it lives here once rather than being reinvented

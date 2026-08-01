@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, MoreVertical } from 'lucide-react'
 import { apiDelete, apiGet, apiPost } from '@/lib/http'
-import type { Resume, Template } from '@/types/resume'
+import type { Resume } from '@/types/resume'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -23,17 +23,11 @@ export default function DashboardPage() {
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
   })
 
-  const templatesQuery = useQuery({
-    queryKey: ['templates'],
-    queryFn: () => apiGet<Template[]>('/api/templates'),
-  })
-
   const createMutation = useMutation({
     mutationFn: () =>
       apiPost<Resume>('/api/resumes', {
         label: 'Untitled resume',
         full_name: '',
-        template_id: templatesQuery.data?.[0]?.id ?? null,
       }),
     onSuccess: (resume) => {
       queryClient.invalidateQueries({ queryKey: resumesKey })

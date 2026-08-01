@@ -30,48 +30,11 @@ CREATE TABLE auth_identities (
 );
 CREATE INDEX idx_auth_identities_user_id ON auth_identities(user_id);
 
--- TEMPLATES (code-defined components; DB tracks identity + region schema only)
-CREATE TABLE templates (
-    id                    UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name                  TEXT NOT NULL,
-    slug                  TEXT NOT NULL UNIQUE,
-    regions               JSONB NOT NULL DEFAULT '["main"]',
-    default_region_map    JSONB NOT NULL DEFAULT '{}',
-    preview_thumbnail_url TEXT,
-    is_active             BOOLEAN NOT NULL DEFAULT true,
-    created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Seed the two starter templates
-INSERT INTO templates (name, slug, regions, default_region_map) VALUES
-(
-    'Vertical Split',
-    'vertical-split',
-    '["sidebar", "main"]',
-    '{
-        "contact": "sidebar", "skills": "sidebar", "languages": "sidebar", "certifications": "sidebar",
-        "summary": "main", "work_experience": "main", "education": "main", "projects": "main",
-        "awards": "main", "publications": "main", "volunteer": "main", "custom": "main"
-    }'
-),
-(
-    'Horizontal Split',
-    'horizontal-split',
-    '["main"]',
-    '{
-        "contact": "main", "summary": "main", "work_experience": "main", "education": "main",
-        "skills": "main", "projects": "main", "certifications": "main", "languages": "main",
-        "awards": "main", "publications": "main", "volunteer": "main", "custom": "main"
-    }'
-);
-
 -- RESUMES (parent document — owns contact info + summary directly)
 CREATE TABLE resumes (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     label             TEXT NOT NULL,
-    template_id       UUID REFERENCES templates(id),
     full_name         TEXT NOT NULL,
     headline          TEXT,
     email             TEXT,
@@ -91,6 +54,7 @@ CREATE TABLE work_experiences (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id       UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
     company         TEXT NOT NULL,
+    company_url     TEXT,
     title           TEXT NOT NULL,
     location        TEXT,
     employment_type TEXT,
@@ -214,7 +178,7 @@ CREATE TABLE custom_section_entries (
 );
 CREATE INDEX idx_custom_section_entries_section_id ON custom_section_entries(custom_section_id);
 
--- SECTION CONFIG (per-resume visibility, order, title overrides, region)
+-- SECTION CONFIG (per-resume visibility, order, title overrides)
 CREATE TYPE section_type AS ENUM (
     'contact', 'summary', 'work_experience', 'education', 'skills',
     'projects', 'certifications', 'languages', 'awards', 'publications',
@@ -226,10 +190,18 @@ CREATE TABLE resume_section_configs (
     resume_id               UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
     section_type            section_type NOT NULL,
     custom_section_id       UUID REFERENCES custom_sections(id) ON DELETE CASCADE,
-    region                  TEXT,
     is_visible              BOOLEAN NOT NULL DEFAULT true,
     display_title_override  TEXT,
     sort_order              INTEGER NOT NULL DEFAULT 0,
     UNIQUE (resume_id, section_type, custom_section_id)
 );
 CREATE INDEX idx_resume_section_configs_resume_id ON resume_section_configs(resume_id);
+
+-- Postgres treats NULL as distinct in a plain UNIQUE constraint, so the
+-- constraint above never actually prevents duplicate rows when
+-- custom_section_id IS NULL (every non-custom section type). That in turn
+-- means ON CONFLICT can't target it for an upsert on non-custom section
+-- types. This partial unique index covers exactly that case.
+CREATE UNIQUE INDEX idx_resume_section_configs_main_unique
+    ON resume_section_configs (resume_id, section_type)
+    WHERE custom_section_id IS NULL;

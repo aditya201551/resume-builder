@@ -15,7 +15,6 @@ type Resume struct {
 	ID             string          `json:"id"`
 	UserID         string          `json:"user_id"`
 	Label          string          `json:"label"`
-	TemplateID     *string         `json:"template_id"`
 	FullName       string          `json:"full_name"`
 	Headline       *string         `json:"headline"`
 	Email          *string         `json:"email"`
@@ -33,7 +32,6 @@ type Resume struct {
 // UserID/timestamps/LastExportedAt are server-controlled.
 type ResumeMetaInput struct {
 	Label      string          `json:"label"`
-	TemplateID *string         `json:"template_id"`
 	FullName   string          `json:"full_name"`
 	Headline   *string         `json:"headline"`
 	Email      *string         `json:"email"`
@@ -52,11 +50,11 @@ func NewResumeRepository(pool *pgxpool.Pool) *ResumeRepository {
 	return &ResumeRepository{pool: pool}
 }
 
-const resumeColumns = `id, user_id, label, template_id, full_name, headline, email, phone, location, photo_url, summary, links, created_at, updated_at, last_exported_at`
+const resumeColumns = `id, user_id, label, full_name, headline, email, phone, location, photo_url, summary, links, created_at, updated_at, last_exported_at`
 
 func scanResume(row pgx.Row) (*Resume, error) {
 	var r Resume
-	err := row.Scan(&r.ID, &r.UserID, &r.Label, &r.TemplateID, &r.FullName, &r.Headline, &r.Email, &r.Phone,
+	err := row.Scan(&r.ID, &r.UserID, &r.Label, &r.FullName, &r.Headline, &r.Email, &r.Phone,
 		&r.Location, &r.PhotoURL, &r.Summary, &r.Links, &r.CreatedAt, &r.UpdatedAt, &r.LastExportedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
@@ -67,57 +65,18 @@ func scanResume(row pgx.Row) (*Resume, error) {
 	return &r, nil
 }
 
-// Create inserts the resume and, when a template is given, seeds
-// resume_section_configs from that template's default_region_map so the
-// resume renders correctly without a separate "pick layout" step.
 func (r *ResumeRepository) Create(ctx context.Context, userID string, in ResumeMetaInput) (*Resume, error) {
 	links := defaultJSON(in.Links, `[]`)
 
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
 	const insertResume = `
-		INSERT INTO resumes (user_id, label, template_id, full_name, headline, email, phone, location, photo_url, summary, links)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+		INSERT INTO resumes (user_id, label, full_name, headline, email, phone, location, photo_url, summary, links)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING ` + resumeColumns
 
-	resume, err := scanResume(tx.QueryRow(ctx, insertResume, userID, in.Label, in.TemplateID, in.FullName, in.Headline,
+	resume, err := scanResume(r.pool.QueryRow(ctx, insertResume, userID, in.Label, in.FullName, in.Headline,
 		in.Email, in.Phone, in.Location, in.PhotoURL, in.Summary, links))
 	if err != nil {
 		return nil, fmt.Errorf("create resume: %w", err)
-	}
-
-	if in.TemplateID != nil {
-		var regionMap json.RawMessage
-		if err := tx.QueryRow(ctx, `SELECT default_region_map FROM templates WHERE id = $1`, *in.TemplateID).Scan(&regionMap); err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return nil, ErrNotFound
-			}
-			return nil, fmt.Errorf("find template: %w", err)
-		}
-
-		var regions map[string]string
-		if err := json.Unmarshal(regionMap, &regions); err != nil {
-			return nil, fmt.Errorf("parse template regions: %w", err)
-		}
-
-		const insertConfig = `
-			INSERT INTO resume_section_configs (resume_id, section_type, region, is_visible, sort_order)
-			VALUES ($1, $2, $3, true, $4)`
-		i := 0
-		for sectionType, region := range regions {
-			if _, err := tx.Exec(ctx, insertConfig, resume.ID, sectionType, region, i); err != nil {
-				return nil, fmt.Errorf("seed section config for %s: %w", sectionType, err)
-			}
-			i++
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit tx: %w", err)
 	}
 	return resume, nil
 }
@@ -154,12 +113,12 @@ func (r *ResumeRepository) ListByUser(ctx context.Context, userID string) ([]Res
 func (r *ResumeRepository) UpdateMeta(ctx context.Context, id string, in ResumeMetaInput) (*Resume, error) {
 	const q = `
 		UPDATE resumes SET
-			label = $2, template_id = $3, full_name = $4, headline = $5, email = $6,
-			phone = $7, location = $8, photo_url = $9, summary = $10, links = $11, updated_at = now()
+			label = $2, full_name = $3, headline = $4, email = $5,
+			phone = $6, location = $7, photo_url = $8, summary = $9, links = $10, updated_at = now()
 		WHERE id = $1
 		RETURNING ` + resumeColumns
 
-	resume, err := scanResume(r.pool.QueryRow(ctx, q, id, in.Label, in.TemplateID, in.FullName, in.Headline,
+	resume, err := scanResume(r.pool.QueryRow(ctx, q, id, in.Label, in.FullName, in.Headline,
 		in.Email, in.Phone, in.Location, in.PhotoURL, in.Summary, defaultJSON(in.Links, `[]`)))
 	if err != nil {
 		return nil, fmt.Errorf("update resume: %w", err)
@@ -174,49 +133,6 @@ func (r *ResumeRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// SwitchTemplate points the resume at a new template and re-seeds every
-// existing resume_section_configs row's region from that template's
-// default_region_map, keyed by section_type — visibility, ordering, and
-// title overrides are left untouched.
-func (r *ResumeRepository) SwitchTemplate(ctx context.Context, resumeID, templateID string) (*Resume, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("begin tx: %w", err)
-	}
-	defer tx.Rollback(ctx)
-
-	var regionMap json.RawMessage
-	if err := tx.QueryRow(ctx, `SELECT default_region_map FROM templates WHERE id = $1`, templateID).Scan(&regionMap); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-		return nil, fmt.Errorf("find template: %w", err)
-	}
-
-	var regions map[string]string
-	if err := json.Unmarshal(regionMap, &regions); err != nil {
-		return nil, fmt.Errorf("parse template regions: %w", err)
-	}
-
-	const updateResume = `UPDATE resumes SET template_id = $2, updated_at = now() WHERE id = $1 RETURNING ` + resumeColumns
-	resume, err := scanResume(tx.QueryRow(ctx, updateResume, resumeID, templateID))
-	if err != nil {
-		return nil, fmt.Errorf("update resume template: %w", err)
-	}
-
-	const updateRegion = `UPDATE resume_section_configs SET region = $3 WHERE resume_id = $1 AND section_type = $2`
-	for sectionType, region := range regions {
-		if _, err := tx.Exec(ctx, updateRegion, resumeID, sectionType, region); err != nil {
-			return nil, fmt.Errorf("reseed region for %s: %w", sectionType, err)
-		}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return nil, fmt.Errorf("commit tx: %w", err)
-	}
-	return resume, nil
-}
-
 // Duplicate deep-copies a resume and every child row into a brand-new
 // resume owned by the same user, so editing one never affects the other.
 func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Resume, error) {
@@ -227,8 +143,8 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 	defer tx.Rollback(ctx)
 
 	const cloneResume = `
-		INSERT INTO resumes (user_id, label, template_id, full_name, headline, email, phone, location, photo_url, summary, links)
-		SELECT user_id, label || ' (copy)', template_id, full_name, headline, email, phone, location, photo_url, summary, links
+		INSERT INTO resumes (user_id, label, full_name, headline, email, phone, location, photo_url, summary, links)
+		SELECT user_id, label || ' (copy)', full_name, headline, email, phone, location, photo_url, summary, links
 		FROM resumes WHERE id = $1
 		RETURNING ` + resumeColumns
 
@@ -347,21 +263,21 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 	}
 
 	configRows, err := tx.Query(ctx,
-		`SELECT section_type, custom_section_id, region, is_visible, display_title_override, sort_order
+		`SELECT section_type, custom_section_id, is_visible, display_title_override, sort_order
 		 FROM resume_section_configs WHERE resume_id = $1`, resumeID)
 	if err != nil {
 		return nil, fmt.Errorf("list section configs: %w", err)
 	}
 	type configRow struct {
-		sectionType, region, titleOverride *string
-		customSectionID                    *string
-		isVisible                          bool
-		sort                               int
+		sectionType, titleOverride *string
+		customSectionID            *string
+		isVisible                  bool
+		sort                       int
 	}
 	var configs []configRow
 	for configRows.Next() {
 		var c configRow
-		if err := configRows.Scan(&c.sectionType, &c.customSectionID, &c.region, &c.isVisible, &c.titleOverride, &c.sort); err != nil {
+		if err := configRows.Scan(&c.sectionType, &c.customSectionID, &c.isVisible, &c.titleOverride, &c.sort); err != nil {
 			configRows.Close()
 			return nil, fmt.Errorf("scan section config: %w", err)
 		}
@@ -380,9 +296,9 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 			}
 		}
 		if _, err := tx.Exec(ctx,
-			`INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, region, is_visible, display_title_override, sort_order)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-			newID, c.sectionType, newCustomSectionID, c.region, c.isVisible, c.titleOverride, c.sort); err != nil {
+			`INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, is_visible, display_title_override, sort_order)
+			 VALUES ($1, $2, $3, $4, $5, $6)`,
+			newID, c.sectionType, newCustomSectionID, c.isVisible, c.titleOverride, c.sort); err != nil {
 			return nil, fmt.Errorf("clone section config: %w", err)
 		}
 	}

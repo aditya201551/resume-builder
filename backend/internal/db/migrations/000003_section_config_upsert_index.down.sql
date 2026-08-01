@@ -1,1 +1,0 @@
-DROP INDEX idx_resume_section_configs_main_unique;

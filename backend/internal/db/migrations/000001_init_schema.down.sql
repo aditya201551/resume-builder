@@ -17,7 +17,6 @@ DROP TABLE IF EXISTS skill_groups;
 DROP TABLE IF EXISTS educations;
 DROP TABLE IF EXISTS work_experiences;
 DROP TABLE IF EXISTS resumes;
-DROP TABLE IF EXISTS templates;
 
 DROP TABLE IF EXISTS auth_identities;
 DROP TABLE IF EXISTS users;

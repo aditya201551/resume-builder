@@ -34,12 +34,9 @@ import CertificationsSection from '@/components/editor/sections/CertificationsSe
 import LanguagesSection from '@/components/editor/sections/LanguagesSection'
 import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
-import LayoutMode from '@/components/editor/LayoutMode'
 import LivePreview from '@/components/editor/LivePreview'
 import EditorNavbar from '@/components/editor/EditorNavbar'
 import type { FullResume, SectionConfig } from '@/types/resume'
-
-type EditorMode = 'content' | 'layout'
 
 const PINNED_TYPES = new Set(['contact', 'summary'])
 const DEFAULT_SLOT_ORDER = [
@@ -252,7 +249,6 @@ function useContentSlotOrder(data: FullResume) {
             resume_id: data.resume.id,
             section_type: key,
             custom_section_id: null,
-            region: null,
             is_visible: true,
             display_title_override: null,
             sort_order: 0,
@@ -332,17 +328,7 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   )
 }
 
-function EditPane({
-  resumeId,
-  data,
-  mode,
-  onModeChange,
-}: {
-  resumeId: string
-  data: FullResume
-  mode: EditorMode
-  onModeChange: (mode: EditorMode) => void
-}) {
+function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
   const openStack = useRef<OpenPanelHandle[]>([])
   const { flushNow } = useResumeDraftContext()
@@ -379,18 +365,11 @@ function EditPane({
 
   return (
     <EditorPanelContext.Provider value={panelContext}>
-      <Tabs value={mode} onValueChange={(v) => onModeChange(v as EditorMode)} className="flex h-full flex-col gap-4">
-        <div className="relative min-h-0 flex-1">
-          <TabsContent value="content" className="absolute inset-0 overflow-y-auto pb-10">
-            <ContentMode resumeId={resumeId} data={data} />
-          </TabsContent>
-          <TabsContent value="layout" className="absolute inset-0 overflow-y-auto pb-10">
-            <LayoutMode data={data} />
-          </TabsContent>
-          {/* Entry editors portal in here, replacing the list in place while it's open. */}
-          <div ref={setPanelSlot} className="absolute inset-0 z-10 empty:pointer-events-none" />
-        </div>
-      </Tabs>
+      <div className="relative h-full flex-1 overflow-y-auto pb-10">
+        <ContentMode resumeId={resumeId} data={data} />
+        {/* Entry editors portal in here, replacing the list in place while it's open. */}
+        <div ref={setPanelSlot} className="absolute inset-0 z-10 empty:pointer-events-none" />
+      </div>
     </EditorPanelContext.Provider>
   )
 }
@@ -398,8 +377,6 @@ function EditPane({
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
   const [overrides, setOverrides] = useState<Record<string, Record<string, unknown>>>({})
-  const [mode, setMode] = useState<EditorMode>('content')
-
   const setOverride = useCallback((id: string, patch: Record<string, unknown>) => {
     setOverrides((prev) => ({ ...prev, [id]: patch }))
   }, [])
@@ -420,7 +397,7 @@ function EditorPageContent() {
   const resumeId = data.resume.id
   const previewData = applyPreviewOverrides(data, overrides)
 
-  const editPane = <EditPane resumeId={resumeId} data={data} mode={mode} onModeChange={setMode} />
+  const editPane = <EditPane resumeId={resumeId} data={data} />
 
   const previewPane = (
     <div className="h-full overflow-y-auto bg-secondary/40 p-6">
@@ -431,7 +408,7 @@ function EditorPageContent() {
   return (
     <PreviewOverrideContext.Provider value={panelContextValue}>
       <div className="flex h-svh flex-col">
-        <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
+        <EditorNavbar resume={data.resume} />
 
         <div className="min-h-0 flex-1">
           {/* Desktop split pane */}

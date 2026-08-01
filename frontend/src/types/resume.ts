@@ -7,7 +7,6 @@ export interface Resume {
   id: string
   user_id: string
   label: string
-  template_id: string | null
   full_name: string
   headline: string | null
   email: string | null
@@ -19,16 +18,6 @@ export interface Resume {
   created_at: string
   updated_at: string
   last_exported_at: string | null
-}
-
-export interface Template {
-  id: string
-  name: string
-  slug: string
-  regions: string[]
-  default_region_map: Record<string, string>
-  preview_thumbnail_url: string | null
-  is_active: boolean
 }
 
 export interface WorkExperience {
@@ -143,7 +132,6 @@ export interface SectionConfig {
   resume_id: string
   section_type: string
   custom_section_id: string | null
-  region: string | null
   is_visible: boolean
   display_title_override: string | null
   sort_order: number

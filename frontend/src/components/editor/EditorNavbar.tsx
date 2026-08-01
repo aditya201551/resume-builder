@@ -18,8 +18,6 @@ import { apiDownload } from '@/lib/http'
 import { cn } from '@/lib/utils'
 import type { Resume } from '@/types/resume'
 
-type EditorMode = 'content' | 'layout'
-
 function EditableResumeName({ resume }: { resume: Resume }) {
   const { dispatch } = useResumeDraftContext()
   const [editing, setEditing] = useState(false)
@@ -119,31 +117,6 @@ function DownloadButton({ resume }: { resume: Resume }) {
         {phase !== 'idle' ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
         {phase === 'saving' ? 'Saving…' : phase === 'generating' ? 'Generating…' : 'Download'}
       </Button>
-    </div>
-  )
-}
-
-const NAV_ITEMS: { key: EditorMode; label: string }[] = [
-  { key: 'content', label: 'Content' },
-  { key: 'layout', label: 'Layout' },
-]
-
-function EditorNavItems({ mode, onModeChange }: { mode: EditorMode; onModeChange: (mode: EditorMode) => void }) {
-  return (
-    <div className="flex items-center gap-1">
-      {NAV_ITEMS.map((item) => (
-        <button
-          key={item.key}
-          type="button"
-          onClick={() => onModeChange(item.key)}
-          className={cn(
-            'rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
-            mode === item.key && 'bg-secondary text-foreground',
-          )}
-        >
-          {item.label}
-        </button>
-      ))}
     </div>
   )
 }
@@ -257,20 +230,10 @@ function BackButton() {
   )
 }
 
-export default function EditorNavbar({
-  resume,
-  mode,
-  onModeChange,
-}: {
-  resume: Resume
-  mode: EditorMode
-  onModeChange: (mode: EditorMode) => void
-}) {
+export default function EditorNavbar({ resume }: { resume: Resume }) {
   return (
     <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-6 py-3">
       <BackButton />
-
-      <EditorNavItems mode={mode} onModeChange={onModeChange} />
 
       <div className="flex-1" />
 

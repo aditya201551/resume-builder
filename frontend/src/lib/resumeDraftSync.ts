@@ -1,4 +1,4 @@
-import { apiDelete, apiPatch, apiPost, HttpError } from '@/lib/http'
+import { apiDelete, apiPatch, apiPost, apiPut, HttpError } from '@/lib/http'
 import { draftReducer, type DraftAction, type DraftState, type FlatKind } from '@/hooks/resumeDraftReducer'
 import type { FullResume } from '@/types/resume'
 
@@ -92,8 +92,8 @@ export async function flushDraft(resumeId: string, snapshot: DraftState, dispatc
 
   await step(() => syncSkillGroups(resumeId, apply, () => state))
   await step(() => syncCustomSections(resumeId, apply, () => state))
-  await step(() => syncSectionConfigs(resumeId, apply, () => state))
   await step(() => syncResumeMeta(resumeId, apply, () => state))
+  await step(() => syncResumeDesign(resumeId, apply, () => state))
 
   if (hadError) throw new Error('one or more draft sync steps failed')
 }
@@ -266,27 +266,6 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
   apply({ type: 'mark_synced_entity', slice: 'custom_sections' })
 }
 
-async function syncSectionConfigs(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
-  const cur = getState().data.section_configs
-  const prev = getState().lastSynced.section_configs
-  const key = (c: { section_type: string; custom_section_id: string | null }) => `${c.section_type}:${c.custom_section_id ?? ''}`
-  const prevByKey = new Map(prev.map((c) => [key(c), c]))
-
-  for (const c of cur) {
-    const prevConfig = prevByKey.get(key(c))
-    // No prevConfig means this section type has never been persisted before
-    // (e.g. reordered for the first time) — the backend's Update endpoint
-    // upserts, so it's fine to always PATCH here rather than only patching
-    // rows that already existed, which used to silently skip brand new ones.
-    if (!prevConfig || JSON.stringify(c) !== JSON.stringify(prevConfig)) {
-      const base = `/api/resumes/${resumeId}/section-configs/${c.section_type}`
-      const url = c.custom_section_id ? `${base}?custom_section_id=${c.custom_section_id}` : base
-      await apiPatch(url, omit(c, ['id', 'resume_id', 'section_type', 'custom_section_id']))
-    }
-  }
-  apply({ type: 'mark_synced_entity', slice: 'section_configs' })
-}
-
 async function syncResumeMeta(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
   const cur = getState().data.resume
   const prev = getState().lastSynced.resume
@@ -297,6 +276,19 @@ async function syncResumeMeta(resumeId: string, apply: (a: DraftAction) => void,
     await apiPatch(`/api/resumes/${resumeId}`, curMeta)
   }
   apply({ type: 'mark_synced_entity', slice: 'resume' })
+}
+
+// Design is a full-document PUT (like resume meta's PATCH, but the backend
+// endpoint always replaces the whole ResumeDesign rather than accepting a
+// partial), so this just sends the current object whenever it differs from
+// what was last synced — no per-field whitelist to maintain.
+async function syncResumeDesign(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
+  const cur = getState().data.design
+  const prev = getState().lastSynced.design
+  if (JSON.stringify(cur) !== JSON.stringify(prev)) {
+    await apiPut(`/api/resumes/${resumeId}/design`, cur)
+  }
+  apply({ type: 'mark_synced_entity', slice: 'design' })
 }
 
 export function isDraftDirty(state: FullResume, lastSynced: FullResume): boolean {

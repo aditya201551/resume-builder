@@ -230,10 +230,11 @@ function BackButton() {
   )
 }
 
-export type EditorMode = 'content' | 'chat'
+export type EditorMode = 'content' | 'design' | 'chat'
 
 const NAV_ITEMS: { key: EditorMode; label: string }[] = [
   { key: 'content', label: 'Content' },
+  { key: 'design', label: 'Design' },
   { key: 'chat', label: 'Chat' },
 ]
 

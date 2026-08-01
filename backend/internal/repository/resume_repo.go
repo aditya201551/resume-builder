@@ -303,6 +303,15 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 		}
 	}
 
+	// resume_designs has no id to remap (it's keyed by resume_id directly) —
+	// a plain INSERT...SELECT is a no-op if the source resume has no design
+	// row yet, which is expected (see resolveResumeDesign's fallback).
+	if _, err := tx.Exec(ctx,
+		`INSERT INTO resume_designs (resume_id, design) SELECT $2, design FROM resume_designs WHERE resume_id = $1`,
+		resumeID, newID); err != nil {
+		return nil, fmt.Errorf("clone resume design: %w", err)
+	}
+
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit tx: %w", err)
 	}

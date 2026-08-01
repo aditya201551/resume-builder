@@ -2,10 +2,10 @@ import type {
   CustomSection,
   CustomSectionEntry,
   FullResume,
-  SectionConfig,
   SkillGroup,
   SkillItem,
 } from '@/types/resume'
+import type { ResumeDesign } from '@/types/design'
 
 export type FlatKind =
   | 'work_experiences'
@@ -19,6 +19,11 @@ export type DraftAction =
   | { type: 'replace_all'; data: FullResume }
   | { type: 'hydrate'; data: FullResume; lastSynced: FullResume }
   | { type: 'update_meta'; patch: Record<string, unknown> }
+  // Shallow merge at the top level of ResumeDesign — callers always pass a
+  // whole sub-object (e.g. { typography: {...} }), never a deep partial, so
+  // a group is replaced wholesale rather than field-merged. Matches
+  // update_meta's shallow-merge shape above.
+  | { type: 'design_update'; patch: Partial<ResumeDesign> }
   | { type: 'flat_create'; entity: FlatKind; tempId: string; fields: Record<string, unknown> }
   | { type: 'flat_update'; entity: FlatKind; id: string; patch: Record<string, unknown> }
   | { type: 'flat_delete'; entity: FlatKind; id: string }
@@ -39,8 +44,6 @@ export type DraftAction =
   | { type: 'custom_entry_update'; sectionId: string; id: string; patch: Record<string, unknown> }
   | { type: 'custom_entry_delete'; sectionId: string; id: string }
   | { type: 'custom_entry_reorder'; sectionId: string; orderedIds: string[] }
-  | { type: 'section_config_update'; sectionType: string; customSectionId: string | null; patch: Record<string, unknown> }
-  | { type: 'section_config_reorder'; ordered: SectionConfig[] }
   | { type: 'resolve_ids'; idMap: Record<string, string> }
   | { type: 'mark_synced_entity'; slice: keyof FullResume }
   | { type: 'mark_synced_all' }
@@ -83,6 +86,9 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
   switch (action.type) {
     case 'update_meta':
       return { ...state, data: { ...d, resume: { ...d.resume, ...action.patch } } }
+
+    case 'design_update':
+      return { ...state, data: { ...d, design: { ...d.design, ...action.patch } } }
 
     case 'flat_create':
       return {
@@ -218,21 +224,6 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
           ),
         },
       }
-
-    case 'section_config_update':
-      return {
-        ...state,
-        data: {
-          ...d,
-          section_configs: d.section_configs.map((c) =>
-            c.section_type === action.sectionType && (c.custom_section_id ?? null) === action.customSectionId
-              ? { ...c, ...action.patch }
-              : c,
-          ),
-        },
-      }
-    case 'section_config_reorder':
-      return { ...state, data: { ...d, section_configs: action.ordered } }
 
     case 'resolve_ids': {
       const resolvedData = replaceIdEverywhere(d, action.idMap) as FullResume

@@ -3,6 +3,7 @@ import { canApplyProposal, groupAssistantParts, proposalToDraftAction } from './
 import type { AgentProposal } from './agentChat'
 import type { AssistantPart } from '@/hooks/useAgentChat'
 import type { FullResume, SkillGroup, CustomSection } from '@/types/resume'
+import { defaultResumeDesign } from './defaultResumeDesign'
 
 function emptyDraft(overrides: Partial<FullResume> = {}): FullResume {
   return {
@@ -22,6 +23,7 @@ function emptyDraft(overrides: Partial<FullResume> = {}): FullResume {
       updated_at: '',
       last_exported_at: null,
     },
+    design: defaultResumeDesign,
     work_experiences: [],
     educations: [],
     skill_groups: [],

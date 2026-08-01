@@ -1,3 +1,5 @@
+import type { ResumeDesign } from './design'
+
 export interface ResumeLink {
   label: string
   url: string
@@ -139,6 +141,7 @@ export interface SectionConfig {
 
 export interface FullResume {
   resume: Resume
+  design: ResumeDesign
   work_experiences: WorkExperience[]
   educations: Education[]
   skill_groups: SkillGroup[]

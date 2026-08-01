@@ -20,9 +20,7 @@ import { Accordion } from '@/components/ui/accordion'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
-import { useSectionConfigReorder } from '@/hooks/useSectionConfigReorder'
 import { ResumeDraftProvider, useResumeDraftContext, useResumeDraftData } from '@/hooks/useResumeDraft'
-import SortableList from '@/components/editor/SortableList'
 import SectionAccordionItem from '@/components/editor/SectionAccordionItem'
 import AddSectionDialog, { type AddSectionOption } from '@/components/editor/AddSectionDialog'
 import ContactSection from '@/components/editor/sections/ContactSection'
@@ -34,13 +32,13 @@ import CertificationsSection from '@/components/editor/sections/CertificationsSe
 import LanguagesSection from '@/components/editor/sections/LanguagesSection'
 import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
+import DesignMode from '@/components/editor/DesignMode'
 import LivePreview from '@/components/editor/LivePreview'
 import PreviewErrorBoundary from '@/components/editor/PreviewErrorBoundary'
 import EditorNavbar, { type EditorMode } from '@/components/editor/EditorNavbar'
 import ChatPanel from '@/components/agent/ChatPanel'
-import type { FullResume, SectionConfig } from '@/types/resume'
+import type { FullResume } from '@/types/resume'
 
-const PINNED_TYPES = new Set(['contact', 'summary'])
 const DEFAULT_SLOT_ORDER = [
   'work_experience',
   'education',
@@ -200,80 +198,22 @@ function slotContent(resumeId: string, data: FullResume, key: SlotKey): { title:
   }
 }
 
-/**
- * Content mode's section order is the same `resume_section_configs.sort_order`
- * Layout mode edits — Contact & Summary stay pinned first (they're the
- * identity block, always index 0/1); everything else is drag-orderable and
- * writes straight back through the shared reorder mutation.
- */
-function useContentSlotOrder(data: FullResume) {
-  const reorderable = data.section_configs.filter((c) => !PINNED_TYPES.has(c.section_type))
-  const nonCustom = reorderable.filter((c) => c.section_type !== 'custom').sort((a, b) => a.sort_order - b.sort_order)
-  const customRows = reorderable.filter((c) => c.section_type === 'custom').sort((a, b) => a.sort_order - b.sort_order)
-
-  const customSortOrder = customRows[0]?.sort_order ?? Infinity
-  const slots: { key: SlotKey; sortOrder: number }[] = nonCustom.map((c) => ({
-    key: c.section_type as SlotKey,
-    sortOrder: c.sort_order,
-  }))
-  if (data.custom_sections.length > 0) slots.push({ key: 'custom', sortOrder: customSortOrder })
-
-  // resume_section_configs only ever gets a row for a section type once it's
-  // been persisted (reordered, or a custom section created) — a default type
-  // that was never touched has no row yet. Without this fallback, such a
-  // type could never be revealed via "Add section" on a resume that already
-  // has *some* persisted rows, since slotKeys would silently exclude it.
-  const known = new Set(slots.map((s) => s.key))
-  let nextSortOrder = slots.reduce((max, s) => Math.max(max, s.sortOrder), -1) + 1
-  for (const key of DEFAULT_SLOT_ORDER) {
-    if (key === 'custom' || known.has(key)) continue
-    slots.push({ key, sortOrder: nextSortOrder++ })
-  }
-
-  const slotKeys = slots.sort((a, b) => a.sortOrder - b.sortOrder).map((s) => s.key)
-
-  function buildFlatOrder(newSlotKeys: string[]): SectionConfig[] {
-    const pinned = data.section_configs.filter((c) => PINNED_TYPES.has(c.section_type)).sort((a, b) => a.sort_order - b.sort_order)
-    const flat: SectionConfig[] = []
-    newSlotKeys.forEach((key) => {
-      if (key === 'custom') {
-        flat.push(...customRows)
-      } else {
-        const row = nonCustom.find((c) => c.section_type === key)
-        // A type reordered for the first time has no persisted row yet —
-        // synthesize one instead of silently dropping it from the list we
-        // persist, or it would never actually save its new position (and
-        // reappear at the end next render, since useContentSlotOrder's own
-        // fallback above re-adds anything missing from section_configs).
-        flat.push(
-          row ?? {
-            id: `pending-${key}`,
-            resume_id: data.resume.id,
-            section_type: key,
-            custom_section_id: null,
-            is_visible: true,
-            display_title_override: null,
-            sort_order: 0,
-          },
-        )
-      }
-    })
-    return [...pinned, ...flat]
-  }
-
-  return { slotKeys, canPersist: reorderable.length > 0, buildFlatOrder }
-}
-
+// Content mode is pure data capture now — order, visibility, and titles are
+// a Design-mode concern (see DesignMode.tsx's SectionsPanel, driven by
+// resolveSectionRefs/design.sectionOrder). Section editors here always
+// render in the same fixed sequence; which ones are visible in Content
+// depends only on whether they have content yet, or were explicitly
+// revealed this session via "Add section" below (that reveal is
+// intentionally ephemeral/local — it's about showing an empty editor to
+// start typing into, not about the resume's rendered structure).
 function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume }) {
-  const reorder = useSectionConfigReorder(resumeId)
-  const { slotKeys, canPersist, buildFlatOrder } = useContentSlotOrder(data)
   const customSections = useEntityMutations(resumeId, `/api/resumes/${resumeId}/custom-sections`)
   const [revealed, setRevealed] = useState<Set<SlotKey>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
 
   const isActive = (key: SlotKey) => slotCount(data, key) > 0 || revealed.has(key)
 
-  const sections = slotKeys.filter(isActive).map((key) => ({ key, ...slotContent(resumeId, data, key) }))
+  const sections = DEFAULT_SLOT_ORDER.filter(isActive).map((key) => ({ key, ...slotContent(resumeId, data, key) }))
 
   const addableOptions: AddSectionOption[] = DEFAULT_SLOT_ORDER.filter((key) => key !== 'custom' && !isActive(key)).map(
     (key) => ({ key, title: SLOT_META[key].title, description: SLOT_META[key].description, icon: SLOT_META[key].icon }),
@@ -303,22 +243,11 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
       </Accordion>
 
       <Accordion type="single" collapsible className="flex flex-col gap-3">
-        <SortableList
-          dragHandlePlacement="inline"
-          items={sections.map((s) => ({ id: s.key }))}
-          onReorder={(orderedKeys) => {
-            if (!canPersist) return
-            reorder.mutate(buildFlatOrder(orderedKeys))
-          }}
-          renderItem={(item, _index, dragHandle) => {
-            const section = sections.find((s) => s.key === item.id)!
-            return (
-              <SectionAccordionItem value={section.key} title={section.title} count={section.count} dragHandle={dragHandle}>
-                {section.node}
-              </SectionAccordionItem>
-            )
-          }}
-        />
+        {sections.map((section) => (
+          <SectionAccordionItem key={section.key} value={section.key} title={section.title} count={section.count}>
+            {section.node}
+          </SectionAccordionItem>
+        ))}
       </Accordion>
 
       <Button type="button" variant="secondary" size="sm" className="mt-2 w-fit" onClick={() => setAddOpen(true)}>
@@ -404,6 +333,11 @@ function EditorPageContent() {
   const previewData = applyPreviewOverrides(data, overrides)
 
   const editPane = <EditPane resumeId={resumeId} data={data} />
+  const designPane = (
+    <div className="h-full overflow-y-auto px-6 py-6">
+      <DesignMode />
+    </div>
+  )
 
   const previewPane = (
     <div className="h-full overflow-y-auto bg-secondary/40 p-6">
@@ -415,9 +349,10 @@ function EditorPageContent() {
 
   // Chat mode swaps the edit pane for the assistant and moves the preview to
   // the other side, so the user watches the resume update live while
-  // chatting — Content mode's layout (edit pane | preview) is unchanged.
+  // chatting — Content and Design modes keep the same (editor pane | preview)
+  // layout, just swapping what's in the left slot.
   const primaryPane =
-    mode === 'chat' ? previewPane : <div className="h-full overflow-y-auto px-6 py-6">{editPane}</div>
+    mode === 'chat' ? previewPane : mode === 'design' ? designPane : <div className="h-full overflow-y-auto px-6 py-6">{editPane}</div>
   const secondaryPane = mode === 'chat' ? <ChatPanel /> : previewPane
 
   return (
@@ -437,12 +372,12 @@ function EditorPageContent() {
             <Tabs defaultValue="edit">
               <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
                 <TabsList>
-                  <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : 'Edit'}</TabsTrigger>
+                  <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : mode === 'design' ? 'Design' : 'Edit'}</TabsTrigger>
                   <TabsTrigger value="preview">Preview</TabsTrigger>
                 </TabsList>
               </div>
               <TabsContent value="edit" className={mode === 'chat' ? 'h-[calc(100svh-8.5rem)]' : 'px-4 py-4'}>
-                {mode === 'chat' ? <ChatPanel /> : editPane}
+                {mode === 'chat' ? <ChatPanel /> : mode === 'design' ? <DesignMode /> : editPane}
               </TabsContent>
               <TabsContent value="preview" className="bg-secondary/40 p-4">
                 <PreviewErrorBoundary resetKey={previewData}>

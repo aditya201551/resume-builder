@@ -11,30 +11,23 @@
   height: 880px;
   flex-shrink: 0;
   overflow: hidden;
-  background: #ffffff;
-  color: #14181d;
-  padding: 48px 56px;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-size: 13px;
-  line-height: 1.55;
+  background: var(--rd-background, #ffffff);
+  color: var(--rd-text, #14181d);
+  padding: var(--rd-margin-top, 48px) var(--rd-margin-right, 56px) var(--rd-margin-bottom, 48px) var(--rd-margin-left, 56px);
+  font-family: var(--rd-font-family, Georgia, 'Times New Roman', serif);
+  font-size: var(--rd-font-size, 13px);
+  line-height: var(--rd-line-height, 1.55);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
-/* PDF export (headless Chrome navigates PrintPage and calls Page.printToPDF
-   with paper size set to exactly 680x880px at 96dpi — see export_service.go)
-   — break-after per .page div makes Chrome's own PDF pagination land on
-   the same page boundaries already computed above, and the screen-only
-   gap/shadow are removed so pages don't leave blank space in the PDF. */
 @media print {
   .pageStack {
     gap: 0;
   }
-
   .page {
     box-shadow: none;
     break-after: page;
   }
-
   .page:last-child {
     break-after: auto;
   }
@@ -42,17 +35,15 @@
 
 .name {
   margin: 0;
-  font-size: 22px;
+  font-size: var(--rd-name-size, 22px);
   font-weight: 700;
   letter-spacing: 0.01em;
 }
-
 .headline {
   margin: 2px 0 0;
   font-size: 13px;
   color: #4a4a4a;
 }
-
 .metaRow {
   display: flex;
   flex-wrap: wrap;
@@ -61,42 +52,35 @@
   font-size: 11.5px;
   color: #4a4a4a;
 }
-
 .metaLink {
   color: inherit;
   text-decoration: none;
 }
-
 .metaLink:hover {
   text-decoration: underline;
 }
-
 .rule {
   border: none;
-  border-top: 1px solid #c9603e;
+  border-top: 1px solid var(--rd-accent, #c9603e);
   margin: 14px 0 18px;
 }
-
 .sectionTitle {
   margin: 0 0 8px;
-  font-size: 11px;
+  font-size: var(--rd-section-heading-size, 11px);
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #14181d;
+  color: var(--rd-text, #14181d);
 }
-
 .entryHead {
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  font-size: 13px;
+  font-size: var(--rd-font-size, 13px);
 }
-
 .entryTitle {
   font-weight: 700;
 }
-
 .entryLinkIcon {
   display: inline-flex;
   align-items: center;
@@ -104,21 +88,17 @@
   color: #888;
   vertical-align: middle;
 }
-
 .entryLinkIcon:hover {
-  color: #c9603e;
+  color: var(--rd-accent, #c9603e);
 }
-
 .entryLinkIcon svg {
   width: 11px;
   height: 11px;
 }
-
 .entrySub {
   font-style: italic;
   color: #333;
 }
-
 .entryDates {
   flex-shrink: 0;
   font-size: 11.5px;
@@ -129,30 +109,25 @@
 .richText :global(p) {
   margin: 4px 0;
 }
-
 .richText :global(ul),
 .richText :global(ol) {
   margin: 4px 0;
   padding-left: 18px;
 }
-
 .richText :global(ul) {
   list-style: disc outside;
 }
-
 .richText :global(ol) {
   list-style: decimal outside;
 }
-
 .richText :global(li) {
   display: list-item;
   margin: 2px 0;
 }
-
 .richText :global(a) {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: #c9603e;
+  text-decoration-color: var(--rd-accent, #c9603e);
 }
 
 .skillGroups {

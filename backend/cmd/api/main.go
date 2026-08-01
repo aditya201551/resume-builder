@@ -53,10 +53,12 @@ func main() {
 	miscEntries := repository.NewMiscEntryRepository(pool)
 	customSections := repository.NewCustomSectionRepository(pool)
 	sectionConfigs := repository.NewSectionConfigRepository(pool)
+	templates := repository.NewTemplateRepository(pool)
+	resumeDesigns := repository.NewResumeDesignRepository(pool)
 
 	// Services
 	authService := service.NewAuthService(users)
-	resumeService := service.NewResumeService(resumes, workExperiences, educations, skills, projects, certifications, languages, miscEntries, customSections, sectionConfigs)
+	resumeService := service.NewResumeService(resumes, resumeDesigns, templates, workExperiences, educations, skills, projects, certifications, languages, miscEntries, customSections, sectionConfigs)
 	workExperienceService := service.NewWorkExperienceService(resumes, workExperiences)
 	educationService := service.NewEducationService(resumes, educations)
 	projectService := service.NewProjectService(resumes, projects)
@@ -66,6 +68,8 @@ func main() {
 	skillService := service.NewSkillService(resumes, skills)
 	customSectionService := service.NewCustomSectionService(resumes, sectionConfigs, customSections)
 	sectionConfigService := service.NewSectionConfigService(resumes, sectionConfigs)
+	templateService := service.NewTemplateService(templates)
+	resumeDesignService := service.NewResumeDesignService(resumes, resumeDesigns, templates)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
 	// AI assistant (Phase 2) — optional. Runs in-process inside this binary;
@@ -95,6 +99,8 @@ func main() {
 		Skill:          handlers.NewSkillHandler(skillService),
 		CustomSection:  handlers.NewCustomSectionHandler(customSectionService),
 		SectionConfig:  handlers.NewSectionConfigHandler(sectionConfigService),
+		Template:       handlers.NewTemplateHandler(templateService),
+		ResumeDesign:   handlers.NewResumeDesignHandler(resumeDesignService),
 		Agent:          agentHandler,
 	}
 

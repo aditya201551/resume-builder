@@ -21,6 +21,8 @@ type Handlers struct {
 	Skill          *handlers.SkillHandler
 	CustomSection  *handlers.CustomSectionHandler
 	SectionConfig  *handlers.SectionConfigHandler
+	Template       *handlers.TemplateHandler
+	ResumeDesign   *handlers.ResumeDesignHandler
 	// Agent is nil when ANTHROPIC_API_KEY isn't configured — see NewRouter,
 	// which skips registering its routes in that case.
 	Agent *handlers.AgentHandler
@@ -79,6 +81,13 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	handle("GET /api/resumes/{resumeID}/section-configs", h.SectionConfig.List)
 	handle("PATCH /api/resumes/{resumeID}/section-configs/{sectionType}", h.SectionConfig.Update)
+
+	// Templates are a global catalog, not resume-scoped — still behind
+	// RequireAuth (this app has no anonymous browsing anywhere else) but
+	// with no ownership check, since there's no resume in scope.
+	handle("GET /api/templates", h.Template.List)
+	handle("GET /api/resumes/{resumeID}/design", h.ResumeDesign.Get)
+	handle("PUT /api/resumes/{resumeID}/design", h.ResumeDesign.Update)
 
 	if h.Agent != nil {
 		handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)

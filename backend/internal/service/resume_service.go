@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"resume-builder/backend/internal/design"
 	"resume-builder/backend/internal/repository"
 )
 
@@ -12,6 +13,7 @@ import (
 // reason about or export the resume.
 type FullResume struct {
 	Resume          repository.Resume           `json:"resume"`
+	Design          design.ResumeDesign         `json:"design"`
 	WorkExperiences []repository.WorkExperience `json:"work_experiences"`
 	Educations      []repository.Education      `json:"educations"`
 	SkillGroups     []repository.SkillGroup     `json:"skill_groups"`
@@ -25,6 +27,8 @@ type FullResume struct {
 
 type ResumeService struct {
 	resumes         *repository.ResumeRepository
+	resumeDesigns   *repository.ResumeDesignRepository
+	templates       *repository.TemplateRepository
 	workExperiences *repository.WorkExperienceRepository
 	educations      *repository.EducationRepository
 	skills          *repository.SkillRepository
@@ -38,6 +42,8 @@ type ResumeService struct {
 
 func NewResumeService(
 	resumes *repository.ResumeRepository,
+	resumeDesigns *repository.ResumeDesignRepository,
+	templates *repository.TemplateRepository,
 	workExperiences *repository.WorkExperienceRepository,
 	educations *repository.EducationRepository,
 	skills *repository.SkillRepository,
@@ -50,6 +56,8 @@ func NewResumeService(
 ) *ResumeService {
 	return &ResumeService{
 		resumes:         resumes,
+		resumeDesigns:   resumeDesigns,
+		templates:       templates,
 		workExperiences: workExperiences,
 		educations:      educations,
 		skills:          skills,
@@ -141,9 +149,14 @@ func (s *ResumeService) GetFullResume(ctx context.Context, callerUserID, resumeI
 	if err != nil {
 		return nil, err
 	}
+	resumeDesign, err := resolveResumeDesign(ctx, s.resumeDesigns, s.templates, resumeID)
+	if err != nil {
+		return nil, err
+	}
 
 	return &FullResume{
 		Resume:          *resume,
+		Design:          resumeDesign,
 		WorkExperiences: workExperiences,
 		Educations:      educations,
 		SkillGroups:     skillGroups,

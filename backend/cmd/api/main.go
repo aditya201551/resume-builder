@@ -89,7 +89,7 @@ func main() {
 	// Handlers
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
-		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.FrontendURL),
+		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.InternalBaseURL),
 		WorkExperience: handlers.NewEntityHandler(workExperienceService),
 		Education:      handlers.NewEntityHandler(educationService),
 		Project:        handlers.NewEntityHandler(projectService),
@@ -114,7 +114,7 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	}
 
-	router := api.NewRouter(jwtIssuer, h, healthCheck)
+	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
 
 	log.Printf("api listening on :%s", cfg.Port)
 	// No ReadTimeout/WriteTimeout/IdleTimeout: the agent chat endpoint

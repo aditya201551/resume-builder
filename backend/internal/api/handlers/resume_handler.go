@@ -15,14 +15,14 @@ import (
 )
 
 type ResumeHandler struct {
-	svc         *service.ResumeService
-	export      *service.ExportService
-	jwtIssuer   *auth.JWTIssuer
-	frontendURL string
+	svc             *service.ResumeService
+	export          *service.ExportService
+	jwtIssuer       *auth.JWTIssuer
+	internalBaseURL string
 }
 
-func NewResumeHandler(svc *service.ResumeService, export *service.ExportService, jwtIssuer *auth.JWTIssuer, frontendURL string) *ResumeHandler {
-	return &ResumeHandler{svc: svc, export: export, jwtIssuer: jwtIssuer, frontendURL: frontendURL}
+func NewResumeHandler(svc *service.ResumeService, export *service.ExportService, jwtIssuer *auth.JWTIssuer, internalBaseURL string) *ResumeHandler {
+	return &ResumeHandler{svc: svc, export: export, jwtIssuer: jwtIssuer, internalBaseURL: internalBaseURL}
 }
 
 // exportTokenTTL is intentionally short — the token only needs to live long
@@ -61,7 +61,7 @@ func (h *ResumeHandler) ExportPDF(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	printURL := fmt.Sprintf("%s/resumes/%s/print?export_token=%s", h.frontendURL, resumeID, url.QueryEscape(token))
+	printURL := fmt.Sprintf("%s/resumes/%s/print?export_token=%s", h.internalBaseURL, resumeID, url.QueryEscape(token))
 
 	pdfBytes, err := h.export.RenderPDF(r.Context(), printURL)
 	if err != nil {

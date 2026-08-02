@@ -2,6 +2,8 @@ package api
 
 import (
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"resume-builder/backend/internal/api/handlers"
 	"resume-builder/backend/internal/api/middleware"
@@ -29,7 +31,7 @@ type Handlers struct {
 	Agent *handlers.AgentHandler
 }
 
-func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc) http.Handler {
+func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc, staticDir string) http.Handler {
 	mux := http.NewServeMux()
 	protect := middleware.RequireAuth(jwtIssuer)
 	handle := func(pattern string, fn http.HandlerFunc) { mux.Handle(pattern, protect(fn)) }
@@ -95,7 +97,29 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 		handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 	}
 
+	// Serve the built frontend from this same binary. staticDir is empty in
+	// local dev (Vite's own dev server handles the frontend there instead).
+	if staticDir != "" {
+		mux.Handle("/", spaFileServer(staticDir))
+	}
+
 	return mux
+}
+
+// spaFileServer serves files out of dir, falling back to dir/index.html for
+// any path that doesn't match a real file — needed so react-router's
+// client-side routes (e.g. /resumes/{id}) resolve on a hard refresh instead
+// of 404ing.
+func spaFileServer(dir string) http.HandlerFunc {
+	fileServer := http.FileServer(http.Dir(dir))
+	return func(w http.ResponseWriter, r *http.Request) {
+		path := filepath.Join(dir, filepath.Clean(r.URL.Path))
+		if info, err := os.Stat(path); err != nil || info.IsDir() {
+			http.ServeFile(w, r, filepath.Join(dir, "index.html"))
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	}
 }
 
 func registerEntityRoutes[TInput any, TOutput any](handle func(string, http.HandlerFunc), base string, h *handlers.EntityHandler[TInput, TOutput]) {

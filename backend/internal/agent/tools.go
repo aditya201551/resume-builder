@@ -577,12 +577,17 @@ func (t *proposeMetaUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error
 	return &schema.ToolInfo{
 		Name: "update_contact_info",
 		Desc: "Change the resume's top-level contact info or summary (full_name, headline, email, phone, location, summary, links). " +
-			"patch should contain only the fields that should change. Use read_resume first if you need to see current values (e.g. " +
-			"to edit the existing summary rather than overwrite it blind).",
+			"patch should contain only the top-level fields that should change; each included field replaces its old value entirely. " +
+			"links is an array of {label, url} objects (e.g. [{\"label\": \"GitHub\", \"url\": \"https://github.com/...\"}]) — to change, " +
+			"add, or remove one link, call read_resume for the current links array, then send the whole array back in patch.links with " +
+			"that one entry changed and the rest unchanged; you don't need a url to change a label, or vice versa. Use read_resume first " +
+			"if you need to see current values for anything in this tool (e.g. to edit the existing summary rather than overwrite it " +
+			"blind, or to edit one link without dropping the others).",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"patch": {
-				Type:     schema.Object,
-				Desc:     "Only the fields that should change.",
+				Type: schema.Object,
+				Desc: "Only the top-level fields that should change. For links specifically, this must be the complete array you want " +
+					"the resume to end up with — it replaces the existing array rather than merging into it.",
 				Required: true,
 			},
 		}),

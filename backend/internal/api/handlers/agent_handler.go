@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -24,12 +25,13 @@ const chatHistoryLimit = 40
 // was actually constructed (i.e. ANTHROPIC_API_KEY is set), so the API
 // keeps working without the AI assistant configured.
 type AgentHandler struct {
-	agent   *agent.Agent
-	resumes *service.ResumeService
+	agent     *agent.Agent
+	resumes   *service.ResumeService
+	templates *service.TemplateService
 }
 
-func NewAgentHandler(a *agent.Agent, resumes *service.ResumeService) *AgentHandler {
-	return &AgentHandler{agent: a, resumes: resumes}
+func NewAgentHandler(a *agent.Agent, resumes *service.ResumeService, templates *service.TemplateService) *AgentHandler {
+	return &AgentHandler{agent: a, resumes: resumes, templates: templates}
 }
 
 type chatMessageDTO struct {
@@ -116,7 +118,23 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	iter, sink, err := h.agent.Chat(r.Context(), messages, string(body.Draft))
+	// Fetched fresh from the database only if list_templates is actually
+	// called — see agent.TemplatesFetcher's doc comment for why this stays
+	// a DB read (unlike the draft, which is client-supplied) and why the
+	// closure defers the query instead of running it up front.
+	fetchTemplates := func(ctx context.Context) (string, error) {
+		list, err := h.templates.List(ctx)
+		if err != nil {
+			return "", err
+		}
+		data, err := json.Marshal(list)
+		if err != nil {
+			return "", err
+		}
+		return string(data), nil
+	}
+
+	iter, sink, err := h.agent.Chat(r.Context(), messages, string(body.Draft), fetchTemplates)
 	if err != nil {
 		send("error", map[string]string{"message": err.Error()})
 		return

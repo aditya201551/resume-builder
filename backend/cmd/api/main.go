@@ -83,7 +83,7 @@ func main() {
 		if err != nil {
 			log.Fatalf("create agent: %v", err)
 		}
-		agentHandler = handlers.NewAgentHandler(aiAgent, resumeService)
+		agentHandler = handlers.NewAgentHandler(aiAgent, resumeService, templateService)
 	}
 
 	// Handlers

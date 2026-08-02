@@ -159,6 +159,22 @@ func Validate(d ResumeDesign) error {
 	return nil
 }
 
+// ValidateSectionRef exposes validateSectionRef for callers outside a full
+// ResumeDesign document — the agent's propose_section_update tool validates
+// one ref at a time rather than a whole document.
+func ValidateSectionRef(ref SectionRef) error {
+	return validateSectionRef("sectionRef", ref)
+}
+
+// ValidSectionTypes returns the section types SectionRef.SectionType may
+// name, for the propose_section_update agent tool's description text — a
+// copy so callers can't mutate the package-level slice.
+func ValidSectionTypes() []string {
+	out := make([]string, len(validSectionTypes))
+	copy(out, validSectionTypes)
+	return out
+}
+
 func validateSectionRef(path string, ref SectionRef) error {
 	if !contains(validSectionTypes, ref.SectionType) {
 		return enumError(path+".sectionType", ref.SectionType, validSectionTypes)

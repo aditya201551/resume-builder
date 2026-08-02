@@ -25,6 +25,10 @@ RUN CGO_ENABLED=0 go build -o /server ./cmd/api
 # headless-shell binary itself as a short-lived child process per export
 # request (see CHROME_EXEC_PATH), it doesn't need a standing CDP server.
 FROM chromedp/headless-shell:stable
+# chromedp/headless-shell ships without a CA bundle, so any outbound HTTPS
+# call from the Go binary (e.g. the OAuth token exchange with Google/GitHub)
+# fails TLS verification without this.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=backend-builder /server /usr/local/bin/server
 COPY --from=frontend-builder /src/frontend/dist /app/dist
 ENV CHROME_EXEC_PATH=/headless-shell/headless-shell

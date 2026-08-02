@@ -638,19 +638,26 @@ func designSchemaDescription() string {
 	for _, group := range design.Schema() {
 		for _, f := range group.Fields {
 			b.WriteString(f.Key)
+			b.WriteString(" (")
+			b.WriteString(f.Label)
+			// f.Label already carries the unit where one applies (e.g. "Left
+			// margin (px)") — the model has no other source for units, since
+			// the wire value is a bare number. Without this, a number field's
+			// range reads as unitless and the model guesses (inches, points,
+			// ...), which silently doesn't match what ValidateFieldValue
+			// accepts.
 			switch f.Type {
 			case design.FieldEnum:
-				b.WriteString(" (one of: ")
+				b.WriteString("; one of: ")
 				b.WriteString(strings.Join(f.Options, "/"))
-				b.WriteString(")")
 			case design.FieldColor:
-				b.WriteString(" (hex color, e.g. #14181d)")
+				b.WriteString("; hex color, e.g. #14181d")
 			case design.FieldBool:
-				b.WriteString(" (boolean)")
+				b.WriteString("; boolean")
 			case design.FieldNumber:
-				b.WriteString(fmt.Sprintf(" (number, %v-%v)", *f.Min, *f.Max))
+				fmt.Fprintf(&b, "; number, %v-%v", *f.Min, *f.Max)
 			}
-			b.WriteString("; ")
+			b.WriteString("); ")
 		}
 	}
 	return b.String()

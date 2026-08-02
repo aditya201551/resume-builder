@@ -185,6 +185,7 @@ export default function ChatPanel() {
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickRef = useRef(true)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current
@@ -197,6 +198,25 @@ export default function ChatPanel() {
   useEffect(() => {
     if (shouldStickRef.current) scrollToBottom('auto')
   }, [messages, streamingParts, scrollToBottom])
+
+  // Sending disables the textarea (see `disabled={isStreaming}` below), and a
+  // disabled element loses focus to document.body — the browser does this
+  // for us, we never call blur() ourselves. Once streaming ends and the
+  // textarea is re-enabled, nothing gives focus back automatically, so the
+  // user has to click back in before they can keep typing. Restore it
+  // ourselves — but only when nothing else has since taken focus on
+  // purpose (a resume field the user clicked into while the assistant was
+  // still responding, an accept/reject button, etc.); document.body is what
+  // activeElement is left holding after the disable-triggered blur, so that
+  // check is what distinguishes "nothing else grabbed focus" from "the user
+  // moved on deliberately."
+  useEffect(() => {
+    if (isStreaming) return
+    const active = document.activeElement
+    if (active === document.body || active === textareaRef.current) {
+      textareaRef.current?.focus()
+    }
+  }, [isStreaming])
 
   function handleScroll() {
     const el = scrollRef.current
@@ -283,6 +303,7 @@ export default function ChatPanel() {
       <div className="mx-auto w-full max-w-2xl p-3 pt-2">
         <div className="rounded-xl border border-input bg-background px-2.5 py-1.5 transition-colors focus-within:border-ring">
           <Textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}

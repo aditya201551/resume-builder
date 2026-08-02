@@ -69,11 +69,17 @@ type Page struct {
 }
 
 type Typography struct {
-	FontFamily               string  `json:"fontFamily"`
+	FontFamily string `json:"fontFamily"`
+	// NameFontFamily is "inherit" (fall back to FontFamily) or one of
+	// validFontFamilies — never empty, so the frontend never has to special-
+	// case a missing value.
+	NameFontFamily           string  `json:"nameFontFamily"`
 	BaseFontSizePt           float64 `json:"baseFontSizePt"`
 	LineHeight               float64 `json:"lineHeight"`
 	NameFontSizePt           float64 `json:"nameFontSizePt"`
+	HeadlineFontSizePt       float64 `json:"headlineFontSizePt"`
 	SectionHeadingFontSizePt float64 `json:"sectionHeadingFontSizePt"`
+	EntryHeaderFontSizePt    float64 `json:"entryHeaderFontSizePt"`
 }
 
 type ApplyAccent struct {
@@ -125,6 +131,22 @@ type Spacing struct {
 	BulletGap  int `json:"bulletGap"`
 }
 
+// LinkStyle controls how links render (entry links, header links) — named
+// distinctly from "Links" to avoid colliding with the unrelated concept of a
+// resume's own header links (LinkedIn/GitHub URLs), which live in content,
+// not design.
+type LinkStyle struct {
+	ShowIcon       bool `json:"showIcon"`
+	Underline      bool `json:"underline"`
+	UseAccentColor bool `json:"useAccentColor"`
+}
+
+type Footer struct {
+	ShowPageNumbers bool `json:"showPageNumbers"`
+	ShowEmail       bool `json:"showEmail"`
+	ShowName        bool `json:"showName"`
+}
+
 // ResumeDesign is the full document stored in resume_designs.design and
 // returned as FullResume.Design. It never references resume content by id
 // except through SectionRef.CustomSectionID, which is an opaque pointer the
@@ -142,5 +164,7 @@ type ResumeDesign struct {
 	EntryLayout    EntryLayout    `json:"entryLayout"`
 	SectionDisplay SectionDisplay `json:"sectionDisplay"`
 	Spacing        Spacing        `json:"spacing"`
+	LinkStyle      LinkStyle      `json:"linkStyle"`
+	Footer         Footer         `json:"footer"`
 	DateFormat     string         `json:"dateFormat"`
 }

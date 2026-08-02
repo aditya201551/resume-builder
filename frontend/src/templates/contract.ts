@@ -40,6 +40,9 @@ export interface ContentSection {
   type: string
   title: string
   entries: ContentEntry[]
+  /** Only meaningful when design.layout.mode is "two" — which column this
+   * section belongs in. Single-column templates never read this. */
+  column?: 'left' | 'right'
 }
 
 export interface ResumeContent {

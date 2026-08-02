@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
+import { clearDraft } from '@/lib/resumeDraftStorage'
 import { apiDownload } from '@/lib/http'
 import { cn } from '@/lib/utils'
 import type { Resume } from '@/types/resume'
@@ -153,11 +154,23 @@ function SyncStatus() {
 }
 
 function BackButton() {
-  const { state, flushNow, hasDirtyPanel, commitDirtyPanels } = useResumeDraftContext()
+  const { state, resumeId, flushNow, hasDirtyPanel, commitDirtyPanels } = useResumeDraftContext()
   const dirty = isDraftDirty(state.data, state.lastSynced) || hasDirtyPanel
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(false)
+
+  function discardAndLeave() {
+    // The draft persists to localStorage on every edit (so a closed tab can
+    // recover unsaved work) — that's the right default, but an explicit
+    // "discard" means the user wants those edits gone, not just off-screen.
+    // Without clearing it here, the next time this resume opens it would
+    // hydrate from the same stale local draft and silently bring the
+    // "discarded" changes right back. Clearing it forces the next mount to
+    // fall through to GET /full instead (see useResumeDraft's hydrate effect).
+    clearDraft(resumeId)
+    blocker.proceed?.()
+  }
 
   async function saveAndLeave() {
     setSaving(true)
@@ -215,7 +228,7 @@ function BackButton() {
               variant="outline"
               disabled={saving}
               className="text-destructive hover:text-destructive"
-              onClick={() => blocker.proceed?.()}
+              onClick={discardAndLeave}
             >
               Discard &amp; leave
             </Button>

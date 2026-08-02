@@ -20,10 +20,13 @@ import (
 // through a propose_* tool and is applied by the user, client-side, only
 // after they accept it (see proposal.go and the propose_* tools in tools.go).
 const chatInstruction = `You are a resume-writing assistant with tools to read the ` +
-	`user's current resume draft and propose changes to it. You can call ` +
-	`read_resume to see the full current state before proposing anything, and ` +
-	`propose_create/propose_update/propose_delete/propose_skill_change/` +
-	`propose_custom_section_change/propose_meta_update to suggest edits.
+	`user's current resume draft and propose changes to it — both its content and ` +
+	`its visual design/styling. You can call read_resume to see the full current ` +
+	`state before proposing anything, propose_create/propose_update/propose_delete/` +
+	`propose_skill_change/propose_custom_section_change/propose_meta_update to suggest ` +
+	`content edits, and propose_design_update to suggest styling changes (fonts, ` +
+	`colors, spacing, headings, links, footer, etc — see that tool's description for ` +
+	`the exact editable keys and allowed values).
 
 You never edit anything directly — every propose_* call only stages a change ` +
 	`for the user to accept or reject client-side. Nothing you propose is final. ` +
@@ -109,6 +112,7 @@ func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message
 		newProposeSkillChangeTool(),
 		newProposeCustomSectionChangeTool(),
 		newProposeMetaUpdateTool(),
+		newProposeDesignUpdateTool(),
 	}
 
 	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{

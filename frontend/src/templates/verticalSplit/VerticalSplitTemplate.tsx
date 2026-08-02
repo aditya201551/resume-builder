@@ -2,19 +2,18 @@ import { useMemo, type ReactNode } from 'react'
 import { ExternalLink } from 'lucide-react'
 import type { ResumeDesign, SectionDisplay } from '@/types/design'
 import type { ContentEntry, ContentSection, ResumeContent } from '@/templates/contract'
-import { useColumnPagination, type PaginationBlock } from '@/templates/pagination/useColumnPagination'
+import { useColumnPagination, type PaginationBlock, type PaginationColumn } from '@/templates/pagination/useColumnPagination'
 import { splitRichTextBlocks } from '@/templates/shared/richText'
 import { withSpacing, pageStyleVars, pageDataAttrs, type RawBlock } from '@/templates/shared/tokens'
 import { cn } from '@/lib/utils'
-import styles from './classic.module.css'
+import styles from './verticalSplit.module.css'
 
 const PAGE_WIDTH = 680
 const PAGE_HEIGHT = 880
 
-// Section types whose entries render as one atomic block per section rather
-// than one block per entry — matches the original single-column engine's
-// granularity for these three (a short skills/languages list, or the
-// one-paragraph summary, never needs an internal page break).
+// Sidebar content (name/contact + Skills/Languages/Certifications) is
+// deliberately short-form — none of these ever need an internal page break,
+// same reasoning as ClassicTemplate's ATOMIC_SECTION_TYPES.
 const ATOMIC_SECTION_TYPES = new Set(['summary', 'skills', 'languages'])
 
 function entryBlock(sectionKey: string, key: string, heading: string | undefined, body: ReactNode, entryKey: string = key): RawBlock {
@@ -31,9 +30,6 @@ function entryBlock(sectionKey: string, key: string, heading: string | undefined
   }
 }
 
-/** An entry's heading/meta line is glued to its first paragraph or bullet;
- * every subsequent paragraph/bullet is its own block so overflow only
- * carries forward what doesn't fit, not the whole entry. */
 function richTextEntryBlocks(sectionKey: string, entryKey: string, heading: string | undefined, head: ReactNode, bodyHtml: string): RawBlock[] {
   const fragments = splitRichTextBlocks(bodyHtml)
   if (fragments.length === 0) {
@@ -88,11 +84,10 @@ function entryHead(entry: ContentEntry) {
   )
 }
 
-/** Renders a section's entries in one of three shapes, matching
- * sectionDisplay.{skills,languages}: `text` reproduces the original
- * single-block-of-lines look exactly (the default, so existing resumes
- * render unchanged), `grid` lays the same lines out in two columns, and
- * `bullets` renders them as a bulleted list. */
+/** Same three sectionDisplay shapes as ClassicTemplate (text/grid/bullets) —
+ * used here for the sidebar's Skills/Languages/Certifications lists, which
+ * default to "bullets" for this template (see the seed migration) since a
+ * narrow column reads better as a short bulleted list than a text sentence. */
 function displayEntries(entries: ContentEntry[], mode: SectionDisplay['skills'], line: (e: ContentEntry) => ReactNode) {
   if (mode === 'bullets') {
     return (
@@ -125,14 +120,24 @@ function buildSectionBlocks(section: ContentSection, sectionDisplay: SectionDisp
       ))
       return [entryBlock(section.key, section.key, section.title, body)]
     }
-    // languages — "text" mode reconstructs the original joined sentence
-    // ("Name — Level · Name — Level") from the per-language entries so its
-    // default look is byte-for-byte what a single pre-joined string produced.
     if (sectionDisplay.languages === 'text') {
       const joined = section.entries.map((e) => [e.title, e.meta].filter(Boolean).join(' — ')).join(' · ')
       return [entryBlock(section.key, section.key, section.title, <p>{joined}</p>)]
     }
     const body = displayEntries(section.entries, sectionDisplay.languages, (e) => [e.title, e.meta].filter(Boolean).join(' — '))
+    return [entryBlock(section.key, section.key, section.title, body)]
+  }
+
+  // certifications in the sidebar render the same short-list shape as
+  // skills/languages rather than Classic's full entry-with-date-and-link
+  // treatment — a narrow column has no room for that.
+  if (section.type === 'certifications') {
+    const body = displayEntries(section.entries, 'bullets', (e) => (
+      <>
+        {e.title}
+        {e.dateLabel && <span className={styles.entryDates}> · {e.dateLabel}</span>}
+      </>
+    ))
     return [entryBlock(section.key, section.key, section.title, body)]
   }
 
@@ -156,40 +161,49 @@ function buildSectionBlocks(section: ContentSection, sectionDisplay: SectionDisp
   })
 }
 
-function buildRawBlocks(content: ResumeContent, sectionDisplay: SectionDisplay): RawBlock[] {
-  const blocks: RawBlock[] = [
-    {
-      key: 'header',
-      sectionKey: 'header',
-      entryKey: 'header',
-      node: (
-        <div className={styles.header}>
-          <h1 className={styles.name}>{content.header.fullName}</h1>
-          {content.header.headline && <p className={styles.headline}>{content.header.headline}</p>}
-          <div className={styles.metaRow}>
-            {[content.header.email, content.header.phone, content.header.location].filter(Boolean).map((v) => (
-              <span key={v}>{v}</span>
-            ))}
-            {content.header.links.map((l) => (
-              <a
-                key={l.url}
-                href={/^https?:\/\//i.test(l.url) ? l.url : `https://${l.url}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={styles.metaLink}
-              >
-                {l.label || l.url}
-              </a>
-            ))}
-          </div>
-          <hr className={styles.rule} />
+function sidebarHeaderBlock(header: ResumeContent['header']): RawBlock {
+  return {
+    key: 'header',
+    sectionKey: 'header',
+    entryKey: 'header',
+    node: (
+      <div className={styles.sidebarHeader}>
+        <h1 className={styles.name}>{header.fullName}</h1>
+        {header.headline && <p className={styles.headline}>{header.headline}</p>}
+        <div className={styles.contactList}>
+          {[header.email, header.phone, header.location].filter(Boolean).map((v) => (
+            <div key={v} className={styles.contactItem}>
+              {v}
+            </div>
+          ))}
+          {header.links.map((l) => (
+            <a
+              key={l.url}
+              href={/^https?:\/\//i.test(l.url) ? l.url : `https://${l.url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(styles.contactItem, styles.metaLink)}
+            >
+              {l.label || l.url}
+            </a>
+          ))}
         </div>
-      ),
-    },
-  ]
+      </div>
+    ),
+  }
+}
 
-  content.sections.forEach((section) => blocks.push(...buildSectionBlocks(section, sectionDisplay)))
-  return blocks
+/** Splits content into sidebar (left) and main (right) raw blocks — column
+ * placement comes straight from resolveResumeContent's per-section `column`
+ * tag (layout.mode "two" via resolveTwoColumnSectionRefs), not decided here. */
+function buildRawBlocks(content: ResumeContent, sectionDisplay: SectionDisplay): { left: RawBlock[]; right: RawBlock[] } {
+  const left: RawBlock[] = [sidebarHeaderBlock(content.header)]
+  const right: RawBlock[] = []
+  for (const section of content.sections) {
+    const target = section.column === 'right' ? right : left
+    target.push(...buildSectionBlocks(section, sectionDisplay))
+  }
+  return { left, right }
 }
 
 function PageFooter({ footer, header, pageIndex, pageCount }: { footer: ResumeDesign['footer']; header: ResumeContent['header']; pageIndex: number; pageCount: number }) {
@@ -207,7 +221,7 @@ function PageFooter({ footer, header, pageIndex, pageCount }: { footer: ResumeDe
   )
 }
 
-export default function ClassicTemplate({
+export default function VerticalSplitTemplate({
   content,
   tokens,
   onReady,
@@ -217,49 +231,72 @@ export default function ClassicTemplate({
   onReady?: () => void
 }) {
   const contentHeight = PAGE_HEIGHT - tokens.page.marginTop - tokens.page.marginBottom
+  const leftWidthPct = tokens.layout.columnWidths.left
 
-  // Memoized on content/tokens (not recomputed as fresh array literals every
-  // render): useColumnPagination's effect depends on `paginationBlocks` by
-  // reference, and its own setPages call triggers a re-render — an
-  // unmemoized array here reruns the effect every render, which reruns
-  // setPages, forever. This is load-bearing, not an optimization.
-  const blocks = useMemo(
-    () => withSpacing(buildRawBlocks(content, tokens.sectionDisplay), tokens.spacing),
-    [content, tokens.sectionDisplay, tokens.spacing],
-  )
-  const paginationBlocks: PaginationBlock[] = useMemo(
-    () => blocks.map((b) => ({ key: b.key, column: 'left' as const, node: b.node })),
-    [blocks],
-  )
+  // Same memoization discipline as ClassicTemplate — see its comment.
+  // useColumnPagination's effect depends on `paginationBlocks` by reference;
+  // an unmemoized array here would rerun the effect (and its setPages call)
+  // every render, forever.
+  const raw = useMemo(() => buildRawBlocks(content, tokens.sectionDisplay), [content, tokens.sectionDisplay])
+  const leftBlocks = useMemo(() => withSpacing(raw.left, tokens.spacing), [raw.left, tokens.spacing])
+  const rightBlocks = useMemo(() => withSpacing(raw.right, tokens.spacing), [raw.right, tokens.spacing])
+  // Order doesn't matter here beyond "left blocks stay in left order, right
+  // blocks stay in right order" — useColumnPagination regroups by column and
+  // balances by actual measured height internally, not by how they're
+  // interleaved in this array.
+  const paginationBlocks: PaginationBlock[] = useMemo(() => {
+    const tagged = (col: PaginationColumn) => (b: { key: string; node: ReactNode }) => ({ key: b.key, column: col, node: b.node })
+    return [...leftBlocks.map(tagged('left')), ...rightBlocks.map(tagged('right'))]
+  }, [leftBlocks, rightBlocks])
   const { pages, setMeasureRef } = useColumnPagination(paginationBlocks, contentHeight, onReady)
 
-  const byKey = useMemo(() => new Map(blocks.map((b) => [b.key, b.node])), [blocks])
+  const byKey = useMemo(() => new Map([...leftBlocks, ...rightBlocks].map((b) => [b.key, b.node])), [leftBlocks, rightBlocks])
   const vars = pageStyleVars(tokens)
   const dataAttrs = pageDataAttrs(tokens)
 
   return (
     <div className={styles.pageStack}>
-      {/* Hidden measuring pass — same nodes, under the exact `.page` font
-          metrics/width/padding so measured heights match the real render;
-          only position/visibility/height/overflow are overridden here. */}
+      {/* Hidden measuring pass — sidebar/main blocks measured under their
+          real column widths (text-wrap height depends on container width),
+          same visibility/position override pattern as ClassicTemplate. */}
       <div
         className={styles.page}
         style={{ ...vars, position: 'fixed', top: 0, left: -99999, height: 'auto', overflow: 'visible', visibility: 'hidden' }}
         aria-hidden
         {...dataAttrs}
       >
-        {blocks.map((b) => (
-          <div key={b.key} ref={setMeasureRef(b.key)} style={{ display: 'flow-root' }}>
-            {b.node}
-          </div>
-        ))}
+        <div className={styles.sidebar} style={{ width: `${leftWidthPct}%` }}>
+          {leftBlocks.map((b) => (
+            <div key={b.key} ref={setMeasureRef(b.key)} style={{ display: 'flow-root' }}>
+              {b.node}
+            </div>
+          ))}
+        </div>
+        <div className={styles.main}>
+          {rightBlocks.map((b) => (
+            <div key={b.key} ref={setMeasureRef(b.key)} style={{ display: 'flow-root' }}>
+              {b.node}
+            </div>
+          ))}
+        </div>
       </div>
 
       {pages.map((page, i) => (
         <div key={i} className={styles.page} style={{ width: PAGE_WIDTH, height: PAGE_HEIGHT, ...vars }} {...dataAttrs}>
-          {page.map((assignment) => (
-            <div key={assignment.key}>{byKey.get(assignment.key)}</div>
-          ))}
+          <div className={styles.sidebar} style={{ width: `${leftWidthPct}%` }}>
+            {page
+              .filter((a) => a.column === 'left')
+              .map((a) => (
+                <div key={a.key}>{byKey.get(a.key)}</div>
+              ))}
+          </div>
+          <div className={styles.main}>
+            {page
+              .filter((a) => a.column === 'right')
+              .map((a) => (
+                <div key={a.key}>{byKey.get(a.key)}</div>
+              ))}
+          </div>
           <PageFooter footer={tokens.footer} header={content.header} pageIndex={i} pageCount={pages.length} />
         </div>
       ))}

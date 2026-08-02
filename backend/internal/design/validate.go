@@ -27,6 +27,10 @@ var (
 		"Georgia", "Times New Roman", "Arial", "Helvetica",
 		"Inter", "Roboto", "Lora", "Merriweather", "Open Sans",
 	}
+	// validNameFontFamilies additionally allows "inherit" (fall back to
+	// typography.fontFamily) — the sentinel a FieldEnum control shows as
+	// "Same as body font".
+	validNameFontFamilies = append([]string{"inherit"}, validFontFamilies...)
 	// Section types a SectionRef may name — deliberately excludes "contact":
 	// the header is always shown and isn't subject to ordering, matching
 	// LivePreview.tsx's DEFAULT_ORDER today.
@@ -64,8 +68,17 @@ func Validate(d ResumeDesign) error {
 	if !contains(validFontFamilies, d.Typography.FontFamily) {
 		return enumError("typography.fontFamily", d.Typography.FontFamily, validFontFamilies)
 	}
+	if !contains(validNameFontFamilies, d.Typography.NameFontFamily) {
+		return enumError("typography.nameFontFamily", d.Typography.NameFontFamily, validNameFontFamilies)
+	}
 	if d.Typography.BaseFontSizePt <= 0 || d.Typography.BaseFontSizePt > 24 {
 		return fmt.Errorf("typography.baseFontSizePt: %.1f is out of range (0, 24]", d.Typography.BaseFontSizePt)
+	}
+	if d.Typography.HeadlineFontSizePt <= 0 || d.Typography.HeadlineFontSizePt > 40 {
+		return fmt.Errorf("typography.headlineFontSizePt: %.1f is out of range (0, 40]", d.Typography.HeadlineFontSizePt)
+	}
+	if d.Typography.EntryHeaderFontSizePt <= 0 || d.Typography.EntryHeaderFontSizePt > 40 {
+		return fmt.Errorf("typography.entryHeaderFontSizePt: %.1f is out of range (0, 40]", d.Typography.EntryHeaderFontSizePt)
 	}
 	if !hexColorPattern.MatchString(d.Colors.Text) {
 		return fmt.Errorf("colors.text: %q is not a hex color like #14181d", d.Colors.Text)
@@ -166,17 +179,22 @@ func validateSectionRef(path string, ref SectionRef) error {
 func DescribeFields() string {
 	return fmt.Sprintf(
 		"layout.mode: one of %s. page.format: one of %s. typography.fontFamily: one of %s. "+
+			"typography.nameFontFamily: one of %s (\"inherit\" falls back to fontFamily). "+
 			"colors.{text,accent,background}: hex color strings like #14181d. "+
+			"colors.applyAccent.{name,headings,dates,icons}: booleans. "+
 			"heading.style: one of %s. heading.capitalization: one of %s. "+
 			"header.photo.size: one of %s. header.alignText: one of %s. header.jobTitlePosition: one of %s. "+
 			"entryLayout.dateDisplayMode: one of %s. entryLayout.subtitleStyle: one of %s. "+
 			"sectionDisplay.{skills,languages,certifications}: one of %s. "+
+			"linkStyle.{showIcon,underline,useAccentColor}: booleans. "+
+			"footer.{showPageNumbers,showEmail,showName}: booleans. "+
 			"dateFormat: one of %s. "+
 			"sectionOrder section refs: sectionType must be one of %s; customSectionId is required "+
 			"when sectionType is \"custom\" and must be null otherwise.",
 		strings.Join(validLayoutModes, "/"),
 		strings.Join(validPageFormats, "/"),
 		strings.Join(validFontFamilies, "/"),
+		strings.Join(validNameFontFamilies, "/"),
 		strings.Join(validHeadingStyles, "/"),
 		strings.Join(validCapitalizations, "/"),
 		strings.Join(validHeaderPhotoSizes, "/"),

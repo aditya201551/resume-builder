@@ -7,16 +7,17 @@
 
 .page {
   position: relative;
+  display: flex;
+  align-items: stretch;
   width: 680px;
   height: 880px;
   flex-shrink: 0;
   overflow: hidden;
   background: var(--rd-background, #ffffff);
-  color: var(--rd-text, #14181d);
-  padding: var(--rd-margin-top, 48px) var(--rd-margin-right, 56px) var(--rd-margin-bottom, 48px) var(--rd-margin-left, 56px);
-  font-family: var(--rd-font-family, Georgia, 'Times New Roman', serif);
-  font-size: var(--rd-font-size, 13px);
-  line-height: var(--rd-line-height, 1.55);
+  color: var(--rd-text, #1f2328);
+  font-family: var(--rd-font-family, Inter, Arial, sans-serif);
+  font-size: var(--rd-font-size, 12.5px);
+  line-height: var(--rd-line-height, 1.5);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -33,46 +34,51 @@
   }
 }
 
-.header {
-  text-align: left;
+.sidebar {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--rd-accent, #3457d5) 8%, var(--rd-background, #ffffff));
+  padding: var(--rd-margin-top, 40px) 18px var(--rd-margin-bottom, 40px) var(--rd-margin-left, 40px);
 }
-.page[data-header-align='center'] .header {
-  text-align: center;
-}
-.page[data-header-align='center'] .metaRow {
-  justify-content: center;
+.main {
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding: var(--rd-margin-top, 40px) var(--rd-margin-right, 40px) var(--rd-margin-bottom, 40px) 28px;
 }
 
+.sidebarHeader {
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid color-mix(in srgb, var(--rd-accent, #3457d5) 25%, transparent);
+}
 .name {
   margin: 0;
   font-size: var(--rd-name-size, 22px);
   font-family: var(--rd-name-font-family, inherit);
   font-weight: 700;
+  line-height: 1.2;
   letter-spacing: 0.01em;
   color: var(--rd-name-color, inherit);
 }
 .headline {
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: var(--rd-headline-size, 13px);
   color: #4a4a4a;
 }
-/* jobTitlePosition: "inline" puts the headline on the same line as the name
-   instead of its own line below — both become inline boxes so they flow
-   into one line the way adjacent inline siblings do. */
-.page[data-job-title-position='inline'] .name,
-.page[data-job-title-position='inline'] .headline {
-  display: inline;
-}
-.page[data-job-title-position='inline'] .headline {
-  margin-left: 8px;
-}
-.metaRow {
+.contactList {
   display: flex;
-  flex-wrap: wrap;
-  gap: 4px 12px;
-  margin-top: 8px;
-  font-size: 11.5px;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 11px;
   color: #4a4a4a;
+  word-break: break-word;
+}
+.contactItem {
+  display: block;
 }
 .metaLink {
   color: var(--rd-link-color, inherit);
@@ -81,50 +87,43 @@
 .metaLink:hover {
   text-decoration: underline;
 }
-.rule {
-  border: none;
-  border-top: 1px solid var(--rd-accent, #c9603e);
-  margin: 14px 0 18px;
-}
+
 .sectionTitle {
   margin: 0 0 8px;
-  font-size: var(--rd-section-heading-size, 11px);
+  font-size: var(--rd-section-heading-size, 12px);
   font-weight: 700;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: var(--rd-heading-transform, uppercase);
-  color: var(--rd-heading-color, var(--rd-text, #14181d));
+  color: var(--rd-heading-color, var(--rd-text, #1f2328));
 }
-/* heading.style: "simple" (no decoration) is the default — every existing
-   resume already looks like this, since this field was never rendered
-   before. The rest are opt-in decorations using the accent color. */
+/* heading.style — same opt-in decoration set as ClassicTemplate; "simple"
+   (no decoration) is this template's default too. */
 .page[data-heading-style='line'] .sectionTitle {
   padding-bottom: 4px;
-  border-bottom: 2px solid var(--rd-accent, #c9603e);
+  border-bottom: 2px solid var(--rd-accent, #3457d5);
 }
 .page[data-heading-style='thinLine'] .sectionTitle {
   padding-bottom: 4px;
-  border-bottom: 1px solid var(--rd-accent, #c9603e);
+  border-bottom: 1px solid var(--rd-accent, #3457d5);
 }
 .page[data-heading-style='underline'] .sectionTitle {
   text-decoration: underline;
-  text-decoration-color: var(--rd-accent, #c9603e);
+  text-decoration-color: var(--rd-accent, #3457d5);
   text-underline-offset: 3px;
 }
 .page[data-heading-style='box'] .sectionTitle {
   display: inline-block;
   padding: 2px 8px;
-  background: var(--rd-accent, #c9603e);
+  background: var(--rd-accent, #3457d5);
   color: #ffffff;
 }
+
 .entryHead {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  font-size: var(--rd-entry-header-size, var(--rd-font-size, 13px));
+  gap: 10px;
+  font-size: var(--rd-entry-header-size, var(--rd-font-size, 12.5px));
 }
-/* entryLayout.dateDisplayMode: "right" (default) is the flex order above,
-   unchanged. "left" swaps which side the date lands on; "belowTitle" stacks
-   date under the title/link row instead of beside it. */
 .page[data-date-display-mode='left'] .entryHead {
   flex-direction: row-reverse;
 }
@@ -147,7 +146,7 @@
   display: none;
 }
 .entryLinkIcon:hover {
-  color: var(--rd-accent, #c9603e);
+  color: var(--rd-accent, #3457d5);
 }
 .entryLinkIcon svg {
   width: 11px;
@@ -159,20 +158,9 @@
 }
 .entryDates {
   flex-shrink: 0;
-  font-size: 11.5px;
+  font-size: 10.5px;
   color: var(--rd-date-color, #555);
   white-space: nowrap;
-}
-.footer {
-  position: absolute;
-  bottom: 12px;
-  left: var(--rd-margin-left, 56px);
-  right: var(--rd-margin-right, 56px);
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: 10px;
-  color: #888;
 }
 
 .richText :global(p) {
@@ -181,7 +169,7 @@
 .richText :global(ul),
 .richText :global(ol) {
   margin: 4px 0;
-  padding-left: 18px;
+  padding-left: 16px;
 }
 .richText :global(ul) {
   list-style: disc outside;
@@ -196,7 +184,7 @@
 .richText :global(a) {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: var(--rd-accent, #c9603e);
+  text-decoration-color: var(--rd-accent, #3457d5);
 }
 
 .skillGroups {
@@ -205,17 +193,30 @@
   gap: 4px;
   margin: 0;
   padding: 0;
+  font-size: 11px;
 }
 .skillGroupsGrid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 4px 16px;
+  gap: 4px 10px;
 }
 .skillGroupsBullets {
   display: block;
   list-style: disc outside;
-  padding-left: 18px;
+  padding-left: 14px;
 }
 .skillGroupsBullets li {
   margin: 2px 0;
+}
+
+.footer {
+  position: absolute;
+  bottom: 12px;
+  left: 18px;
+  right: var(--rd-margin-right, 40px);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 9.5px;
+  color: #888;
 }

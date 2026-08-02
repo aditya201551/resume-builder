@@ -101,6 +101,7 @@ func main() {
 		SectionConfig:  handlers.NewSectionConfigHandler(sectionConfigService),
 		Template:       handlers.NewTemplateHandler(templateService),
 		ResumeDesign:   handlers.NewResumeDesignHandler(resumeDesignService),
+		DesignSchema:   handlers.NewDesignSchemaHandler(),
 		Agent:          agentHandler,
 	}
 

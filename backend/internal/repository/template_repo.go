@@ -14,16 +14,17 @@ import (
 // ownership check on this table; it's a global, read-only (from the API's
 // perspective) list of renderers a resume's design can select.
 type Template struct {
-	ID             string          `json:"id"`
-	RendererKey    string          `json:"renderer_key"`
-	Name           string          `json:"name"`
-	ThumbnailURL   *string         `json:"thumbnail_url"`
-	Tags           json.RawMessage `json:"tags"`
-	SupportedModes json.RawMessage `json:"supported_modes"`
-	DefaultDesign  json.RawMessage `json:"default_design"`
-	IsPremium      bool            `json:"is_premium"`
-	Published      bool            `json:"published"`
-	SortOrder      int             `json:"sort_order"`
+	ID              string          `json:"id"`
+	RendererKey     string          `json:"renderer_key"`
+	Name            string          `json:"name"`
+	ThumbnailURL    *string         `json:"thumbnail_url"`
+	Tags            json.RawMessage `json:"tags"`
+	SupportedModes  json.RawMessage `json:"supported_modes"`
+	SupportedGroups json.RawMessage `json:"supported_groups"`
+	DefaultDesign   json.RawMessage `json:"default_design"`
+	IsPremium       bool            `json:"is_premium"`
+	Published       bool            `json:"published"`
+	SortOrder       int             `json:"sort_order"`
 }
 
 type TemplateRepository struct {
@@ -34,12 +35,12 @@ func NewTemplateRepository(pool *pgxpool.Pool) *TemplateRepository {
 	return &TemplateRepository{pool: pool}
 }
 
-const templateColumns = `id, renderer_key, name, thumbnail_url, tags, supported_modes, default_design, is_premium, published, sort_order`
+const templateColumns = `id, renderer_key, name, thumbnail_url, tags, supported_modes, supported_groups, default_design, is_premium, published, sort_order`
 
 func scanTemplate(row pgx.Row) (*Template, error) {
 	var t Template
 	err := row.Scan(&t.ID, &t.RendererKey, &t.Name, &t.ThumbnailURL, &t.Tags,
-		&t.SupportedModes, &t.DefaultDesign, &t.IsPremium, &t.Published, &t.SortOrder)
+		&t.SupportedModes, &t.SupportedGroups, &t.DefaultDesign, &t.IsPremium, &t.Published, &t.SortOrder)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, ErrNotFound
 	}

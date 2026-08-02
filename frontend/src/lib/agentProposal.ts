@@ -2,6 +2,7 @@ import type { AgentProposal, AgentToolEvent } from '@/lib/agentChat'
 import type { DraftAction, FlatKind } from '@/hooks/resumeDraftReducer'
 import type { AssistantPart } from '@/hooks/useAgentChat'
 import type { FullResume } from '@/types/resume'
+import type { ResumeDesign } from '@/types/design'
 
 /**
  * Converts one AgentProposal (the wire shape the backend chat agent emits)
@@ -64,6 +65,9 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
 
     case 'update_meta':
       return { type: 'update_meta', patch: p.patch ?? {} }
+
+    case 'design_update':
+      return { type: 'design_update', patch: (p.designPatch ?? {}) as Partial<ResumeDesign> }
 
     default:
       return null
@@ -205,6 +209,8 @@ export function describeProposal(p: AgentProposal): string {
       return 'Remove entry'
     case 'update_meta':
       return 'Update contact info / summary'
+    case 'design_update':
+      return 'Update design settings'
     default:
       return p.type
   }
@@ -212,6 +218,7 @@ export function describeProposal(p: AgentProposal): string {
 
 /** Field/patch entries worth showing on the card, skipping ID-ish keys. */
 export function proposalDetailEntries(p: AgentProposal): [string, unknown][] {
+  if (p.type === 'design_update') return Object.entries(p.designUpdates ?? {})
   const data = p.fields ?? p.patch ?? {}
   return Object.entries(data).filter(([k]) => k !== 'id' && k !== 'sort_order')
 }

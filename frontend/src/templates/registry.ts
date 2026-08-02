@@ -1,6 +1,7 @@
 import type { ResumeDesign } from '@/types/design'
 import type { ResumeContent } from './contract'
 import ClassicTemplate from './classic/ClassicTemplate'
+import VerticalSplitTemplate from './verticalSplit/VerticalSplitTemplate'
 
 export interface TemplateComponentProps {
   content: ResumeContent
@@ -12,11 +13,11 @@ export type TemplateComponent = (props: TemplateComponentProps) => React.JSX.Ele
 
 // Keyed by the templates table's renderer_key, not its id — the id is a
 // per-database UUID, renderer_key is the stable string this registry and
-// the seeded migration both agree on. Only "classic" exists today; once
-// GET /api/templates is consumed by a template picker (later phase), this
-// map grows one entry per new renderer without touching call sites.
+// the seeded migrations both agree on. Grows one entry per new renderer
+// without touching call sites.
 export const templateRegistry: Record<string, TemplateComponent> = {
   classic: ClassicTemplate,
+  'vertical-split': VerticalSplitTemplate,
 }
 
 const DEFAULT_RENDERER_KEY = 'classic'

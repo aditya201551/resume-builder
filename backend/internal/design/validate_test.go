@@ -24,6 +24,7 @@ func TestValidateRejectsBadEnums(t *testing.T) {
 		{"bad layout mode", func(d *ResumeDesign) { d.Layout.Mode = "three" }},
 		{"bad page format", func(d *ResumeDesign) { d.Page.Format = "Legal" }},
 		{"bad font family", func(d *ResumeDesign) { d.Typography.FontFamily = "Comic Sans" }},
+		{"bad name font family", func(d *ResumeDesign) { d.Typography.NameFontFamily = "Comic Sans" }},
 		{"bad heading style", func(d *ResumeDesign) { d.Heading.Style = "sparkles" }},
 		{"bad capitalization", func(d *ResumeDesign) { d.Heading.Capitalization = "titlecase" }},
 		{"bad photo size", func(d *ResumeDesign) { d.Header.Photo.Size = "xl" }},
@@ -115,6 +116,7 @@ func TestDescribeFieldsCoversEveryEnum(t *testing.T) {
 		validLayoutModes, validPageFormats, validHeadingStyles, validCapitalizations,
 		validHeaderPhotoSizes, validAlignText, validJobTitlePositions, validDateDisplayModes,
 		validSubtitleStyles, validSectionDisplayModes, validDateFormats, validSectionTypes,
+		validNameFontFamilies,
 	}
 	for _, group := range groups {
 		for _, value := range group {

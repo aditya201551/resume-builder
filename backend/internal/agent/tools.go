@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"resume-builder/backend/internal/design"
+
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
@@ -541,4 +543,154 @@ func (t *proposeMetaUpdateTool) InvokableRun(ctx context.Context, argumentsInJSO
 
 	sink.add(Proposal{Type: "update_meta", Patch: patch, ToolCallID: compose.GetToolCallID(ctx)})
 	return "proposed: update contact info", nil
+}
+
+// --- propose_design_update ----------------------------------------------------
+//
+// The design/styling counterpart to the propose_* content tools above: it
+// only stages a change (a "design_update" Proposal, applied client-side only
+// once accepted — see proposal.go), it never touches the database, and it
+// validates against internal/design.Schema()/ValidateFieldValue() — the same
+// pure-Go, DB-free source of truth the REST design PUT handler and the
+// Design Mode UI already use (see design.go's package comment, which
+// anticipated this exact tool). Importing internal/design does not
+// reintroduce the internal/service/internal/auth/cmd/api coupling doc.go's
+// split-out plan avoids — it's a sibling leaf package with no DB or HTTP
+// dependency of its own.
+
+// designSchemaDescription renders every editable design field (key, type,
+// and its enum options / numeric range) from design.Schema() into tool-
+// description text, so the model's view of what's editable can never drift
+// from what ValidateFieldValue() below actually accepts.
+func designSchemaDescription() string {
+	var b strings.Builder
+	for _, group := range design.Schema() {
+		for _, f := range group.Fields {
+			b.WriteString(f.Key)
+			switch f.Type {
+			case design.FieldEnum:
+				b.WriteString(" (one of: ")
+				b.WriteString(strings.Join(f.Options, "/"))
+				b.WriteString(")")
+			case design.FieldColor:
+				b.WriteString(" (hex color, e.g. #14181d)")
+			case design.FieldBool:
+				b.WriteString(" (boolean)")
+			case design.FieldNumber:
+				b.WriteString(fmt.Sprintf(" (number, %v-%v)", *f.Min, *f.Max))
+			}
+			b.WriteString("; ")
+		}
+	}
+	return b.String()
+}
+
+type proposeDesignUpdateTool struct{}
+
+func newProposeDesignUpdateTool() tool.InvokableTool { return &proposeDesignUpdateTool{} }
+
+func (t *proposeDesignUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
+	return &schema.ToolInfo{
+		Name: "propose_design_update",
+		Desc: "Propose changing one or more resume styling/design settings (fonts, colors, spacing, headings, links, footer, etc). This does not save anything — it stages a change for the user to accept. " +
+			"Valid keys and their allowed values: " + designSchemaDescription() +
+			"Only propose keys from this list — other ResumeDesign fields (template choice, section order, page format) aren't editable through this tool.",
+		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+			"updates": {
+				Type:     schema.Object,
+				Desc:     "Map of design field key -> new value, e.g. {\"colors.accent\": \"#3457d5\", \"typography.baseFontSizePt\": 12}. Use the exact dot-path keys listed in this tool's description.",
+				Required: true,
+			},
+		}),
+	}, nil
+}
+
+type proposeDesignUpdateArgs struct {
+	Updates map[string]any `json:"updates"`
+}
+
+// currentDesignMap reads the client's current design object (part of the
+// same draft JSON read_resume returns) out of session state, as a raw
+// map[string]any — not a typed design.ResumeDesign — so setNestedField can
+// build a patch that carries forward every sibling value in a touched group
+// without needing a full unmarshal/marshal round-trip.
+func currentDesignMap(ctx context.Context) (map[string]any, error) {
+	v, ok := adk.GetSessionValue(ctx, sessionKeyDraft)
+	if !ok {
+		return nil, errors.New("no resume draft in context (tool called outside Agent.Chat)")
+	}
+	draftJSON, ok := v.(string)
+	if !ok {
+		return nil, errors.New("resume draft has unexpected type")
+	}
+	var draft struct {
+		Design map[string]any `json:"design"`
+	}
+	if err := json.Unmarshal([]byte(draftJSON), &draft); err != nil {
+		return nil, fmt.Errorf("parse draft: %w", err)
+	}
+	if draft.Design == nil {
+		draft.Design = map[string]any{}
+	}
+	return draft.Design, nil
+}
+
+// setNestedField writes value at the dot-path parts inside obj, creating
+// intermediate objects as needed and reusing (mutating) any that already
+// exist — mirroring frontend/src/lib/designField.ts's buildFieldPatch, which
+// spreads each level's existing siblings rather than replacing the whole
+// sub-object.
+func setNestedField(obj map[string]any, parts []string, value any) {
+	if len(parts) == 1 {
+		obj[parts[0]] = value
+		return
+	}
+	sub, ok := obj[parts[0]].(map[string]any)
+	if !ok {
+		sub = map[string]any{}
+		obj[parts[0]] = sub
+	}
+	setNestedField(sub, parts[1:], value)
+}
+
+func (t *proposeDesignUpdateTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
+	var args proposeDesignUpdateArgs
+	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
+		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
+	}
+	if len(args.Updates) == 0 {
+		return toolProblem("updates must contain at least one key/value pair")
+	}
+
+	working, err := currentDesignMap(ctx)
+	if err != nil {
+		return "", err
+	}
+
+	touched := map[string]bool{}
+	for key, value := range args.Updates {
+		if err := design.ValidateFieldValue(key, value); err != nil {
+			return toolProblem("%v", err)
+		}
+		parts := strings.Split(key, ".")
+		setNestedField(working, parts, value)
+		touched[parts[0]] = true
+	}
+
+	patch := make(map[string]any, len(touched))
+	for top := range touched {
+		patch[top] = working[top]
+	}
+
+	sink, err := sinkFromContext(ctx)
+	if err != nil {
+		return "", err
+	}
+	sink.add(Proposal{Type: "design_update", DesignPatch: patch, DesignUpdates: args.Updates, ToolCallID: compose.GetToolCallID(ctx)})
+
+	keys := make([]string, 0, len(args.Updates))
+	for k := range args.Updates {
+		keys = append(keys, k)
+	}
+	return fmt.Sprintf("proposed: update design (%s)", strings.Join(keys, ", ")), nil
 }

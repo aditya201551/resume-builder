@@ -38,10 +38,14 @@ export interface Page {
 
 export interface Typography {
   fontFamily: string
+  /** "inherit" falls back to fontFamily, or one of the same font options. */
+  nameFontFamily: string
   baseFontSizePt: number
   lineHeight: number
   nameFontSizePt: number
+  headlineFontSizePt: number
   sectionHeadingFontSizePt: number
+  entryHeaderFontSizePt: number
 }
 
 export interface ApplyAccent {
@@ -93,14 +97,20 @@ export interface Spacing {
   bulletGap: number
 }
 
-// Mirrors the enum lists in backend/internal/design/validate.go — keep in
-// sync by hand, same as the types above. Used to populate the design
-// panel's selects so the UI can never offer a value the backend would
-// then reject.
-export const FONT_FAMILIES = ['Georgia', 'Times New Roman', 'Arial', 'Helvetica', 'Inter', 'Roboto', 'Lora', 'Merriweather', 'Open Sans']
-export const HEADING_STYLES: Heading['style'][] = ['line', 'box', 'underline', 'thinLine', 'simple']
-export const CAPITALIZATIONS: Heading['capitalization'][] = ['none', 'uppercase']
-export const PAGE_FORMATS: Page['format'][] = ['A4', 'Letter']
+// Named distinctly from "Links" to avoid colliding with the unrelated
+// concept of a resume's own header links (LinkedIn/GitHub URLs), which live
+// in content (ContentHeader.links), not design.
+export interface LinkStyle {
+  showIcon: boolean
+  underline: boolean
+  useAccentColor: boolean
+}
+
+export interface Footer {
+  showPageNumbers: boolean
+  showEmail: boolean
+  showName: boolean
+}
 
 export interface ResumeDesign {
   templateId: string
@@ -114,5 +124,7 @@ export interface ResumeDesign {
   entryLayout: EntryLayout
   sectionDisplay: SectionDisplay
   spacing: Spacing
+  linkStyle: LinkStyle
+  footer: Footer
   dateFormat: 'MM/YYYY' | 'Mon YYYY' | 'YYYY'
 }

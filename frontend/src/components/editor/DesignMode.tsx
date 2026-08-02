@@ -1,16 +1,33 @@
-import type { ReactNode } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
+import {
+  DndContext,
+  DragOverlay,
+  closestCorners,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragEndEvent,
+  type DragOverEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core'
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { GripVertical } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import SortableList from '@/components/editor/SortableList'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { useTemplates } from '@/hooks/useTemplates'
-import { FONT_FAMILIES, HEADING_STYLES, CAPITALIZATIONS, type ResumeDesign, type SectionRef } from '@/types/design'
-import { resolveSectionRefs, sectionRefKey, SECTION_LABELS } from '@/lib/sectionOrder'
-import { tempId } from '@/lib/tempId'
+import { useDesignSchema } from '@/hooks/useDesignSchema'
+import type { ResumeDesign, SectionRef } from '@/types/design'
+import type { CustomSection, FullResume } from '@/types/resume'
+import type { FieldDef, FieldGroup } from '@/types/designSchema'
+import type { Template } from '@/types/template'
+import { resolveSectionRefs, resolveTwoColumnSectionRefs, sectionRefKey, SECTION_LABELS } from '@/lib/sectionOrder'
+import { getFieldValue, buildFieldPatch } from '@/lib/designField'
 import { cn } from '@/lib/utils'
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -22,32 +39,78 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
+/** Rounds to the nearest `step` and clamps to [min, max] — avoids floating
+ * point drift (e.g. 1.55 + 0.05 landing on 1.5999999999999999) when
+ * stepping with the +/- buttons. */
+function stepValue(value: number, delta: number, min: number, max: number, step: number) {
+  const precision = step < 1 ? String(step).split('.')[1]?.length ?? 0 : 0
+  const next = Number((value + delta).toFixed(precision))
+  return Math.min(max, Math.max(min, next))
+}
+
 function NumberField({
   label,
   value,
   onChange,
+  min = 0,
+  max = 100,
   step = 1,
-  min,
 }: {
   label: string
   value: number
   onChange: (v: number) => void
-  step?: number
   min?: number
+  max?: number
+  step?: number
 }) {
   return (
-    <Field label={label}>
-      <Input
-        type="number"
-        value={value}
-        step={step}
-        min={min}
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          if (!Number.isNaN(n)) onChange(n)
-        }}
-      />
-    </Field>
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <Label>{label}</Label>
+        {/* Slider is bounded to [min, max], but typing an exact value here
+            isn't clamped to that range — the range is a sensible default,
+            not a hard backend limit. */}
+        <input
+          type="number"
+          value={value}
+          step={step}
+          onChange={(e) => {
+            const n = Number(e.target.value)
+            if (!Number.isNaN(n)) onChange(n)
+          }}
+          className="h-7 w-16 rounded border border-input bg-transparent px-1.5 text-right text-sm tabular-nums"
+        />
+      </div>
+      <div className="flex items-center gap-2">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={Math.min(max, Math.max(min, value))}
+          onChange={(e) => onChange(Number(e.target.value))}
+          className="h-1.5 flex-1 cursor-pointer accent-accent"
+        />
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            aria-label={`Decrease ${label}`}
+            onClick={() => onChange(stepValue(value, -step, min, max, step))}
+            className="flex size-6 items-center justify-center rounded border border-input text-muted-foreground hover:bg-secondary"
+          >
+            −
+          </button>
+          <button
+            type="button"
+            aria-label={`Increase ${label}`}
+            onClick={() => onChange(stepValue(value, step, min, max, step))}
+            className="flex size-6 items-center justify-center rounded border border-input text-muted-foreground hover:bg-secondary"
+          >
+            +
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 
@@ -67,18 +130,39 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
   )
 }
 
+function BoolField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+      {label}
+      <Switch checked={value} onCheckedChange={onChange} />
+    </label>
+  )
+}
+
 function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: (patch: Partial<ResumeDesign>) => void }) {
   const { data: templates, isLoading } = useTemplates()
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading templates…</p>
   if (!templates || templates.length === 0) return null
 
+  // Switching templates replaces every design field with that template's
+  // default_design wholesale — matches FlowCV's actual apply-template
+  // behavior (confirmed from its request payload: the whole customization
+  // object gets replaced, not just a templateId pointer) — so a new
+  // template's fonts/colors/spacing don't end up mixed with the old one's.
+  // sectionOrder is the one exception: it's resume-specific (references
+  // this resume's actual custom sections) rather than a template default,
+  // so it's carried over unchanged.
+  function applyTemplate(t: Template) {
+    onChange({ ...t.default_design, templateId: t.id, sectionOrder: design.sectionOrder })
+  }
+
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <div className="grid grid-cols-2 gap-3">
       {templates.map((t) => (
         <button
           key={t.id}
           type="button"
-          onClick={() => onChange({ templateId: t.id })}
+          onClick={() => applyTemplate(t)}
           className={cn(
             'flex flex-col items-center gap-2 rounded-lg border p-3 text-sm transition-colors',
             design.templateId === t.id ? 'border-accent ring-1 ring-accent' : 'border-border hover:border-foreground/30',
@@ -92,269 +176,594 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
   )
 }
 
+/** One reorderable/toggle-able/renameable list of section refs — shared by
+ * the single-column Sections panel and each column of the two-column one.
+ * Purely presentational: the caller owns what "persist" means for whichever
+ * sectionOrder sub-path it's editing. */
+function SectionRefList({
+  refs,
+  customSections,
+  onReorder,
+  onToggleVisible,
+  onSetTitleOverride,
+}: {
+  refs: SectionRef[]
+  customSections: CustomSection[]
+  onReorder: (orderedIds: string[]) => void
+  onToggleVisible: (key: string) => void
+  onSetTitleOverride: (key: string, value: string) => void
+}) {
+  if (refs.length === 0) {
+    return <p className="text-sm text-muted-foreground">Nothing here yet.</p>
+  }
+  return (
+    <SortableList
+      dragHandlePlacement="inline"
+      items={refs.map((r) => ({ id: sectionRefKey(r) }))}
+      onReorder={onReorder}
+      renderItem={(item, _index, dragHandle) => {
+        const ref = refs.find((r) => sectionRefKey(r) === item.id)!
+        const isCustom = ref.sectionType === 'custom'
+        const customSection = isCustom ? customSections.find((s) => s.id === ref.customSectionId) : undefined
+        const defaultLabel = isCustom ? customSection?.title || 'Untitled section' : (SECTION_LABELS[ref.sectionType] ?? ref.sectionType)
+        return (
+          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+            {dragHandle}
+            <Input
+              value={ref.titleOverride ?? ''}
+              placeholder={defaultLabel}
+              onChange={(e) => onSetTitleOverride(item.id, e.target.value)}
+              className="h-8 flex-1"
+            />
+            <Switch checked={ref.isVisible} onCheckedChange={() => onToggleVisible(item.id)} />
+          </div>
+        )
+      }}
+    />
+  )
+}
+
+/** Bundles the reorder/toggle/rename callbacks a SectionRefList needs,
+ * closing over whichever `refs` snapshot and `persist` function apply to
+ * the list it's backing. */
+function sectionRefListHandlers(refs: SectionRef[], persist: (newRefs: SectionRef[]) => void) {
+  return {
+    onReorder: (orderedIds: string[]) => {
+      const byKey = new Map(refs.map((r) => [sectionRefKey(r), r]))
+      persist(orderedIds.map((id) => byKey.get(id)!))
+    },
+    onToggleVisible: (key: string) => persist(refs.map((r) => (sectionRefKey(r) === key ? { ...r, isVisible: !r.isVisible } : r))),
+    onSetTitleOverride: (key: string, value: string) =>
+      persist(refs.map((r) => (sectionRefKey(r) === key ? { ...r, titleOverride: value || null } : r))),
+  }
+}
+
+function sectionDefaultLabel(ref: SectionRef, customSections: CustomSection[]): string {
+  if (ref.sectionType !== 'custom') return SECTION_LABELS[ref.sectionType] ?? ref.sectionType
+  return customSections.find((s) => s.id === ref.customSectionId)?.title || 'Untitled section'
+}
+
+/** The row's visual content only — shared by the real (sortable, in-column)
+ * row and its DragOverlay preview, which must NOT be wrapped in useSortable
+ * (the overlay renders outside any SortableContext). */
+function SectionRowContent({
+  dragHandle,
+  ref,
+  defaultLabel,
+  onSetTitleOverride,
+  onToggleVisible,
+  overlay,
+}: {
+  dragHandle: ReactNode
+  ref: SectionRef
+  defaultLabel: string
+  onSetTitleOverride?: (key: string, value: string) => void
+  onToggleVisible?: (key: string) => void
+  overlay?: boolean
+}) {
+  const key = sectionRefKey(ref)
+  return (
+    <div className={cn('flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2', overlay && 'shadow-lg')}>
+      {dragHandle}
+      <Input
+        value={ref.titleOverride ?? ''}
+        placeholder={defaultLabel}
+        onChange={(e) => onSetTitleOverride?.(key, e.target.value)}
+        readOnly={overlay}
+        className="h-8 flex-1"
+      />
+      <Switch checked={ref.isVisible} onCheckedChange={() => onToggleVisible?.(key)} disabled={overlay} />
+    </div>
+  )
+}
+
+function DragHandle(props: React.ComponentProps<'button'>) {
+  return (
+    <button
+      type="button"
+      aria-label="Drag to move"
+      onClick={(e) => e.stopPropagation()}
+      className="-my-1 flex size-6 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
+      {...props}
+    >
+      <GripVertical className="size-4" />
+    </button>
+  )
+}
+
+function SortableSectionRow({
+  sectionRef,
+  defaultLabel,
+  onSetTitleOverride,
+  onToggleVisible,
+}: {
+  sectionRef: SectionRef
+  defaultLabel: string
+  onSetTitleOverride: (key: string, value: string) => void
+  onToggleVisible: (key: string) => void
+}) {
+  const id = sectionRefKey(sectionRef)
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
+  return (
+    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn(isDragging && 'opacity-30')}>
+      <SectionRowContent
+        dragHandle={<DragHandle {...attributes} {...listeners} />}
+        ref={sectionRef}
+        defaultLabel={defaultLabel}
+        onSetTitleOverride={onSetTitleOverride}
+        onToggleVisible={onToggleVisible}
+      />
+    </div>
+  )
+}
+
+/** One droppable+sortable column ("Sidebar" or "Main") — droppable on the
+ * column id itself (so dropping into empty space, or an empty column,
+ * still registers) as well as sortable over its own items (for reordering
+ * within the column and for detecting drops onto a specific row). */
+function SectionColumn({
+  id,
+  label,
+  refs,
+  customSections,
+  onSetTitleOverride,
+  onToggleVisible,
+}: {
+  id: 'left' | 'right'
+  label: string
+  refs: SectionRef[]
+  customSections: CustomSection[]
+  onSetTitleOverride: (key: string, value: string) => void
+  onToggleVisible: (key: string) => void
+}) {
+  const { setNodeRef } = useDroppable({ id })
+  return (
+    <div className="flex flex-col gap-2">
+      <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</h4>
+      <SortableContext items={refs.map(sectionRefKey)} strategy={verticalListSortingStrategy}>
+        <div ref={setNodeRef} className="flex min-h-16 flex-col gap-2 rounded-lg border border-dashed border-transparent p-0.5">
+          {refs.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+              Drop a section here
+            </p>
+          ) : (
+            refs.map((ref) => (
+              <SortableSectionRow
+                key={sectionRefKey(ref)}
+                sectionRef={ref}
+                defaultLabel={sectionDefaultLabel(ref, customSections)}
+                onSetTitleOverride={onSetTitleOverride}
+                onToggleVisible={onToggleVisible}
+              />
+            ))
+          )}
+        </div>
+      </SortableContext>
+    </div>
+  )
+}
+
+type Columns = { left: SectionRef[]; right: SectionRef[] }
+
+function findColumn(id: string, columns: Columns): 'left' | 'right' | undefined {
+  if (id === 'left' || id === 'right') return id
+  if (columns.left.some((r) => sectionRefKey(r) === id)) return 'left'
+  if (columns.right.some((r) => sectionRefKey(r) === id)) return 'right'
+  return undefined
+}
+
+/** True cross-column drag-and-drop for a two-column template's section
+ * order — dragging a section from Sidebar to Main (or back) moves it
+ * between sectionOrder.two.left/.right live, not via a separate button.
+ * `dragColumns` is local, ephemeral state that exists only for the duration
+ * of a drag gesture (initialized from the draft on drag start, committed to
+ * the draft on drop) — at rest, the draft (sectionOrder.two) is still the
+ * only source of truth, so this never risks drifting from it. */
+function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch: (action: { type: 'design_update'; patch: Partial<ResumeDesign> }) => void }) {
+  const [dragColumns, setDragColumns] = useState<Columns | null>(null)
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+
+  const columns = dragColumns ?? resolveTwoColumnSectionRefs(data)
+
+  function persist(final: Columns) {
+    dispatch({
+      type: 'design_update',
+      patch: { sectionOrder: { ...data.design.sectionOrder, two: { left: final.left, right: final.right } } },
+    })
+  }
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(String(event.active.id))
+    setDragColumns(resolveTwoColumnSectionRefs(data))
+  }
+
+  function handleDragOver(event: DragOverEvent) {
+    const { active, over } = event
+    if (!over) return
+    setDragColumns((prev) => {
+      if (!prev) return prev
+      const activeId = String(active.id)
+      const overId = String(over.id)
+      const activeColumn = findColumn(activeId, prev)
+      const overColumn = findColumn(overId, prev)
+      if (!activeColumn || !overColumn || activeColumn === overColumn) return prev
+
+      const activeItems = prev[activeColumn]
+      const overItems = prev[overColumn]
+      const activeIndex = activeItems.findIndex((r) => sectionRefKey(r) === activeId)
+      if (activeIndex === -1) return prev
+      const overIndex = overItems.findIndex((r) => sectionRefKey(r) === overId)
+      const insertAt = overIndex >= 0 ? overIndex : overItems.length
+      const moved = activeItems[activeIndex]
+      return {
+        ...prev,
+        [activeColumn]: activeItems.filter((_, i) => i !== activeIndex),
+        [overColumn]: [...overItems.slice(0, insertAt), moved, ...overItems.slice(insertAt)],
+      }
+    })
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    let final = dragColumns ?? resolveTwoColumnSectionRefs(data)
+
+    if (over) {
+      const activeId = String(active.id)
+      const overId = String(over.id)
+      const column = findColumn(activeId, final)
+      const overColumn = findColumn(overId, final)
+      if (column && overColumn === column) {
+        const items = final[column]
+        const activeIndex = items.findIndex((r) => sectionRefKey(r) === activeId)
+        const overIndex = items.findIndex((r) => sectionRefKey(r) === overId)
+        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
+          final = { ...final, [column]: arrayMove(items, activeIndex, overIndex) }
+        }
+      }
+    }
+
+    persist(final)
+    setDragColumns(null)
+    setActiveId(null)
+  }
+
+  function toggleVisible(key: string) {
+    const cur = resolveTwoColumnSectionRefs(data)
+    const column = findColumn(key, cur)
+    if (!column) return
+    persist({ ...cur, [column]: cur[column].map((r) => (sectionRefKey(r) === key ? { ...r, isVisible: !r.isVisible } : r)) })
+  }
+
+  function setTitleOverride(key: string, value: string) {
+    const cur = resolveTwoColumnSectionRefs(data)
+    const column = findColumn(key, cur)
+    if (!column) return
+    persist({ ...cur, [column]: cur[column].map((r) => (sectionRefKey(r) === key ? { ...r, titleOverride: value || null } : r)) })
+  }
+
+  const activeRef = activeId ? [...columns.left, ...columns.right].find((r) => sectionRefKey(r) === activeId) : undefined
+
+  return (
+    <div className="flex flex-col gap-5">
+      <p className="text-xs text-muted-foreground">
+        This template has two columns — drag sections between them, reorder within a column, and show/hide or rename
+        each. A section only shows up here once it actually has content — add or remove sections in Content.
+      </p>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCorners}
+        onDragStart={handleDragStart}
+        onDragOver={handleDragOver}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-2 gap-4">
+          <SectionColumn
+            id="left"
+            label="Sidebar"
+            refs={columns.left}
+            customSections={data.custom_sections}
+            onSetTitleOverride={setTitleOverride}
+            onToggleVisible={toggleVisible}
+          />
+          <SectionColumn
+            id="right"
+            label="Main"
+            refs={columns.right}
+            customSections={data.custom_sections}
+            onSetTitleOverride={setTitleOverride}
+            onToggleVisible={toggleVisible}
+          />
+        </div>
+        <DragOverlay>
+          {activeRef && (
+            <SectionRowContent
+              dragHandle={<DragHandle />}
+              ref={activeRef}
+              defaultLabel={sectionDefaultLabel(activeRef, data.custom_sections)}
+              overlay
+            />
+          )}
+        </DragOverlay>
+      </DndContext>
+    </div>
+  )
+}
+
+// Design only ever reorders/toggles/renames sections that already exist —
+// it never creates or deletes content (custom sections included). Adding or
+// removing a custom section is a content action and stays exclusively in
+// Content mode's CustomSectionsSection; this panel treats data.custom_sections
+// as read-only, the same way it treats work_experiences/educations/etc. as
+// read-only when computing counts elsewhere in the editor.
 function SectionsPanel() {
   const { state, dispatch } = useResumeDraftContext()
   const data = state.data
-  const refs = resolveSectionRefs(data)
 
-  function persist(newRefs: SectionRef[]) {
+  if (data.design.layout.mode === 'two') {
+    return <TwoColumnSectionsPanel data={data} dispatch={dispatch} />
+  }
+
+  // mode "one" (and "mix", not rendered by any template yet — falls back to
+  // the same flat order as "one").
+  const refs = resolveSectionRefs(data)
+  const persist = (newRefs: SectionRef[]) =>
     dispatch({
       type: 'design_update',
       patch: { sectionOrder: { ...data.design.sectionOrder, one: { sections: newRefs } } },
     })
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-xs text-muted-foreground">
+        Order, show/hide, and rename the sections that appear on your resume. A section only shows up here once it
+        actually has content — add or remove sections in Content.
+      </p>
+      <SectionRefList refs={refs} customSections={data.custom_sections} {...sectionRefListHandlers(refs, persist)} />
+    </div>
+  )
+}
+
+// Renders one control per field, entirely from the backend-served schema —
+// no hardcoded enum lists or field set here. `field.type` picks the control;
+// `getFieldValue`/`buildFieldPatch` do the dot-path read/write into the
+// current design object (see lib/designField.ts), and now recurse to
+// whatever depth a field's key needs (e.g. colors.applyAccent.name is 3
+// levels), not just 2.
+function SchemaField({
+  field,
+  design,
+  onChange,
+  options,
+}: {
+  field: FieldDef
+  design: ResumeDesign
+  onChange: (patch: Partial<ResumeDesign>) => void
+  /** Narrows an enum field's offered options (used for layout.mode, gated to
+   * the active template's supported_modes) without touching the field's
+   * declared full option set. */
+  options?: string[]
+}) {
+  const value = getFieldValue(design, field.key)
+
+  if (field.type === 'bool') {
+    return <BoolField label={field.label} value={value as boolean} onChange={(v) => onChange(buildFieldPatch(design, field.key, v))} />
   }
 
-  function toggleVisible(key: string) {
-    persist(refs.map((r) => (sectionRefKey(r) === key ? { ...r, isVisible: !r.isVisible } : r)))
+  if (field.type === 'enum') {
+    return (
+      <Field label={field.label}>
+        <Select value={value as string} onValueChange={(v) => onChange(buildFieldPatch(design, field.key, v))}>
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(options ?? field.options ?? []).map((o) => (
+              <SelectItem key={o} value={o}>
+                {o}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Field>
+    )
   }
 
-  function setTitleOverride(key: string, value: string) {
-    persist(refs.map((r) => (sectionRefKey(r) === key ? { ...r, titleOverride: value || null } : r)))
-  }
-
-  function addCustomSection() {
-    const id = tempId()
-    dispatch({ type: 'custom_section_create', tempId: id, fields: { title: 'New section', sort_order: data.custom_sections.length } })
-    persist([...refs, { sectionType: 'custom', customSectionId: id, isVisible: true, titleOverride: null }])
-  }
-
-  function removeCustomSection(customSectionId: string) {
-    dispatch({ type: 'custom_section_delete', id: customSectionId })
+  if (field.type === 'color') {
+    return <ColorField label={field.label} value={value as string} onChange={(v) => onChange(buildFieldPatch(design, field.key, v))} />
   }
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-foreground">Sections</h3>
-        <Button type="button" variant="secondary" size="sm" onClick={addCustomSection}>
-          <Plus className="size-3.5" /> Add custom section
-        </Button>
-      </div>
-      <p className="text-xs text-muted-foreground">
-        Order, show/hide, and rename the sections that appear on your resume. A default section (Experience, Skills,
-        etc.) only shows up here once it actually has content — add it in Content first.
-      </p>
-      {refs.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing to order yet — add some content first.</p>
-      ) : (
-        <SortableList
-          dragHandlePlacement="inline"
-          items={refs.map((r) => ({ id: sectionRefKey(r) }))}
-          onReorder={(orderedIds) => {
-            const byKey = new Map(refs.map((r) => [sectionRefKey(r), r]))
-            persist(orderedIds.map((id) => byKey.get(id)!))
-          }}
-          renderItem={(item, _index, dragHandle) => {
-            const ref = refs.find((r) => sectionRefKey(r) === item.id)!
-            const isCustom = ref.sectionType === 'custom'
-            const customSection = isCustom ? data.custom_sections.find((s) => s.id === ref.customSectionId) : undefined
-            const defaultLabel = isCustom ? customSection?.title || 'Untitled section' : (SECTION_LABELS[ref.sectionType] ?? ref.sectionType)
-            return (
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
-                {dragHandle}
-                <Input
-                  value={ref.titleOverride ?? ''}
-                  placeholder={defaultLabel}
-                  onChange={(e) => setTitleOverride(item.id, e.target.value)}
-                  className="h-8 flex-1"
-                />
-                <Switch checked={ref.isVisible} onCheckedChange={() => toggleVisible(item.id)} />
-                {isCustom && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={() => removeCustomSection(ref.customSectionId!)}
-                  >
-                    <Trash2 className="size-3.5" />
-                  </Button>
-                )}
-              </div>
-            )
-          }}
-        />
-      )}
-    </section>
+    <NumberField
+      label={field.label}
+      value={value as number}
+      min={field.min}
+      max={field.max}
+      step={field.step}
+      onChange={(v) => onChange(buildFieldPatch(design, field.key, v))}
+    />
   )
 }
+
+function SchemaGroupPanel({
+  group,
+  design,
+  onChange,
+  layoutModeOptions,
+}: {
+  group: FieldGroup
+  design: ResumeDesign
+  onChange: (patch: Partial<ResumeDesign>) => void
+  layoutModeOptions?: string[]
+}) {
+  const boolFields = group.fields.filter((f) => f.type === 'bool')
+  const otherFields = group.fields.filter((f) => f.type !== 'bool')
+
+  return (
+    <div className="flex flex-col gap-4">
+      {otherFields.length > 0 && (
+        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+          {otherFields.map((field) => (
+            <SchemaField
+              key={field.key}
+              field={field}
+              design={design}
+              onChange={onChange}
+              options={field.key === 'layout.mode' ? layoutModeOptions : undefined}
+            />
+          ))}
+        </div>
+      )}
+      {boolFields.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {boolFields.map((field) => (
+            <SchemaField key={field.key} field={field} design={design} onChange={onChange} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const PINNED_ITEMS = [
+  { key: 'templates', label: 'Templates' },
+  { key: 'sections', label: 'Sections' },
+] as const
+
+// How far a section's top edge can be below the viewport top and still
+// count as "current" for the left nav's highlight — i.e. the active section
+// is whichever one has most recently scrolled past the top ~15% of the pane.
+const SCROLLSPY_ROOT_MARGIN = '0px 0px -75% 0px'
+// After a nav click triggers a smooth scroll, ignore the scrollspy observer
+// for this long so it doesn't flicker through intermediate sections while
+// the scroll animation is still in flight.
+const CLICK_SCROLL_SUPPRESS_MS = 700
 
 export default function DesignMode() {
   const { state, dispatch } = useResumeDraftContext()
   const design = state.data.design
+  const { data: schema, isLoading: schemaLoading } = useDesignSchema()
+  const { data: templates } = useTemplates()
+  const [activeCategory, setActiveCategory] = useState<string>('templates')
+  const sectionElsRef = useRef<Map<string, HTMLElement>>(new Map())
+  const suppressObserverUntilRef = useRef(0)
 
   function update(patch: Partial<ResumeDesign>) {
     dispatch({ type: 'design_update', patch })
   }
 
+  const activeTemplate = templates?.find((t) => t.id === design.templateId)
+  // Which nav categories/fields a template exposes is capability-driven —
+  // template.supported_groups gates whole categories, template.supported_modes
+  // additionally narrows layout.mode's options (and hides the Layout
+  // category entirely when there's nothing to actually choose between).
+  // While templates haven't loaded yet, show everything rather than nothing
+  // so the panel doesn't flash empty.
+  const visibleGroups = (schema ?? []).filter((group) => {
+    if (!activeTemplate) return true
+    if (!activeTemplate.supported_groups.includes(group.key)) return false
+    if (group.key === 'layout' && activeTemplate.supported_modes.length <= 1) return false
+    return true
+  })
+
+  const navItems = [...PINNED_ITEMS, ...visibleGroups.map((g) => ({ key: g.key, label: g.label }))]
+  // A primitive string, not the array itself — safe to use as an effect
+  // dependency below without re-creating the observer (and re-firing its
+  // initial callback) on every render the way a fresh array reference would.
+  const navKeys = navItems.map((n) => n.key).join(',')
+
+  // Scrollspy: every category's controls are always rendered in one
+  // scrollable column (per the FlowCV reference), so the left nav's
+  // highlight — and which section a click scrolls to — has to track scroll
+  // position instead of gating what's rendered.
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (Date.now() < suppressObserverUntilRef.current) return
+        const visible = entries.filter((e) => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        const top = visible[0]?.target.getAttribute('data-nav-key')
+        if (top) setActiveCategory(top)
+      },
+      { rootMargin: SCROLLSPY_ROOT_MARGIN, threshold: 0 },
+    )
+    for (const el of sectionElsRef.current.values()) observer.observe(el)
+    return () => observer.disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navKeys])
+
+  function registerSection(key: string, el: HTMLElement | null) {
+    if (el) sectionElsRef.current.set(key, el)
+    else sectionElsRef.current.delete(key)
+  }
+
+  function goToSection(key: string) {
+    setActiveCategory(key)
+    suppressObserverUntilRef.current = Date.now() + CLICK_SCROLL_SUPPRESS_MS
+    sectionElsRef.current.get(key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Template</h3>
-        <TemplatePicker design={design} onChange={update} />
-      </section>
+    <div className="flex gap-6">
+      <nav className="sticky top-0 flex max-h-svh w-36 shrink-0 flex-col gap-0.5 self-start overflow-y-auto">
+        {navItems.map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => goToSection(item.key)}
+            className={cn(
+              'rounded-md px-3 py-2 text-left text-sm transition-colors',
+              activeCategory === item.key ? 'bg-secondary font-medium text-foreground' : 'text-muted-foreground hover:bg-secondary/60',
+            )}
+          >
+            {item.label}
+          </button>
+        ))}
+      </nav>
 
-      <SectionsPanel />
+      <div className="flex min-w-0 flex-1 flex-col gap-8">
+        <section ref={(el) => registerSection('templates', el)} data-nav-key="templates" className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold text-foreground">Templates</h3>
+          <TemplatePicker design={design} onChange={update} />
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Typography</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Font family">
-            <Select
-              value={design.typography.fontFamily}
-              onValueChange={(v) => update({ typography: { ...design.typography, fontFamily: v } })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {FONT_FAMILIES.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <NumberField
-            label="Base size (px)"
-            value={design.typography.baseFontSizePt}
-            min={8}
-            onChange={(v) => update({ typography: { ...design.typography, baseFontSizePt: v } })}
-          />
-          <NumberField
-            label="Line height"
-            value={design.typography.lineHeight}
-            step={0.05}
-            min={1}
-            onChange={(v) => update({ typography: { ...design.typography, lineHeight: v } })}
-          />
-          <NumberField
-            label="Name size (px)"
-            value={design.typography.nameFontSizePt}
-            min={8}
-            onChange={(v) => update({ typography: { ...design.typography, nameFontSizePt: v } })}
-          />
-          <NumberField
-            label="Section heading size (px)"
-            value={design.typography.sectionHeadingFontSizePt}
-            min={8}
-            onChange={(v) => update({ typography: { ...design.typography, sectionHeadingFontSizePt: v } })}
-          />
-        </div>
-      </section>
+        <section ref={(el) => registerSection('sections', el)} data-nav-key="sections" className="flex flex-col gap-3">
+          <h3 className="text-sm font-semibold text-foreground">Sections</h3>
+          <SectionsPanel />
+        </section>
 
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Colors</h3>
-        <div className="grid grid-cols-3 gap-3">
-          <ColorField label="Text" value={design.colors.text} onChange={(v) => update({ colors: { ...design.colors, text: v } })} />
-          <ColorField label="Accent" value={design.colors.accent} onChange={(v) => update({ colors: { ...design.colors, accent: v } })} />
-          <ColorField
-            label="Background"
-            value={design.colors.background}
-            onChange={(v) => update({ colors: { ...design.colors, background: v } })}
-          />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Section headings</h3>
-        <div className="grid grid-cols-2 gap-3">
-          <Field label="Style">
-            <Select
-              value={design.heading.style}
-              onValueChange={(v) => update({ heading: { ...design.heading, style: v as ResumeDesign['heading']['style'] } })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {HEADING_STYLES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    {s}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Capitalization">
-            <Select
-              value={design.heading.capitalization}
-              onValueChange={(v) =>
-                update({ heading: { ...design.heading, capitalization: v as ResumeDesign['heading']['capitalization'] } })
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CAPITALIZATIONS.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    {c}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Spacing</h3>
-        <div className="grid grid-cols-3 gap-3">
-          <NumberField
-            label="Section gap (px)"
-            value={design.spacing.sectionGap}
-            min={0}
-            onChange={(v) => update({ spacing: { ...design.spacing, sectionGap: v } })}
-          />
-          <NumberField
-            label="Entry gap (px)"
-            value={design.spacing.entryGap}
-            min={0}
-            onChange={(v) => update({ spacing: { ...design.spacing, entryGap: v } })}
-          />
-          <NumberField
-            label="Bullet gap (px)"
-            value={design.spacing.bulletGap}
-            min={0}
-            onChange={(v) => update({ spacing: { ...design.spacing, bulletGap: v } })}
-          />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h3 className="text-sm font-semibold text-foreground">Page margins</h3>
-        <p className="text-xs text-muted-foreground">
-          Page size (A4/Letter) isn&apos;t wired up to rendering yet — margins already apply live.
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          <NumberField
-            label="Top (px)"
-            value={design.page.marginTop}
-            min={0}
-            onChange={(v) => update({ page: { ...design.page, marginTop: v } })}
-          />
-          <NumberField
-            label="Bottom (px)"
-            value={design.page.marginBottom}
-            min={0}
-            onChange={(v) => update({ page: { ...design.page, marginBottom: v } })}
-          />
-          <NumberField
-            label="Left (px)"
-            value={design.page.marginLeft}
-            min={0}
-            onChange={(v) => update({ page: { ...design.page, marginLeft: v } })}
-          />
-          <NumberField
-            label="Right (px)"
-            value={design.page.marginRight}
-            min={0}
-            onChange={(v) => update({ page: { ...design.page, marginRight: v } })}
-          />
-        </div>
-      </section>
+        {schemaLoading && <p className="text-sm text-muted-foreground">Loading design options…</p>}
+        {visibleGroups.map((group) => (
+          <section key={group.key} ref={(el) => registerSection(group.key, el)} data-nav-key={group.key} className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold text-foreground">{group.label}</h3>
+            <SchemaGroupPanel
+              group={group}
+              design={design}
+              onChange={update}
+              layoutModeOptions={group.key === 'layout' ? activeTemplate?.supported_modes : undefined}
+            />
+          </section>
+        ))}
+      </div>
     </div>
   )
 }

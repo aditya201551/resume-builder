@@ -23,6 +23,7 @@ type Handlers struct {
 	SectionConfig  *handlers.SectionConfigHandler
 	Template       *handlers.TemplateHandler
 	ResumeDesign   *handlers.ResumeDesignHandler
+	DesignSchema   *handlers.DesignSchemaHandler
 	// Agent is nil when ANTHROPIC_API_KEY isn't configured — see NewRouter,
 	// which skips registering its routes in that case.
 	Agent *handlers.AgentHandler
@@ -86,6 +87,7 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	// RequireAuth (this app has no anonymous browsing anywhere else) but
 	// with no ownership check, since there's no resume in scope.
 	handle("GET /api/templates", h.Template.List)
+	handle("GET /api/design-schema", h.DesignSchema.Get)
 	handle("GET /api/resumes/{resumeID}/design", h.ResumeDesign.Get)
 	handle("PUT /api/resumes/{resumeID}/design", h.ResumeDesign.Update)
 

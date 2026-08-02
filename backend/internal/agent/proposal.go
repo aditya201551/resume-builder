@@ -25,6 +25,20 @@ type Proposal struct {
 	CustomSectionID *string        `json:"customSectionId,omitempty"`
 	Fields          map[string]any `json:"fields,omitempty"`
 	Patch           map[string]any `json:"patch,omitempty"`
+	// DesignPatch is only populated for Type == "design_update" — shaped
+	// exactly like the frontend's design_update DraftAction patch (one or
+	// more top-level ResumeDesign groups, each the group's full current
+	// value with the requested field(s) overridden). See
+	// propose_design_update in tools.go for how it's built. This is what
+	// gets applied; DesignUpdates below is what gets displayed.
+	DesignPatch map[string]any `json:"designPatch,omitempty"`
+	// DesignUpdates is only populated for Type == "design_update" — the
+	// flat dot-path key/value pairs the model actually requested (e.g.
+	// {"colors.accent": "#3457d5"}), separate from DesignPatch because the
+	// patch carries every untouched sibling in the same group forward too
+	// (required for the reducer's shallow merge) and would otherwise make
+	// the review card show fields that didn't change.
+	DesignUpdates map[string]any `json:"designUpdates,omitempty"`
 	// ToolCallID is the id of the propose_* call that produced this
 	// proposal (compose.GetToolCallID, stamped by each propose_* tool
 	// before calling sink.add). The "tool" and "proposal" SSE events are

@@ -68,7 +68,7 @@ func sinkFromContext(ctx context.Context) (*ProposalSink, error) {
 // the model can act on) stay real errors.
 func toolProblem(format string, a ...any) (string, error) {
 	return "ERROR: " + fmt.Sprintf(format, a...) +
-		". Nothing was staged for this call. Fix the arguments and call the tool again.", nil
+		". Nothing was changed by this call. Fix the arguments and call the tool again.", nil
 }
 
 // readResumeTool returns the client-supplied draft snapshot for this run
@@ -169,12 +169,11 @@ func newProposeCreateTool() tool.InvokableTool { return &proposeCreateTool{} }
 
 func (t *proposeCreateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_create",
-		Desc: "Propose adding a new entry to a resume section (work experience, education, project, certification, language, or misc entry). " +
-			"This does not save anything — it stages a change for the user to review and accept or reject in the UI. " +
+		Name: "create_resume_entry",
+		Desc: "Add a new entry to a resume section (work experience, education, project, certification, language, or misc entry). " +
 			"Use this when the user describes new experience in natural language; turn their description into well-structured, " +
 			"achievement-focused fields rather than asking them to fill out a form, but only include numbers or outcomes the user " +
-			"actually stated — do not invent metrics. Never include sort_order; the client places new entries.",
+			"actually stated — do not invent metrics. Never include sort_order; the app places new entries.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"fields": {
@@ -213,7 +212,7 @@ func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 
 	id := tempID()
 	sink.add(Proposal{Type: "flat_create", Entity: args.Entity, TempID: id, Fields: fields, ToolCallID: compose.GetToolCallID(ctx)})
-	return fmt.Sprintf("proposed: create %s (tempId %s)", args.Entity, id), nil
+	return fmt.Sprintf("created %s (tempId %s)", args.Entity, id), nil
 }
 
 // --- propose_update ----------------------------------------------------------
@@ -224,13 +223,12 @@ func newProposeUpdateTool() tool.InvokableTool { return &proposeUpdateTool{} }
 
 func (t *proposeUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_update",
-		Desc: "Propose changing one or more fields on an existing resume entry. This does not save anything — it stages a change for the " +
-			"user to review and accept or reject in the UI. Requires the exact id of the entry, as returned by read_resume; if you don't " +
-			"already have current ids and values for this entry from earlier in this conversation, call read_resume first rather than " +
-			"guessing or reusing an id from a different entry. patch should contain only the fields that should change — omitted fields " +
-			"are left as they are. If more than one entry could match what the user described, ask which one before calling this. " +
-			"Never include sort_order.",
+		Name: "update_resume_entry",
+		Desc: "Change one or more fields on an existing resume entry. Requires the exact id of the entry, as returned by read_resume; " +
+			"if you don't already have current ids and values for this entry from earlier in this conversation, call read_resume first " +
+			"rather than guessing or reusing an id from a different entry. patch should contain only the fields that should change — " +
+			"omitted fields are left as they are. If more than one entry could match what the user described, ask which one before " +
+			"calling this. Never include sort_order.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"id": {
@@ -274,7 +272,7 @@ func (t *proposeUpdateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	}
 
 	sink.add(Proposal{Type: "flat_update", Entity: args.Entity, ID: args.ID, Patch: patch, ToolCallID: compose.GetToolCallID(ctx)})
-	return fmt.Sprintf("proposed: update %s %s", args.Entity, args.ID), nil
+	return fmt.Sprintf("updated %s %s", args.Entity, args.ID), nil
 }
 
 // --- propose_delete ----------------------------------------------------------
@@ -285,11 +283,10 @@ func newProposeDeleteTool() tool.InvokableTool { return &proposeDeleteTool{} }
 
 func (t *proposeDeleteTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_delete",
-		Desc: "Propose removing an existing resume entry. This does not save anything — it stages a change for the user to review and " +
-			"accept or reject in the UI. Requires the exact id of the entry, as returned by read_resume; call read_resume first if you " +
-			"don't already have it. Only use this when the user has clearly asked to remove a specific entry — if it's ambiguous which " +
-			"entry they mean, or if they're describing a change rather than a removal, ask or use propose_update instead.",
+		Name: "delete_resume_entry",
+		Desc: "Remove an existing resume entry. Requires the exact id of the entry, as returned by read_resume; call read_resume first " +
+			"if you don't already have it. Only use this when the user has clearly asked to remove a specific entry — if it's ambiguous " +
+			"which entry they mean, or if they're describing a change rather than a removal, ask or use update_resume_entry instead.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"id": {
@@ -323,7 +320,7 @@ func (t *proposeDeleteTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	}
 
 	sink.add(Proposal{Type: "flat_delete", Entity: args.Entity, ID: args.ID, ToolCallID: compose.GetToolCallID(ctx)})
-	return fmt.Sprintf("proposed: delete %s %s", args.Entity, args.ID), nil
+	return fmt.Sprintf("deleted %s %s", args.Entity, args.ID), nil
 }
 
 // --- propose_skill_change ----------------------------------------------------
@@ -346,13 +343,12 @@ func newProposeSkillChangeTool() tool.InvokableTool { return &proposeSkillChange
 
 func (t *proposeSkillChangeTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_skill_change",
-		Desc: "Propose a change to skill groups or the items within them (skills are grouped, e.g. a \"Languages\" group containing \"Go\" " +
-			"and \"Python\" as items). This does not save anything — it stages a change for the user to review and accept or reject in the " +
-			"UI. create_group must be proposed before any create_item that belongs to it, in the same turn — pass the id create_group " +
-			"returns back as group_id. For update_item/delete_item/update_group/delete_group, you need the item or group's exact id from " +
-			"read_resume (or from a create_* you proposed earlier in this conversation) — never guess it. If it's unclear which group an " +
-			"item belongs to or which item the user means, ask rather than assume. Never include sort_order.",
+		Name: "update_skills",
+		Desc: "Change skill groups or the items within them (skills are grouped, e.g. a \"Languages\" group containing \"Go\" and " +
+			"\"Python\" as items). create_group must be called before any create_item that belongs to it, in the same turn — pass the " +
+			"id create_group returns back as group_id. For update_item/delete_item/update_group/delete_group, you need the item or " +
+			"group's exact id from read_resume (or from a create_* call earlier in this conversation) — never guess it. If it's unclear " +
+			"which group an item belongs to or which item the user means, ask rather than assume. Never include sort_order.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"action": {
 				Type:     schema.String,
@@ -416,7 +412,7 @@ func (t *proposeSkillChangeTool) InvokableRun(ctx context.Context, argumentsInJS
 		p.Fields = fields
 	case "create_item":
 		if args.GroupID == "" {
-			return toolProblem("group_id is required for create_item — propose the group first and pass back the id it returns")
+			return toolProblem("group_id is required for create_item — create the group first and pass back the id it returns")
 		}
 		fields, err := normalizeFields("skill", spec, args.Data, true)
 		if err != nil {
@@ -446,11 +442,11 @@ func (t *proposeSkillChangeTool) InvokableRun(ctx context.Context, argumentsInJS
 	sink.add(p)
 	// create_group must report its tempId: it's the only way a follow-up
 	// create_item can name the group it belongs to, since the group has no
-	// real ID until the user accepts it client-side.
+	// real ID until the change reaches the client.
 	if p.TempID != "" {
-		return fmt.Sprintf("proposed: %s (id %s — use this as group_id for items in this group)", args.Action, p.TempID), nil
+		return fmt.Sprintf("%s (id %s — use this as group_id for items in this group)", args.Action, p.TempID), nil
 	}
-	return fmt.Sprintf("proposed: %s", args.Action), nil
+	return args.Action, nil
 }
 
 // --- propose_custom_section_change --------------------------------------------
@@ -472,12 +468,11 @@ func newProposeCustomSectionChangeTool() tool.InvokableTool { return &proposeCus
 
 func (t *proposeCustomSectionChangeTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_custom_section_change",
-		Desc: "Propose a change to a custom (user-defined) resume section or its entries. This does not save anything — it stages a " +
-			"change for the user to review and accept or reject in the UI. create_section must be proposed before any create_entry that " +
-			"belongs to it, in the same turn — pass the id create_section returns back as section_id. For " +
-			"update_entry/delete_entry/update_section/delete_section, you need the section or entry's exact id from read_resume (or from " +
-			"a create_* proposed earlier in this conversation) — never guess it. Never include sort_order.",
+		Name: "update_custom_section",
+		Desc: "Change a custom (user-defined) resume section or its entries. create_section must be called before any create_entry " +
+			"that belongs to it, in the same turn — pass the id create_section returns back as section_id. For " +
+			"update_entry/delete_entry/update_section/delete_section, you need the section or entry's exact id from read_resume (or " +
+			"from a create_* call earlier in this conversation) — never guess it. Never include sort_order.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"action": {
 				Type:     schema.String,
@@ -536,7 +531,7 @@ func (t *proposeCustomSectionChangeTool) InvokableRun(ctx context.Context, argum
 		p.Fields = fields
 	case "create_entry":
 		if args.SectionID == "" {
-			return toolProblem("section_id is required for create_entry — propose the section first and pass back the id it returns")
+			return toolProblem("section_id is required for create_entry — create the section first and pass back the id it returns")
 		}
 		fields, err := normalizeFields(label, spec, args.Data, true)
 		if err != nil {
@@ -567,9 +562,9 @@ func (t *proposeCustomSectionChangeTool) InvokableRun(ctx context.Context, argum
 	// As with skill groups, a new section's tempId is what a follow-up
 	// create_entry needs for section_id.
 	if p.TempID != "" {
-		return fmt.Sprintf("proposed: %s (id %s — use this as section_id for entries in this section)", args.Action, p.TempID), nil
+		return fmt.Sprintf("%s (id %s — use this as section_id for entries in this section)", args.Action, p.TempID), nil
 	}
-	return fmt.Sprintf("proposed: %s", args.Action), nil
+	return args.Action, nil
 }
 
 // --- propose_meta_update -------------------------------------------------------
@@ -580,11 +575,10 @@ func newProposeMetaUpdateTool() tool.InvokableTool { return &proposeMetaUpdateTo
 
 func (t *proposeMetaUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_meta_update",
-		Desc: "Propose changing the resume's top-level contact info or summary (full_name, headline, email, phone, location, summary, " +
-			"links). This does not save anything — it stages a change for the user to review and accept or reject in the UI. patch " +
-			"should contain only the fields that should change. Use read_resume first if you need to see current values (e.g. to edit " +
-			"the existing summary rather than overwrite it blind).",
+		Name: "update_contact_info",
+		Desc: "Change the resume's top-level contact info or summary (full_name, headline, email, phone, location, summary, links). " +
+			"patch should contain only the fields that should change. Use read_resume first if you need to see current values (e.g. " +
+			"to edit the existing summary rather than overwrite it blind).",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"patch": {
 				Type:     schema.Object,
@@ -614,7 +608,7 @@ func (t *proposeMetaUpdateTool) InvokableRun(ctx context.Context, argumentsInJSO
 	}
 
 	sink.add(Proposal{Type: "update_meta", Patch: patch, ToolCallID: compose.GetToolCallID(ctx)})
-	return "proposed: update contact info", nil
+	return "updated contact info", nil
 }
 
 // --- propose_design_update ----------------------------------------------------
@@ -663,13 +657,12 @@ func newProposeDesignUpdateTool() tool.InvokableTool { return &proposeDesignUpda
 
 func (t *proposeDesignUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_design_update",
-		Desc: "Propose changing one or more resume styling/design settings (fonts, colors, spacing, headings, links, footer, etc). " +
-			"This does not save anything — it stages a change for the user to review and accept or reject in the UI. Some keys only " +
-			"apply to certain templates or layout modes (for example, sidebar-related display isn't meaningful on a single-column " +
-			"template) — if you're not sure the current template supports a key you're about to propose, check via read_resume first " +
-			"rather than proposing it speculatively. Template choice itself and section order/visibility/titles are separate concerns " +
-			"— use propose_template_switch and propose_section_update for those instead. Only propose keys from the list below. " +
+		Name: "update_design",
+		Desc: "Change one or more resume styling/design settings (fonts, colors, spacing, headings, links, footer, etc). Some keys " +
+			"only apply to certain templates or layout modes (for example, sidebar-related display isn't meaningful on a single-column " +
+			"template) — if you're not sure the current template supports a key you're about to set, check via read_resume first rather " +
+			"than setting it speculatively. Template choice itself and section order/visibility/titles are separate concerns — use " +
+			"switch_template and update_section_layout for those instead. Only use keys from the list below. " +
 			"Valid keys and their allowed values: " + designSchemaDescription(),
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"updates": {
@@ -768,7 +761,7 @@ func (t *proposeDesignUpdateTool) InvokableRun(ctx context.Context, argumentsInJ
 	for k := range args.Updates {
 		keys = append(keys, k)
 	}
-	return fmt.Sprintf("proposed: update design (%s)", strings.Join(keys, ", ")), nil
+	return fmt.Sprintf("updated design (%s)", strings.Join(keys, ", ")), nil
 }
 
 // --- propose_template_switch --------------------------------------------------
@@ -788,12 +781,11 @@ func newProposeTemplateSwitchTool() tool.InvokableTool { return &proposeTemplate
 
 func (t *proposeTemplateSwitchTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_template_switch",
-		Desc: "Propose switching the resume to a different template. This does not save anything — it stages a change for the user to " +
-			"review and accept or reject in the UI. Call list_templates first if you don't already know the target template's id and " +
-			"capabilities from earlier in this conversation — don't guess a template id. Note that some previously proposed or accepted " +
-			"design settings and section placements may not carry over cleanly to a template with a different layout mode; mention this " +
-			"to the user if you know the target template's mode differs from the current one.",
+		Name: "switch_template",
+		Desc: "Switch the resume to a different template. Call list_templates first if you don't already know the target template's id " +
+			"and capabilities from earlier in this conversation — don't guess a template id. Note that some previously set design " +
+			"settings and section placements may not carry over cleanly to a template with a different layout mode; mention this to " +
+			"the user if you know the target template's mode differs from the current one.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"template_id": {
 				Type:     schema.String,
@@ -906,7 +898,7 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 		DesignUpdates: map[string]any{"templateId": target.ID, "template": target.Name},
 		ToolCallID:    compose.GetToolCallID(ctx),
 	})
-	return fmt.Sprintf("proposed: switch template to %s (%s)", target.Name, target.ID), nil
+	return fmt.Sprintf("switched template to %s (%s)", target.Name, target.ID), nil
 }
 
 // --- propose_section_update ---------------------------------------------------
@@ -1016,15 +1008,15 @@ func newProposeSectionUpdateTool() tool.InvokableTool { return &proposeSectionUp
 
 func (t *proposeSectionUpdateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "propose_section_update",
-		Desc: "Propose reordering, showing/hiding, renaming, or (on two-column templates only) moving a resume section between the " +
-			"sidebar and main columns. This does not save anything — it stages a change for the user to review and accept or reject in " +
-			"the UI. Section keys are either a plain section type (" + strings.Join(design.ValidSectionTypes(), "/") + ") or " +
+		Name: "update_section_layout",
+		Desc: "Reorder, show/hide, rename, or (on two-column templates only) move a resume section between the sidebar and main " +
+			"columns. Section keys are either a plain section type (" + strings.Join(design.ValidSectionTypes(), "/") + ") or " +
 			"\"custom-<id>\" for a custom section, using the id from read_resume's custom_sections. The move action and left/right " +
 			"column values only apply to two-column templates; check the resume's design.layout.mode via read_resume first if you " +
-			"don't already know it — single-column templates use column: \"one\" for everything. A custom-<id> section key referencing " +
-			"a custom section you just proposed (not yet accepted) won't actually take effect until that create is accepted first, so " +
-			"mention that to the user if relevant.",
+			"don't already know it — single-column templates use column: \"one\" for everything. A custom-<id> section key only works " +
+			"once that custom section actually exists — if you created it earlier this same turn you can reference the id its create " +
+			"call returned, but don't reference a custom section id from an earlier turn without confirming via read_resume first that " +
+			"it's still there.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"action": {
 				Type:     schema.String,
@@ -1257,5 +1249,5 @@ func (t *proposeSectionUpdateTool) InvokableRun(ctx context.Context, argumentsIn
 		DesignUpdates: updates,
 		ToolCallID:    compose.GetToolCallID(ctx),
 	})
-	return fmt.Sprintf("proposed: section %s", args.Action), nil
+	return fmt.Sprintf("section %s applied", args.Action), nil
 }

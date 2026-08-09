@@ -6,11 +6,6 @@ import (
 	"strings"
 )
 
-// Every enum lives here as the single source of truth — Validate checks
-// against these slices and Describe() renders them into tool-description
-// text, so a future agent tool can never advertise a value Validate would
-// then reject (the same discipline agent/fields.go's describeFlatEntityFields
-// follows for content fields).
 var (
 	validLayoutModes         = []string{"one", "two", "mix"}
 	validPageFormats         = []string{"A4", "Letter"}
@@ -27,14 +22,8 @@ var (
 		"Georgia", "Times New Roman", "Arial", "Helvetica",
 		"Inter", "Roboto", "Lora", "Merriweather", "Open Sans",
 	}
-	// validNameFontFamilies additionally allows "inherit" (fall back to
-	// typography.fontFamily) — the sentinel a FieldEnum control shows as
-	// "Same as body font".
 	validNameFontFamilies = append([]string{"inherit"}, validFontFamilies...)
-	// Section types a SectionRef may name — deliberately excludes "contact":
-	// the header is always shown and isn't subject to ordering, matching
-	// LivePreview.tsx's DEFAULT_ORDER today.
-	validSectionTypes = []string{
+	validSectionTypes     = []string{
 		"summary", "work_experience", "education", "skills", "projects",
 		"certifications", "languages", "awards", "publications", "volunteer", "custom",
 	}
@@ -55,9 +44,6 @@ func enumError(field, got string, allowed []string) error {
 	return fmt.Errorf("%s: %q is not one of %s", field, got, strings.Join(allowed, ", "))
 }
 
-// Validate checks every enum, hex color, and section reference in a
-// ResumeDesign. It's the single gate both the REST PUT handler and a future
-// agent propose_design_update tool call before anything is persisted.
 func Validate(d ResumeDesign) error {
 	if !contains(validLayoutModes, string(d.Layout.Mode)) {
 		return enumError("layout.mode", string(d.Layout.Mode), validLayoutModes)
@@ -159,16 +145,10 @@ func Validate(d ResumeDesign) error {
 	return nil
 }
 
-// ValidateSectionRef exposes validateSectionRef for callers outside a full
-// ResumeDesign document — the agent's propose_section_update tool validates
-// one ref at a time rather than a whole document.
 func ValidateSectionRef(ref SectionRef) error {
 	return validateSectionRef("sectionRef", ref)
 }
 
-// ValidSectionTypes returns the section types SectionRef.SectionType may
-// name, for the propose_section_update agent tool's description text — a
-// copy so callers can't mutate the package-level slice.
 func ValidSectionTypes() []string {
 	out := make([]string, len(validSectionTypes))
 	copy(out, validSectionTypes)
@@ -188,10 +168,6 @@ func validateSectionRef(path string, ref SectionRef) error {
 	return nil
 }
 
-// DescribeFields renders every enum above into one string so a future agent
-// tool's description can be generated from this file instead of hand-copied
-// — the same role describeFlatEntityFields() plays for content entities in
-// internal/agent/fields.go.
 func DescribeFields() string {
 	return fmt.Sprintf(
 		"layout.mode: one of %s. page.format: one of %s. typography.fontFamily: one of %s. "+

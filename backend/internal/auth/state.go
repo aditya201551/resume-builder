@@ -11,9 +11,6 @@ import (
 	"time"
 )
 
-// StateSigner produces and verifies the OAuth "state" CSRF token without any
-// server-side storage: the nonce and expiry are carried in the value itself,
-// authenticated with an HMAC derived from the JWT secret.
 type StateSigner struct {
 	secret []byte
 	ttl    time.Duration

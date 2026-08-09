@@ -4,7 +4,6 @@ function mergeEntity<T extends { id: string }>(items: T[], overrides: Record<str
   return items.map((item) => (overrides[item.id] ? ({ ...item, ...overrides[item.id] } as T) : item))
 }
 
-/** Overlays in-progress (uncommitted) editor field values onto the draft data, for preview only. */
 export function applyPreviewOverrides(data: FullResume, overrides: Record<string, Record<string, unknown>>): FullResume {
   if (Object.keys(overrides).length === 0) return data
 

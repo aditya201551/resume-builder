@@ -1,7 +1,3 @@
-// Mirrors backend/internal/design/schema.go's FieldDef/FieldGroup — the
-// backend-served description of what's editable, so the frontend never
-// hardcodes an enum list or field set that could drift from what Validate()
-// actually accepts.
 export type FieldType = 'enum' | 'number' | 'color' | 'bool'
 
 export interface FieldDef {

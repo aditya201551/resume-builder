@@ -19,10 +19,6 @@ export type DraftAction =
   | { type: 'replace_all'; data: FullResume }
   | { type: 'hydrate'; data: FullResume; lastSynced: FullResume }
   | { type: 'update_meta'; patch: Record<string, unknown> }
-  // Shallow merge at the top level of ResumeDesign — callers always pass a
-  // whole sub-object (e.g. { typography: {...} }), never a deep partial, so
-  // a group is replaced wholesale rather than field-merged. Matches
-  // update_meta's shallow-merge shape above.
   | { type: 'design_update'; patch: Partial<ResumeDesign> }
   | { type: 'flat_create'; entity: FlatKind; tempId: string; fields: Record<string, unknown> }
   | { type: 'flat_update'; entity: FlatKind; id: string; patch: Record<string, unknown> }
@@ -76,8 +72,6 @@ function replaceIdEverywhere(value: unknown, idMap: Record<string, string>): unk
 }
 
 export function draftReducer(state: DraftState, action: DraftAction): DraftState {
-  // Handled first — these are the only actions valid against the `null`
-  // placeholder state useReducer starts with, before hydration completes.
   if (action.type === 'replace_all') return { data: action.data, lastSynced: action.data }
   if (action.type === 'hydrate') return { data: action.data, lastSynced: action.lastSynced }
 

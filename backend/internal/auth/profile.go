@@ -9,8 +9,6 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// Profile is the normalized shape every provider's raw userinfo response is
-// mapped into before it reaches the auth service.
 type Profile struct {
 	ProviderUserID string
 	Email          string
@@ -53,9 +51,6 @@ func fetchGoogleProfile(ctx context.Context, client *http.Client) (*Profile, err
 	}, nil
 }
 
-// GitHub's /user endpoint doesn't reliably include email (it depends on the
-// user's privacy settings), so the verified primary email is fetched
-// separately from /user/emails.
 func fetchGitHubProfile(ctx context.Context, client *http.Client) (*Profile, error) {
 	var user struct {
 		ID        int64  `json:"id"`

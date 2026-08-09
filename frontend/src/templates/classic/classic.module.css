@@ -56,9 +56,6 @@
   font-size: var(--rd-headline-size, 13px);
   color: #4a4a4a;
 }
-/* jobTitlePosition: "inline" puts the headline on the same line as the name
-   instead of its own line below — both become inline boxes so they flow
-   into one line the way adjacent inline siblings do. */
 .page[data-job-title-position='inline'] .name,
 .page[data-job-title-position='inline'] .headline {
   display: inline;
@@ -94,9 +91,6 @@
   text-transform: var(--rd-heading-transform, uppercase);
   color: var(--rd-heading-color, var(--rd-text, #14181d));
 }
-/* heading.style: "simple" (no decoration) is the default — every existing
-   resume already looks like this, since this field was never rendered
-   before. The rest are opt-in decorations using the accent color. */
 .page[data-heading-style='line'] .sectionTitle {
   padding-bottom: 4px;
   border-bottom: 2px solid var(--rd-accent, #c9603e);
@@ -122,9 +116,6 @@
   gap: 12px;
   font-size: var(--rd-entry-header-size, var(--rd-font-size, 13px));
 }
-/* entryLayout.dateDisplayMode: "right" (default) is the flex order above,
-   unchanged. "left" swaps which side the date lands on; "belowTitle" stacks
-   date under the title/link row instead of beside it. */
 .page[data-date-display-mode='left'] .entryHead {
   flex-direction: row-reverse;
 }

@@ -26,9 +26,6 @@ func (h *SectionConfigHandler) List(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, configs)
 }
 
-// Update is keyed by (section_type, custom_section_id) via the path segment
-// plus an optional query param, since that pair — not a synthetic row id —
-// is the config's real identity (see the schema's UNIQUE constraint).
 func (h *SectionConfigHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, _ := auth.UserIDFromContext(r.Context())
 	var in repository.SectionConfigInput

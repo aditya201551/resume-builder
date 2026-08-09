@@ -75,7 +75,6 @@ func (r *UserRepository) FindByID(ctx context.Context, id string) (*User, error)
 	return &u, nil
 }
 
-// CreateWithIdentity creates a new user and its first linked SSO identity atomically.
 func (r *UserRepository) CreateWithIdentity(ctx context.Context, u User, provider, providerUserID, providerEmail string) (*User, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -105,9 +104,6 @@ func (r *UserRepository) CreateWithIdentity(ctx context.Context, u User, provide
 	return &u, nil
 }
 
-// LinkIdentity attaches a new provider identity to an existing user — the
-// account-linking path when a returning user authenticates via a second SSO
-// provider that shares their already-verified email.
 func (r *UserRepository) LinkIdentity(ctx context.Context, userID, provider, providerUserID, providerEmail string) error {
 	return insertIdentity(ctx, r.pool, userID, provider, providerUserID, providerEmail)
 }

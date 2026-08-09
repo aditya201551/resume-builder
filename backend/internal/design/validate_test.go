@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// The seeded default must itself be valid — if it weren't, every resume
-// without a resume_designs row would fail validation the moment it's
-// re-saved, which would be a silent trap for the very fallback this
-// package exists to provide.
 func TestDefaultIsValid(t *testing.T) {
 	d := Default("template-id")
 	if err := Validate(d); err != nil {
@@ -66,9 +62,6 @@ func TestValidateRejectsBadColors(t *testing.T) {
 	}
 }
 
-// A section ref naming a real content section type must not carry a
-// customSectionId, and a "custom" ref must carry one — mixing these up
-// would let a design point at a nonexistent or wrong custom section.
 func TestValidateSectionRefCustomSectionIdRules(t *testing.T) {
 	customID := "some-id"
 
@@ -107,9 +100,6 @@ func TestValidateRejectsUnknownSectionType(t *testing.T) {
 	}
 }
 
-// Guards against DescribeFields silently going stale if a new enum group
-// is added to Validate without a matching entry here — every enum slice
-// declared in validate.go should show up in the description text.
 func TestDescribeFieldsCoversEveryEnum(t *testing.T) {
 	desc := DescribeFields()
 	groups := [][]string{

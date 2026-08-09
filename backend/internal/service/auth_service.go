@@ -17,14 +17,6 @@ func NewAuthService(users *repository.UserRepository) *AuthService {
 	return &AuthService{users: users}
 }
 
-// Login resolves a provider profile to a user, in order:
-//  1. an existing identity for this exact (provider, provider_user_id) — returning user
-//  2. account-linking onto an existing user by verified email — same person, new provider
-//  3. otherwise create a brand-new user + identity — first-time signup
-//
-// Linking by email only happens when the provider itself reports the email as
-// verified — otherwise an attacker could claim an email their provider account
-// never proved ownership of and take over an existing account.
 func (s *AuthService) Login(ctx context.Context, provider string, profile *auth.Profile) (*repository.User, error) {
 	if profile.ProviderUserID == "" {
 		return nil, fmt.Errorf("provider %s returned no subject id", provider)

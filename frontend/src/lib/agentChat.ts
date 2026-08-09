@@ -1,18 +1,9 @@
-/**
- * Thin SSE client for POST /api/resumes/{resumeId}/agent/chat — a custom
- * event protocol (token/proposal/done/error), not OpenAI's stream shape.
- * Uses fetch()+ReadableStream rather than EventSource, since EventSource
- * can't POST a body (see backend/internal/api/handlers/agent_handler.go for
- * the server side of this contract).
- */
 
 export interface AgentChatMessage {
   role: 'user' | 'assistant'
   content: string
 }
 
-// Mirrors backend/internal/agent/proposal.go's Proposal struct. Fields are
-// optional because which ones are populated depends on `type`.
 export interface AgentProposal {
   type: string
   entity?: string
@@ -24,21 +15,8 @@ export interface AgentProposal {
   customSectionId?: string | null
   fields?: Record<string, unknown>
   patch?: Record<string, unknown>
-  // Populated only for type "design_update" — shaped like the design_update
-  // DraftAction's patch (Partial<ResumeDesign>), built server-side by the
-  // propose_design_update tool. Applied to the draft as-is.
   designPatch?: Record<string, unknown>
-  // Populated only for type "design_update" — the flat dot-path key/value
-  // pairs actually requested (e.g. {"colors.accent": "#3457d5"}), for
-  // display on the review card. designPatch carries untouched siblings
-  // forward too (needed for the reducer's shallow merge), so it isn't a
-  // reliable "what changed" list on its own.
   designUpdates?: Record<string, unknown>
-  // Id of the propose_* tool call that produced this proposal. Used to pair
-  // a proposal with its "tool" event in the UI — the two arrive as separate
-  // SSE events, and when several propose_* calls run concurrently their
-  // "done"/proposal events can interleave in either order, so stream
-  // position alone can't be trusted to pair them.
   toolCallId?: string
 }
 

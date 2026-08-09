@@ -7,10 +7,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// reorder sets sort_order = position for each id in orderedIDs, scoped to
-// parentColumn = parentID, in one transaction. table/parentColumn are always
-// internal string literals supplied by callers in this package, never
-// request data, so building the statement with fmt.Sprintf is safe here.
 func reorder(ctx context.Context, pool *pgxpool.Pool, table, parentColumn, parentID string, orderedIDs []string) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {

@@ -24,10 +24,6 @@ function miscByKind(entries: MiscEntry[], kind: MiscEntry['kind']) {
   return entries.filter((e) => e.kind === kind)
 }
 
-/** Builds one ContentSection from a single section ref, or null if it's
- * hidden or has no content to show — shared by both the single-column and
- * two-column assembly paths below so the per-type field mapping only lives
- * in one place. */
 function buildSection(ref: SectionRef, data: FullResume, fmt: ResumeDesign['dateFormat']): ContentSection | null {
   if (!ref.isVisible) return null
   const type = ref.sectionType
@@ -90,10 +86,6 @@ function buildSection(ref: SectionRef, data: FullResume, fmt: ResumeDesign['date
   }
   if (type === 'languages') {
     if (data.languages.length === 0) return null
-    // One entry per language (not one pre-joined string) so
-    // sectionDisplay.languages can actually render grid/bullets variants —
-    // ClassicTemplate reconstructs the "text" mode's joined sentence from
-    // these at render time to keep that variant looking identical to before.
     const entries: ContentEntry[] = data.languages.map((l) => ({
       key: `lang-${l.id}`,
       title: l.name,
@@ -129,13 +121,6 @@ function buildSection(ref: SectionRef, data: FullResume, fmt: ResumeDesign['date
   return null
 }
 
-/** Resolves the client-side draft/full-resume state into the template-facing
- * content contract — the only translation point between content data and
- * template rendering. Order, visibility, and title overrides come from
- * design.sectionOrder (resolveSectionRefs for single-column templates,
- * resolveTwoColumnSectionRefs for layout.mode "two"), not resume_section_configs —
- * hidden sections and empty collections are dropped here so templates never
- * have to check visibility or emptiness themselves. */
 export function resolveResumeContent(data: FullResume): ResumeContent {
   const { resume } = data
   const fmt = data.design.dateFormat
@@ -152,8 +137,6 @@ export function resolveResumeContent(data: FullResume): ResumeContent {
       if (s) sections.push({ ...s, column: 'right' })
     }
   } else {
-    // "mix" isn't rendered by any template yet — falls back to the same
-    // flat single-column order as "one" until one is.
     for (const ref of resolveSectionRefs(data)) {
       const s = buildSection(ref, data, fmt)
       if (s) sections.push(s)

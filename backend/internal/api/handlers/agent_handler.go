@@ -13,17 +13,8 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// chatHistoryLimit caps how many prior messages are forwarded to the model
-// per request. History is entirely client-owned (see chat.go's package
-// comment on the agent package) — the backend keeps no session, so this
-// only bounds token usage per call; older turns are simply dropped and the
-// client still has them locally.
 const chatHistoryLimit = 40
 
-// AgentHandler exposes the Phase 2 AI assistant over HTTP. It is nil-safe
-// at the router level: NewRouter only registers these routes when an Agent
-// was actually constructed (i.e. ANTHROPIC_API_KEY is set), so the API
-// keeps working without the AI assistant configured.
 type AgentHandler struct {
 	agent     *agent.Agent
 	resumes   *service.ResumeService
@@ -61,12 +52,6 @@ func toolEventFromCall(tc schema.ToolCall, status string) toolEventDTO {
 	}
 }
 
-// Chat streams a multi-turn, multi-tool-call conversation over SSE. The
-// agent never writes to storage — it emits "proposal" events shaped like
-// the frontend's DraftAction union (see internal/agent/proposal.go), which
-// the client applies to its local draft only once the user accepts them.
-// History and the current resume draft are both supplied by the client on
-// every call; this handler and the agent underneath it are stateless.
 func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	userID, _ := auth.UserIDFromContext(r.Context())
 	resumeID := r.PathValue("resumeID")
@@ -80,9 +65,6 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ownership check up front, before any SSE headers go out or any model
-	// call is made — a user can't probe another user's resume through this
-	// endpoint before the agent ever runs.
 	if _, err := h.resumes.Get(r.Context(), userID, resumeID); err != nil {
 		writeError(w, err)
 		return
@@ -118,10 +100,6 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		flusher.Flush()
 	}
 
-	// Fetched fresh from the database only if list_templates is actually
-	// called — see agent.TemplatesFetcher's doc comment for why this stays
-	// a DB read (unlike the draft, which is client-supplied) and why the
-	// closure defers the query instead of running it up front.
 	fetchTemplates := func(ctx context.Context) (string, error) {
 		list, err := h.templates.List(ctx)
 		if err != nil {
@@ -184,8 +162,6 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Tools can fire on the same iterator step as the final event; drain
-	// once more so nothing decided right at the end is dropped.
 	for _, p := range sink.Drain() {
 		send("proposal", map[string]any{"action": p})
 	}

@@ -7,10 +7,6 @@ import (
 	"resume-builder/backend/internal/repository"
 )
 
-// EntityService is the shape every resume child-entity (work experience,
-// education, project, ...) exposes. One generic implementation below covers
-// every entity whose repository already matches entityRepo — see
-// simple_entities.go for the six that qualify as-is.
 type EntityService[TInput any, TOutput any] interface {
 	List(ctx context.Context, callerUserID, resumeID string) ([]TOutput, error)
 	Create(ctx context.Context, callerUserID, resumeID string, in TInput) (*TOutput, error)

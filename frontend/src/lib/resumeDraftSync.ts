@@ -23,26 +23,10 @@ function isTempId(id: string) {
   return id.startsWith('temp-')
 }
 
-/**
- * Every create body carries its local tempId as client_id. If the browser
- * dies between the server creating the row and this draft durably recording
- * the resolved real id (resolve_ids below), the tempId never gets marked
- * synced — so the next flush sees the same not-yet-synced entity and POSTs
- * it again. Without client_id that retry creates a second row server-side;
- * with it, the backend's create is an upsert keyed on client_id that
- * returns the original row instead (see backend's onConflictClientID).
- */
 function createBody(item: { id: string }, omitKeys: string[]): Record<string, unknown> {
   return { ...omit(item, omitKeys), client_id: item.id }
 }
 
-/**
- * A delete's goal is for the row to not exist — if it's already gone (404,
- * e.g. a previous flush attempt's delete actually succeeded but a later
- * step in that same attempt threw before `mark_synced_entity` recorded it),
- * that's success, not failure. Without this, the same doomed delete would
- * retry identically forever.
- */
 async function deleteIfExists(url: string) {
   try {
     await apiDelete(url)
@@ -52,23 +36,6 @@ async function deleteIfExists(url: string) {
   }
 }
 
-/**
- * Diffs `state.data` against `state.lastSynced` and replays only what
- * changed against the backend, in an order where parents (skill groups,
- * custom sections) sync — and get their temp IDs resolved to real ones —
- * before their children, which need the real parent ID in their URL.
- *
- * `apply` both updates the local working copy (so later steps in this same
- * flush see the resolved IDs immediately) and dispatches to React state.
- *
- * Each step below is isolated in its own try/catch: one entity type failing
- * (network blip, a stale delete, a validation error) must not prevent every
- * *other* entity type from syncing — previously a single throw anywhere
- * aborted the whole function, and since it always aborted at the same
- * point, later entity types (misc_entries, skill groups, custom sections…)
- * could never sync on any subsequent retry either. We still throw at the
- * end if anything failed, so the UI's "Couldn't save" status is accurate.
- */
 export async function flushDraft(resumeId: string, snapshot: DraftState, dispatch: (action: DraftAction) => void) {
   let state = snapshot
   const apply = (action: DraftAction) => {
@@ -164,12 +131,6 @@ async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void
     }
   }
 
-  // Items, per (now-real-id) group. mark_synced_entity for 'skill_groups'
-  // happens once, after this loop too — not here — because it snapshots the
-  // *whole* current skill_groups array, items included. Marking it synced
-  // before items are actually synced would make lastSynced claim items were
-  // persisted when they weren't; if this loop then throws, the next retry's
-  // diff would see no difference and silently never retry the failed items.
   for (const g of getState().data.skill_groups) {
     const itemsPath = `${basePath}/${g.id}/items`
     const curItems = g.items
@@ -233,8 +194,6 @@ async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => v
     }
   }
 
-  // Same reasoning as syncSkillGroups above: mark_synced_entity for
-  // 'custom_sections' happens once, after entries are synced too.
   for (const s of getState().data.custom_sections) {
     const entriesPath = `${basePath}/${s.id}/entries`
     const curEntries = s.entries
@@ -278,10 +237,6 @@ async function syncResumeMeta(resumeId: string, apply: (a: DraftAction) => void,
   apply({ type: 'mark_synced_entity', slice: 'resume' })
 }
 
-// Design is a full-document PUT (like resume meta's PATCH, but the backend
-// endpoint always replaces the whole ResumeDesign rather than accepting a
-// partial), so this just sends the current object whenever it differs from
-// what was last synced — no per-field whitelist to maintain.
 async function syncResumeDesign(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
   const cur = getState().data.design
   const prev = getState().lastSynced.design

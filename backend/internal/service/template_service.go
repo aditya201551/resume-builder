@@ -6,8 +6,6 @@ import (
 	"resume-builder/backend/internal/repository"
 )
 
-// TemplateService has no ownership check — templates aren't resume-scoped,
-// they're a shared, global catalog every user reads the same rows from.
 type TemplateService struct {
 	repo *repository.TemplateRepository
 }

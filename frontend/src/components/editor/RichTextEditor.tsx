@@ -14,10 +14,6 @@ interface RichTextEditorProps {
 export default function RichTextEditor({ value, onChange, placeholder }: RichTextEditorProps) {
   const [linkPopoverOpen, setLinkPopoverOpen] = useState(false)
   const [linkUrl, setLinkUrl] = useState('')
-  // Position the popover was last dismissed at — lets a user close it (Done/
-  // Remove/Escape) without the cursor still sitting inside the link mark
-  // immediately reopening it, while still reopening if they click away and
-  // back into the same link later.
   const dismissedAtRef = useRef<number | null>(null)
 
   const editor = useEditor({
@@ -47,12 +43,6 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
           '[&_a]:text-accent [&_a]:underline',
       },
       handleDOMEvents: {
-        // Links are real <a href> elements inside the contenteditable, so
-        // the browser will still navigate on click unless we stop it —
-        // openOnClick:false only disables tiptap's own open-on-cmd-click.
-        // event.target can be a Text node (rendered text has no element of
-        // its own), which has no .closest — walk up to an Element first or
-        // the lookup throws and preventDefault() never runs.
         click: (_view, event) => {
           const target = event.target
           const el = target instanceof Element ? target : (target as Node | null)?.parentElement

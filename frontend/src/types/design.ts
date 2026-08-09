@@ -1,6 +1,3 @@
-// Mirrors backend/internal/design/design.go field-for-field (json tags
-// match). Keep these two in sync by hand — there is no shared codegen
-// between the Go module and the frontend workspace.
 
 export type LayoutMode = 'one' | 'two' | 'mix'
 
@@ -38,7 +35,6 @@ export interface Page {
 
 export interface Typography {
   fontFamily: string
-  /** "inherit" falls back to fontFamily, or one of the same font options. */
   nameFontFamily: string
   baseFontSizePt: number
   lineHeight: number
@@ -97,9 +93,6 @@ export interface Spacing {
   bulletGap: number
 }
 
-// Named distinctly from "Links" to avoid colliding with the unrelated
-// concept of a resume's own header links (LinkedIn/GitHub URLs), which live
-// in content (ContentHeader.links), not design.
 export interface LinkStyle {
   showIcon: boolean
   underline: boolean

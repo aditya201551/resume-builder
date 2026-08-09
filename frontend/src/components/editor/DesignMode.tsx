@@ -39,9 +39,6 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-/** Rounds to the nearest `step` and clamps to [min, max] — avoids floating
- * point drift (e.g. 1.55 + 0.05 landing on 1.5999999999999999) when
- * stepping with the +/- buttons. */
 function stepValue(value: number, delta: number, min: number, max: number, step: number) {
   const precision = step < 1 ? String(step).split('.')[1]?.length ?? 0 : 0
   const next = Number((value + delta).toFixed(precision))
@@ -144,14 +141,6 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading templates…</p>
   if (!templates || templates.length === 0) return null
 
-  // Switching templates replaces every design field with that template's
-  // default_design wholesale — matches FlowCV's actual apply-template
-  // behavior (confirmed from its request payload: the whole customization
-  // object gets replaced, not just a templateId pointer) — so a new
-  // template's fonts/colors/spacing don't end up mixed with the old one's.
-  // sectionOrder is the one exception: it's resume-specific (references
-  // this resume's actual custom sections) rather than a template default,
-  // so it's carried over unchanged.
   function applyTemplate(t: Template) {
     onChange({ ...t.default_design, templateId: t.id, sectionOrder: design.sectionOrder })
   }
@@ -176,10 +165,6 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
   )
 }
 
-/** One reorderable/toggle-able/renameable list of section refs — shared by
- * the single-column Sections panel and each column of the two-column one.
- * Purely presentational: the caller owns what "persist" means for whichever
- * sectionOrder sub-path it's editing. */
 function SectionRefList({
   refs,
   customSections,
@@ -223,9 +208,6 @@ function SectionRefList({
   )
 }
 
-/** Bundles the reorder/toggle/rename callbacks a SectionRefList needs,
- * closing over whichever `refs` snapshot and `persist` function apply to
- * the list it's backing. */
 function sectionRefListHandlers(refs: SectionRef[], persist: (newRefs: SectionRef[]) => void) {
   return {
     onReorder: (orderedIds: string[]) => {
@@ -243,9 +225,6 @@ function sectionDefaultLabel(ref: SectionRef, customSections: CustomSection[]): 
   return customSections.find((s) => s.id === ref.customSectionId)?.title || 'Untitled section'
 }
 
-/** The row's visual content only — shared by the real (sortable, in-column)
- * row and its DragOverlay preview, which must NOT be wrapped in useSortable
- * (the overlay renders outside any SortableContext). */
 function SectionRowContent({
   dragHandle,
   ref,
@@ -317,10 +296,6 @@ function SortableSectionRow({
   )
 }
 
-/** One droppable+sortable column ("Sidebar" or "Main") — droppable on the
- * column id itself (so dropping into empty space, or an empty column,
- * still registers) as well as sortable over its own items (for reordering
- * within the column and for detecting drops onto a specific row). */
 function SectionColumn({
   id,
   label,
@@ -372,13 +347,6 @@ function findColumn(id: string, columns: Columns): 'left' | 'right' | undefined 
   return undefined
 }
 
-/** True cross-column drag-and-drop for a two-column template's section
- * order — dragging a section from Sidebar to Main (or back) moves it
- * between sectionOrder.two.left/.right live, not via a separate button.
- * `dragColumns` is local, ephemeral state that exists only for the duration
- * of a drag gesture (initialized from the draft on drag start, committed to
- * the draft on drop) — at rest, the draft (sectionOrder.two) is still the
- * only source of truth, so this never risks drifting from it. */
 function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch: (action: { type: 'design_update'; patch: Partial<ResumeDesign> }) => void }) {
   const [dragColumns, setDragColumns] = useState<Columns | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
@@ -510,12 +478,6 @@ function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch
   )
 }
 
-// Design only ever reorders/toggles/renames sections that already exist —
-// it never creates or deletes content (custom sections included). Adding or
-// removing a custom section is a content action and stays exclusively in
-// Content mode's CustomSectionsSection; this panel treats data.custom_sections
-// as read-only, the same way it treats work_experiences/educations/etc. as
-// read-only when computing counts elsewhere in the editor.
 function SectionsPanel() {
   const { state, dispatch } = useResumeDraftContext()
   const data = state.data
@@ -524,8 +486,6 @@ function SectionsPanel() {
     return <TwoColumnSectionsPanel data={data} dispatch={dispatch} />
   }
 
-  // mode "one" (and "mix", not rendered by any template yet — falls back to
-  // the same flat order as "one").
   const refs = resolveSectionRefs(data)
   const persist = (newRefs: SectionRef[]) =>
     dispatch({
@@ -544,12 +504,6 @@ function SectionsPanel() {
   )
 }
 
-// Renders one control per field, entirely from the backend-served schema —
-// no hardcoded enum lists or field set here. `field.type` picks the control;
-// `getFieldValue`/`buildFieldPatch` do the dot-path read/write into the
-// current design object (see lib/designField.ts), and now recurse to
-// whatever depth a field's key needs (e.g. colors.applyAccent.name is 3
-// levels), not just 2.
 function SchemaField({
   field,
   design,
@@ -559,9 +513,6 @@ function SchemaField({
   field: FieldDef
   design: ResumeDesign
   onChange: (patch: Partial<ResumeDesign>) => void
-  /** Narrows an enum field's offered options (used for layout.mode, gated to
-   * the active template's supported_modes) without touching the field's
-   * declared full option set. */
   options?: string[]
 }) {
   const value = getFieldValue(design, field.key)
@@ -650,13 +601,7 @@ const PINNED_ITEMS = [
   { key: 'sections', label: 'Sections' },
 ] as const
 
-// How far a section's top edge can be below the viewport top and still
-// count as "current" for the left nav's highlight — i.e. the active section
-// is whichever one has most recently scrolled past the top ~15% of the pane.
 const SCROLLSPY_ROOT_MARGIN = '0px 0px -75% 0px'
-// After a nav click triggers a smooth scroll, ignore the scrollspy observer
-// for this long so it doesn't flicker through intermediate sections while
-// the scroll animation is still in flight.
 const CLICK_SCROLL_SUPPRESS_MS = 700
 
 export default function DesignMode() {
@@ -673,12 +618,6 @@ export default function DesignMode() {
   }
 
   const activeTemplate = templates?.find((t) => t.id === design.templateId)
-  // Which nav categories/fields a template exposes is capability-driven —
-  // template.supported_groups gates whole categories, template.supported_modes
-  // additionally narrows layout.mode's options (and hides the Layout
-  // category entirely when there's nothing to actually choose between).
-  // While templates haven't loaded yet, show everything rather than nothing
-  // so the panel doesn't flash empty.
   const visibleGroups = (schema ?? []).filter((group) => {
     if (!activeTemplate) return true
     if (!activeTemplate.supported_groups.includes(group.key)) return false
@@ -687,15 +626,8 @@ export default function DesignMode() {
   })
 
   const navItems = [...PINNED_ITEMS, ...visibleGroups.map((g) => ({ key: g.key, label: g.label }))]
-  // A primitive string, not the array itself — safe to use as an effect
-  // dependency below without re-creating the observer (and re-firing its
-  // initial callback) on every render the way a fresh array reference would.
   const navKeys = navItems.map((n) => n.key).join(',')
 
-  // Scrollspy: every category's controls are always rendered in one
-  // scrollable column (per the FlowCV reference), so the left nav's
-  // highlight — and which section a click scrolls to — has to track scroll
-  // position instead of gating what's rendered.
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {

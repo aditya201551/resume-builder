@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/cloudwego/eino-ext/components/model/claude"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/components/tool"
@@ -14,11 +13,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// chatInstruction is the system prompt for the resume_chat agent — the
-// multi-turn, multi-tool-call counterpart to the single-shot rewrite agent
-// in agent.go. It never writes to the resume directly; every change goes
-// through a propose_* tool and is applied by the user, client-side, only
-// after they accept it (see proposal.go and the propose_* tools in tools.go).
 const chatInstruction = `You are a resume-writing assistant with tools to read the ` +
 	`user's current resume draft and make changes to it — both its content and its ` +
 	`visual design/styling. Call the tools naturally as part of doing what the user ` +
@@ -187,27 +181,11 @@ If the user asks for something with no matching tool — adding a photo, ` +
 	`unrelated tool call.
 </tool_mechanics>`
 
-// ChatMessage is the wire-level shape of one turn in the conversation.
 type ChatMessage struct {
-	Role    string // "user" | "assistant"
+	Role    string
 	Content string
 }
 
-// Chat starts one turn of the multi-tool-call resume assistant. draftJSON is
-// the client's current local draft (see doc.go / package comment on why the
-// agent reads this instead of the database — the local-first frontend has no
-// autosave, so the DB can be stale relative to what the user is looking at).
-// templates is a TemplatesFetcher (see tools.go) the caller supplies, backed
-// by a real DB read — the template catalog has no staleness concern the way
-// the draft does, so unlike draftJSON it's fetched from the database rather
-// than sent by the client. Neither draftJSON nor templates is injected into
-// the model's context just by being passed here — both only surface if the
-// matching tool (read_resume / list_templates) is actually called.
-//
-// The returned ProposalSink accumulates propose_* tool calls made during this
-// run; the caller (agent_handler.go's SSE handler) should Drain() it after
-// each iterator step to stream proposals to the client as they're decided,
-// not just once at the end.
 func (a *Agent) Chat(ctx context.Context, history []ChatMessage, draftJSON string, templates TemplatesFetcher) (*adk.AsyncIterator[*adk.AgentEvent], *ProposalSink, error) {
 	if a.chatRunner == nil {
 		return nil, nil, errors.New("chat agent not configured")
@@ -233,22 +211,11 @@ func (a *Agent) Chat(ctx context.Context, history []ChatMessage, draftJSON strin
 			sessionKeySink:      sink,
 			sessionKeyTemplates: templates,
 		}),
-		// The system instruction and tool schemas (chat.go/tools.go) are
-		// identical on every call across every user and turn — auto-cache
-		// sets breakpoints on them (plus the last input message) so repeat
-		// calls read from cache instead of reprocessing the full prefix. A
-		// 1h TTL (vs. the 5m default) survives the gaps between turns while
-		// a user reads a proposal before replying, which would otherwise
-		// evict the cache and force a full-price rewrite on their next turn.
-		adk.WithChatModelOptions([]model.Option{
-			claude.WithAutoCacheControl(&claude.CacheControl{TTL: claude.CacheTTL1h}),
-		}),
+		adk.WithChatModelOptions(a.modelOptions),
 	)
 	return iter, sink, nil
 }
 
-// newChatAgent builds the resume_chat ChatModelAgent sharing chatModel with
-// the rewrite agent in agent.go's New().
 func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message]) (*adk.ChatModelAgent, error) {
 	tools := []tool.BaseTool{
 		newReadResumeTool(),
@@ -275,20 +242,10 @@ func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message
 	})
 }
 
-// StreamAssistantText drains an assistant MessageVariant and calls emit for
-// each piece of text as it arrives — the streaming counterpart to agent.go's
-// assistantText, which blocks until the whole message is available. Only
-// assistant-authored text is surfaced; tool-call/tool-result variants are
-// silently skipped, matching assistantText's behavior. Exported so
-// agent_handler.go's SSE loop can call it per event.
 func StreamAssistantText(mv *adk.MessageVariant, emit func(string)) error {
 	return StreamAssistantOutput(mv, emit, nil)
 }
 
-// StreamAssistantOutput drains an assistant MessageVariant and calls emitText
-// for user-visible text and emitToolCall when the model decides to call a
-// tool. Tool calls are metadata for UI status only; tool results are emitted
-// separately by the HTTP handler when Role == schema.Tool events arrive.
 func StreamAssistantOutput(mv *adk.MessageVariant, emitText func(string), emitToolCall func(schema.ToolCall)) error {
 	if mv == nil || mv.Role != schema.Assistant {
 		return nil

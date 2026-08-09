@@ -4,13 +4,6 @@ import type { AssistantPart } from '@/hooks/useAgentChat'
 import type { FullResume } from '@/types/resume'
 import type { ResumeDesign } from '@/types/design'
 
-/**
- * Converts one AgentProposal (the wire shape the backend chat agent emits)
- * into the exact DraftAction variant the draft reducer expects. Kept as an
- * explicit switch rather than a cast — the backend's flat Proposal struct
- * only structurally overlaps with DraftAction's discriminated union, it
- * isn't assignable to it as-is.
- */
 export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
   switch (p.type) {
     case 'flat_create':
@@ -74,22 +67,6 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
   }
 }
 
-/**
- * Whether a proposal can be applied against the draft as it stands right now.
- *
- * Proposals are accepted one at a time, so a child can always be accepted
- * while its parent is still pending — or after the user rejected the parent
- * outright. A skill item whose group was never accepted has nowhere to go:
- * the reducer's `map` finds no matching group and drops it silently, so the
- * user sees "Accepted" on a change that did nothing. The same holds for a
- * custom entry without its section, and for any update/delete naming an id
- * the draft doesn't have (a rejected create, a hallucinated id, or a row the
- * user deleted by hand mid-conversation).
- *
- * This is checked against live draft state rather than tracked as a static
- * dependency between proposals, so it stays correct no matter how the parent
- * came to exist or stop existing.
- */
 export type ProposalApplicability = { ok: true } | { ok: false; reason: string }
 
 const APPLICABLE: ProposalApplicability = { ok: true }
@@ -101,8 +78,6 @@ function blocked(reason: string): ProposalApplicability {
 export function canApplyProposal(
   p: AgentProposal,
   draft: FullResume,
-  // tempIds of parents accepted so recently that `draft` hasn't re-rendered
-  // with them yet (see createdParentIdsRef in useAgentChat).
   justCreatedParentIds: ReadonlySet<string> = new Set(),
 ): ProposalApplicability {
   const flatEntity = (): ProposalApplicability => {
@@ -147,7 +122,6 @@ export function canApplyProposal(
       return s.entries.some((e) => e.id === p.id) ? APPLICABLE : blocked('That entry no longer exists')
     }
 
-    // Creates with no parent, and whole-resume metadata, always apply.
     default:
       return APPLICABLE
   }
@@ -171,7 +145,6 @@ function pickTitle(fields: Record<string, unknown> | undefined): string | null {
   return null
 }
 
-/** Short human-readable summary shown on a proposal review card. */
 export function describeProposal(p: AgentProposal): string {
   const entityLabel = p.entity ? (ENTITY_LABELS[p.entity] ?? p.entity) : null
   const title = pickTitle(p.fields) ?? pickTitle(p.patch)
@@ -216,7 +189,6 @@ export function describeProposal(p: AgentProposal): string {
   }
 }
 
-/** Field/patch entries worth showing on the card, skipping ID-ish keys. */
 export function proposalDetailEntries(p: AgentProposal): [string, unknown][] {
   if (p.type === 'design_update') return Object.entries(p.designUpdates ?? {})
   const data = p.fields ?? p.patch ?? {}
@@ -228,22 +200,6 @@ export type DisplayItem =
   | { kind: 'tool'; key: string; event: AgentToolEvent }
   | { kind: 'action'; key: string; event: AgentToolEvent; part: Extract<AssistantPart, { kind: 'proposal' }> }
 
-/**
- * Groups a flat AssistantPart stream into display items, merging each
- * propose_* tool call with the proposal it produced into a single 'action'
- * item — one collapsible row instead of a separate activity pill and detail
- * card. Pairing is by proposal.toolCallId, not by array position: several
- * propose_* calls can run concurrently, and their "done" tool events and
- * proposal events can then interleave in either order, so adjacency in the
- * array isn't a reliable signal for which proposal belongs to which call.
- *
- * A tool part with no matching proposal (read_resume, or a propose_* call
- * that errored before staging anything) stays a plain 'tool' item, same as
- * before this existed. A proposal with no matching tool part (toolCallId
- * missing, or its tool event hasn't streamed in yet) still renders — as a
- * standalone 'action' item with a synthesized "done" status — so a proposal
- * is never silently dropped from the transcript.
- */
 export function groupAssistantParts(parts: AssistantPart[]): DisplayItem[] {
   const proposalByToolCallId = new Map<string, Extract<AssistantPart, { kind: 'proposal' }>>()
   for (const part of parts) {
@@ -270,7 +226,6 @@ export function groupAssistantParts(parts: AssistantPart[]): DisplayItem[] {
       }
       continue
     }
-    // A 'proposal' part reaches here only if no 'tool' part claimed it.
     if (!consumed.has(part.key)) {
       items.push({ kind: 'action', key: part.key, event: { name: part.proposal.type, status: 'done' }, part })
     }

@@ -1,6 +1,5 @@
 import type { ResumeDesign } from './design'
 
-// Mirrors backend/internal/repository/template_repo.go's Template struct.
 export interface Template {
   id: string
   renderer_key: string

@@ -5,9 +5,6 @@ import (
 	"golang.org/x/oauth2/endpoints"
 )
 
-// SupportedProviders is the full set of SSO providers the schema's
-// auth_identities.provider CHECK constraint allows — adding a new one here
-// still requires that constraint to be widened via a migration.
 var SupportedProviders = []string{"google", "github", "linkedin"}
 
 type ProviderConfig struct {
@@ -15,8 +12,6 @@ type ProviderConfig struct {
 	OAuth2 *oauth2.Config
 }
 
-// Providers holds only the providers with credentials configured — an entry
-// missing from this map means that provider isn't set up yet, not an error.
 type Providers map[string]*ProviderConfig
 
 func NewProviders(redirectBaseURL, googleID, googleSecret, githubID, githubSecret string) Providers {

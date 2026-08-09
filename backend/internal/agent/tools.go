@@ -15,11 +15,6 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// Session value keys set by Agent.Chat (chat.go) via adk.WithSessionValues
-// and read by the propose_*/read_resume tools below via
-// adk.GetSessionValue. Keeping these unexported keeps the mechanism private
-// to this package — callers only see Chat's exported (history, draftJSON)
-// signature.
 const (
 	sessionKeyDraft     = "chat_draft_json"
 	sessionKeySink      = "chat_proposal_sink"
@@ -38,52 +33,19 @@ func sinkFromContext(ctx context.Context) (*ProposalSink, error) {
 	return sink, nil
 }
 
-// --- resume_chat tools -----------------------------------------------------
-//
-// Everything below reads/writes via session values (see sinkFromContext and
-// sessionKeyDraft above) instead of resume_id arguments or the database —
-// the chat agent operates on the client's local draft, which may be ahead of
-// what's persisted (see chat.go's package comment), and letting the model
-// name an arbitrary resume_id would let it target a resume the user doesn't
-// currently have open. propose_* tools never touch storage; they only
-// append a Proposal to the run's sink for the HTTP handler to stream out.
-
-// Every propose_* payload passes through normalizeFields (fields.go) before
-// it becomes a Proposal — see that file for why an untyped `fields` object
-// can't be trusted as the model sends it.
-
-// toolProblem reports a problem the model itself can fix — bad arguments,
-// unknown fields, a missing id — as the tool's *result* rather than as a Go
-// error.
-//
-// This distinction matters more than it looks: eino treats an error returned
-// from InvokableRun as fatal to the whole run (compose/tool_node.go wraps it
-// as "failed to stream tool call ..." and aborts), so returning an error here
-// would turn one malformed tool call into a dead conversation — exactly what
-// happens when the model's output is truncated mid-JSON by the token limit.
-// Returned as a result, the text lands in the transcript as that tool call's
-// output, and the model reads it and retries.
-//
-// Genuine faults (no proposal sink in context — a wiring bug, not something
-// the model can act on) stay real errors.
 func toolProblem(format string, a ...any) (string, error) {
 	return "ERROR: " + fmt.Sprintf(format, a...) +
 		". Nothing was changed by this call. Fix the arguments and call the tool again.", nil
 }
 
-// readResumeTool returns the client-supplied draft snapshot for this run
-// verbatim, so the model can inspect current state before proposing changes.
 type readResumeTool struct{}
 
 func newReadResumeTool() tool.InvokableTool { return &readResumeTool{} }
 
 func (t *readResumeTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
-		Name: "read_resume",
-		Desc: "Read the user's current resume draft (work experience, education, skills, projects, certifications, languages, misc entries, custom sections, contact info). Takes no arguments.",
-		// Anthropic requires every tool to have an input_schema, even a
-		// no-argument one — an empty params map produces {"type":"object",
-		// "properties":{}} rather than omitting the field entirely.
+		Name:        "read_resume",
+		Desc:        "Read the user's current resume draft (work experience, education, skills, projects, certifications, languages, misc entries, custom sections, contact info). Takes no arguments.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
 	}, nil
 }
@@ -100,26 +62,8 @@ func (t *readResumeTool) InvokableRun(ctx context.Context, _ string, _ ...tool.O
 	return draftJSON, nil
 }
 
-// TemplatesFetcher fetches the template catalog (id, name, renderer_key,
-// supported_modes, supported_groups, default_design — one row per template)
-// as JSON, on demand. The agent package defines only this function type, not
-// an implementation — Chat's caller (agent_handler.go) supplies the actual
-// closure, backed by internal/service.TemplateService, which is a DB read.
-// That keeps the DB dependency in the handler layer, where it already
-// exists for the resume-ownership check, instead of importing
-// internal/service (or internal/repository) into this package — see
-// doc.go's split-out plan, which only allows Eino/Claude and per-request
-// client-supplied data as dependencies. The fetcher is only invoked if
-// list_templates is actually called, so a turn that never asks about
-// templates costs zero DB round-trips, not just zero model tokens.
 type TemplatesFetcher func(ctx context.Context) (string, error)
 
-// listTemplatesTool calls the TemplatesFetcher supplied to Agent.Chat —
-// fetching the catalog fresh from the database, unlike read_resume/the
-// draft, which is client-supplied because it may be ahead of what's
-// persisted (see chat.go's Chat doc comment). The template catalog has no
-// such staleness concern — it's global, not resume-scoped, and nothing the
-// user does in the editor can make their own local copy of it stale.
 type listTemplatesTool struct{}
 
 func newListTemplatesTool() tool.InvokableTool { return &listTemplatesTool{} }
@@ -160,8 +104,6 @@ func validateFlatEntity(entity string) error {
 	}
 	return nil
 }
-
-// --- propose_create ---------------------------------------------------------
 
 type proposeCreateTool struct{}
 
@@ -214,8 +156,6 @@ func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	sink.add(Proposal{Type: "flat_create", Entity: args.Entity, TempID: id, Fields: fields, ToolCallID: compose.GetToolCallID(ctx)})
 	return fmt.Sprintf("created %s (tempId %s)", args.Entity, id), nil
 }
-
-// --- propose_update ----------------------------------------------------------
 
 type proposeUpdateTool struct{}
 
@@ -275,8 +215,6 @@ func (t *proposeUpdateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	return fmt.Sprintf("updated %s %s", args.Entity, args.ID), nil
 }
 
-// --- propose_delete ----------------------------------------------------------
-
 type proposeDeleteTool struct{}
 
 func newProposeDeleteTool() tool.InvokableTool { return &proposeDeleteTool{} }
@@ -323,11 +261,6 @@ func (t *proposeDeleteTool) InvokableRun(ctx context.Context, argumentsInJSON st
 	return fmt.Sprintf("deleted %s %s", args.Entity, args.ID), nil
 }
 
-// --- propose_skill_change ----------------------------------------------------
-//
-// One tool covers all six skill-group/skill-item operations instead of six
-// separate tools, since they share the same shallow argument shape.
-
 var skillActions = map[string]string{
 	"create_group": "skill_group_create",
 	"update_group": "skill_group_update",
@@ -372,7 +305,6 @@ func (t *proposeSkillChangeTool) Info(_ context.Context) (*schema.ToolInfo, erro
 	}, nil
 }
 
-// skillSpecFor picks the spec matching the action's target (group vs item).
 func skillSpecFor(action string) entitySpec {
 	if strings.HasSuffix(action, "_item") {
 		return skillItemSpec
@@ -397,9 +329,6 @@ func (t *proposeSkillChangeTool) InvokableRun(ctx context.Context, argumentsInJS
 		return toolProblem("unknown action %q", args.Action)
 	}
 
-	// Arguments are fully validated before the sink is touched, so a bad
-	// payload is always reported to the model rather than surfacing as a
-	// context/wiring error.
 	spec := skillSpecFor(args.Action)
 	p := Proposal{Type: proposalType, GroupID: args.GroupID, ID: args.ID, ToolCallID: compose.GetToolCallID(ctx)}
 	switch args.Action {
@@ -440,18 +369,11 @@ func (t *proposeSkillChangeTool) InvokableRun(ctx context.Context, argumentsInJS
 		return "", err
 	}
 	sink.add(p)
-	// create_group must report its tempId: it's the only way a follow-up
-	// create_item can name the group it belongs to, since the group has no
-	// real ID until the change reaches the client.
 	if p.TempID != "" {
 		return fmt.Sprintf("%s (id %s — use this as group_id for items in this group)", args.Action, p.TempID), nil
 	}
 	return args.Action, nil
 }
-
-// --- propose_custom_section_change --------------------------------------------
-//
-// Same shape as propose_skill_change, for the custom-sections/entries tree.
 
 var customSectionActions = map[string]string{
 	"create_section": "custom_section_create",
@@ -513,7 +435,6 @@ func (t *proposeCustomSectionChangeTool) InvokableRun(ctx context.Context, argum
 		return toolProblem("unknown action %q", args.Action)
 	}
 
-	// Validate before touching the sink — see propose_skill_change above.
 	spec := customSectionSpec
 	label := "custom section"
 	if strings.HasSuffix(args.Action, "_entry") {
@@ -559,15 +480,11 @@ func (t *proposeCustomSectionChangeTool) InvokableRun(ctx context.Context, argum
 		return "", err
 	}
 	sink.add(p)
-	// As with skill groups, a new section's tempId is what a follow-up
-	// create_entry needs for section_id.
 	if p.TempID != "" {
 		return fmt.Sprintf("%s (id %s — use this as section_id for entries in this section)", args.Action, p.TempID), nil
 	}
 	return args.Action, nil
 }
-
-// --- propose_meta_update -------------------------------------------------------
 
 type proposeMetaUpdateTool struct{}
 
@@ -616,23 +533,6 @@ func (t *proposeMetaUpdateTool) InvokableRun(ctx context.Context, argumentsInJSO
 	return "updated contact info", nil
 }
 
-// --- propose_design_update ----------------------------------------------------
-//
-// The design/styling counterpart to the propose_* content tools above: it
-// only stages a change (a "design_update" Proposal, applied client-side only
-// once accepted — see proposal.go), it never touches the database, and it
-// validates against internal/design.Schema()/ValidateFieldValue() — the same
-// pure-Go, DB-free source of truth the REST design PUT handler and the
-// Design Mode UI already use (see design.go's package comment, which
-// anticipated this exact tool). Importing internal/design does not
-// reintroduce the internal/service/internal/auth/cmd/api coupling doc.go's
-// split-out plan avoids — it's a sibling leaf package with no DB or HTTP
-// dependency of its own.
-
-// designSchemaDescription renders every editable design field (key, type,
-// and its enum options / numeric range) from design.Schema() into tool-
-// description text, so the model's view of what's editable can never drift
-// from what ValidateFieldValue() below actually accepts.
 func designSchemaDescription() string {
 	var b strings.Builder
 	for _, group := range design.Schema() {
@@ -640,12 +540,6 @@ func designSchemaDescription() string {
 			b.WriteString(f.Key)
 			b.WriteString(" (")
 			b.WriteString(f.Label)
-			// f.Label already carries the unit where one applies (e.g. "Left
-			// margin (px)") — the model has no other source for units, since
-			// the wire value is a bare number. Without this, a number field's
-			// range reads as unitless and the model guesses (inches, points,
-			// ...), which silently doesn't match what ValidateFieldValue
-			// accepts.
 			switch f.Type {
 			case design.FieldEnum:
 				b.WriteString("; one of: ")
@@ -690,11 +584,6 @@ type proposeDesignUpdateArgs struct {
 	Updates map[string]any `json:"updates"`
 }
 
-// currentDesignMap reads the client's current design object (part of the
-// same draft JSON read_resume returns) out of session state, as a raw
-// map[string]any — not a typed design.ResumeDesign — so setNestedField can
-// build a patch that carries forward every sibling value in a touched group
-// without needing a full unmarshal/marshal round-trip.
 func currentDesignMap(ctx context.Context) (map[string]any, error) {
 	v, ok := adk.GetSessionValue(ctx, sessionKeyDraft)
 	if !ok {
@@ -716,11 +605,6 @@ func currentDesignMap(ctx context.Context) (map[string]any, error) {
 	return draft.Design, nil
 }
 
-// setNestedField writes value at the dot-path parts inside obj, creating
-// intermediate objects as needed and reusing (mutating) any that already
-// exist — mirroring frontend/src/lib/designField.ts's buildFieldPatch, which
-// spreads each level's existing siblings rather than replacing the whole
-// sub-object.
 func setNestedField(obj map[string]any, parts []string, value any) {
 	if len(parts) == 1 {
 		obj[parts[0]] = value
@@ -776,17 +660,6 @@ func (t *proposeDesignUpdateTool) InvokableRun(ctx context.Context, argumentsInJ
 	return fmt.Sprintf("updated design (%s)", strings.Join(keys, ", ")), nil
 }
 
-// --- propose_template_switch --------------------------------------------------
-//
-// Mirrors frontend/src/components/editor/DesignMode.tsx's TemplatePicker
-// exactly: switching template fully replaces every design group with the
-// target template's default_design, overrides templateId, but carries the
-// CURRENT resume's sectionOrder forward unchanged (sectionOrder is
-// resume-specific — which sections a person has and how they've arranged
-// them — not something a template's defaults should discard). Same
-// "design_update" Proposal type as propose_design_update; no new Proposal
-// fields, no frontend changes.
-
 type proposeTemplateSwitchTool struct{}
 
 func newProposeTemplateSwitchTool() tool.InvokableTool { return &proposeTemplateSwitchTool{} }
@@ -812,10 +685,6 @@ type proposeTemplateSwitchArgs struct {
 	TemplateID string `json:"template_id"`
 }
 
-// templatesFetcherFromContext mirrors sinkFromContext/currentDesignMap's
-// shape for the third session value Chat sets — see Chat's doc comment in
-// chat.go for why this is a fetch closure rather than a plain string like
-// draftJSON.
 func templatesFetcherFromContext(ctx context.Context) (TemplatesFetcher, error) {
 	v, ok := adk.GetSessionValue(ctx, sessionKeyTemplates)
 	if !ok {
@@ -883,11 +752,6 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 		patch["sectionOrder"] = sectionOrder
 	}
 
-	// Validate the resulting document defensively before staging — the PUT
-	// endpoint this eventually syncs through does the same design.Validate()
-	// call with no special-casing for a templateId change (see
-	// resume_design_service.go), so anything wrong here would otherwise only
-	// surface as a failed save, with no earlier warning to the user.
 	patchJSON, err := json.Marshal(patch)
 	if err != nil {
 		return "", fmt.Errorf("marshal merged design: %w", err)
@@ -913,24 +777,6 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 	return fmt.Sprintf("switched template to %s (%s)", target.Name, target.ID), nil
 }
 
-// --- propose_section_update ---------------------------------------------------
-//
-// Mirrors frontend/src/components/editor/DesignMode.tsx's SectionsPanel /
-// TwoColumnSectionsPanel: every action here ends up staging a
-// "design_update" Proposal whose DesignPatch only ever touches the single
-// top-level "sectionOrder" key — spreading the whole sectionOrder object
-// forward and replacing just the addressed sub-list (sectionOrder.one.sections,
-// .two.left, or .two.right), same shallow-merge contract every other
-// design_update proposal relies on (resumeDraftReducer.ts's design_update
-// case). Ref identity mirrors frontend/src/lib/sectionOrder.ts's
-// sectionRefKey: a plain section type ("work_experience"), or
-// "custom-<customSectionId>" for a custom section.
-
-// sectionOrderPath maps a column name to its dot-path inside
-// ResumeDesign.sectionOrder — "one" is the single flat list one-column
-// templates use; "left"/"right" are the two-column template's independent
-// lists. "mix" bands aren't exposed here — no template renders that mode yet
-// (same scope Schema() and the manual Sections UI already stick to).
 func sectionOrderPath(column string) ([]string, error) {
 	switch column {
 	case "one":
@@ -944,7 +790,6 @@ func sectionOrderPath(column string) ([]string, error) {
 	}
 }
 
-// sectionRefKey mirrors frontend/src/lib/sectionOrder.ts's sectionRefKey.
 func sectionRefKey(ref design.SectionRef) string {
 	if ref.SectionType == "custom" && ref.CustomSectionID != nil {
 		return "custom-" + *ref.CustomSectionID
@@ -952,9 +797,6 @@ func sectionRefKey(ref design.SectionRef) string {
 	return ref.SectionType
 }
 
-// parseSectionKey is sectionRefKey's inverse — used to synthesize a default
-// ref for a key the current list doesn't have yet (e.g. reorder naming a
-// section that isn't in sectionOrder at all so far).
 func parseSectionKey(key string) (sectionType string, customSectionID *string) {
 	if id, ok := strings.CutPrefix(key, "custom-"); ok {
 		return "custom", &id
@@ -962,9 +804,6 @@ func parseSectionKey(key string) (sectionType string, customSectionID *string) {
 	return key, nil
 }
 
-// getNestedField is the read-side counterpart to setNestedField above —
-// walks a dot-path of map[string]any levels and returns whatever's there
-// (nil if any level along the way is missing).
 func getNestedField(obj map[string]any, parts []string) any {
 	var cur any = obj
 	for _, p := range parts {
@@ -977,10 +816,6 @@ func getNestedField(obj map[string]any, parts []string) any {
 	return cur
 }
 
-// readSectionRefs reads the ref list at path out of sectionOrder (a raw
-// map[string]any, as produced by currentDesignMap) and round-trips it
-// through JSON into typed design.SectionRef values, so callers can mutate
-// with normal struct field access instead of juggling map[string]any.
 func readSectionRefs(sectionOrder map[string]any, path []string) ([]design.SectionRef, error) {
 	raw := getNestedField(sectionOrder, path)
 	if raw == nil {
@@ -997,10 +832,6 @@ func readSectionRefs(sectionOrder map[string]any, path []string) ([]design.Secti
 	return refs, nil
 }
 
-// writeSectionRefs is readSectionRefs's inverse — round-trips refs back
-// through JSON into a []any and writes it at path via setNestedField (which
-// preserves every sibling of sectionOrder/sectionOrder.two along the way,
-// exactly like the design-field patch builder above).
 func writeSectionRefs(sectionOrder map[string]any, path []string, refs []design.SectionRef) error {
 	data, err := json.Marshal(refs)
 	if err != nil {
@@ -1230,9 +1061,6 @@ func (t *proposeSectionUpdateTool) InvokableRun(ctx context.Context, argumentsIn
 		}
 		toRefs = append(toRefs[:insertAt], append([]design.SectionRef{moved}, toRefs[insertAt:]...)...)
 
-		// toPath already reflects the reinsertion (toRefs, which for a
-		// same-column move IS fromRefs post-splice-and-reinsert). Only write
-		// fromPath separately when it's a different list.
 		if err := writeSectionRefs(sectionOrder, toPath, toRefs); err != nil {
 			return "", err
 		}
@@ -1248,7 +1076,7 @@ func (t *proposeSectionUpdateTool) InvokableRun(ctx context.Context, argumentsIn
 
 	updates := map[string]any{}
 	if err := json.Unmarshal([]byte(argumentsInJSON), &updates); err != nil {
-		updates = nil // display-only; fall through with no detail rather than fail the whole call
+		updates = nil
 	}
 
 	sink, err := sinkFromContext(ctx)

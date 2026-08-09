@@ -2,31 +2,6 @@ package design
 
 import "fmt"
 
-// Schema describes the design fields a client can render controls for,
-// generated from the exact same enum lists Validate() checks against (see
-// validate.go) — so the frontend's config UI can never offer a value the
-// backend would then reject, and the two can't drift since they share one
-// slice per field.
-//
-// Each FieldGroup is one nav category in the design panel's left sidebar.
-// Which groups/options a given template actually shows is NOT decided here
-// — that's Template.SupportedGroups/SupportedModes (see
-// repository.Template), cross-referenced by the frontend against this same
-// static list. Schema() itself has no notion of "which template" — it's one
-// universal field catalog every template draws from.
-//
-// This still doesn't cover every ResumeDesign field: page.format (no
-// template renders differing page dimensions yet), layout's column-width/
-// column-assignment fields (no template renders two/mix columns yet), and
-// header.photo (no content-side photo field exists yet) are modeled and
-// validated by Validate() so a full document round-trips fine, but omitted
-// here until something actually interprets them — otherwise the config UI
-// would offer a control with no visible effect. sectionDisplay.certifications
-// is similarly modeled but unexposed: certifications render per-entry today
-// (like education), so "grid/bullets" doesn't map onto it the way it does
-// for skills/languages. See DescribeFields() for the broader, full-surface
-// description used for validation-error messages.
-
 type FieldType string
 
 const (
@@ -37,11 +12,11 @@ const (
 )
 
 type FieldDef struct {
-	Key     string    `json:"key"` // dot path into ResumeDesign, e.g. "typography.fontFamily"
+	Key     string    `json:"key"`
 	Label   string    `json:"label"`
 	Type    FieldType `json:"type"`
-	Options []string  `json:"options,omitempty"` // FieldEnum
-	Min     *float64  `json:"min,omitempty"`     // FieldNumber
+	Options []string  `json:"options,omitempty"`
+	Min     *float64  `json:"min,omitempty"`
 	Max     *float64  `json:"max,omitempty"`
 	Step    *float64  `json:"step,omitempty"`
 }
@@ -60,9 +35,6 @@ func boolField(key, label string) FieldDef {
 	return FieldDef{Key: key, Label: label, Type: FieldBool}
 }
 
-// fieldByKey looks up one FieldDef by its dot-path key across every group in
-// Schema(). Used by ValidateFieldValue so a single field/value pair can be
-// checked without a whole ResumeDesign to validate against.
 func fieldByKey(key string) *FieldDef {
 	for _, group := range Schema() {
 		for i := range group.Fields {
@@ -84,14 +56,6 @@ func toFloat(v any) (float64, bool) {
 	return 0, false
 }
 
-// ValidateFieldValue checks one design field's proposed value against its
-// FieldDef from Schema() — the single-field counterpart to Validate(), which
-// operates on a whole ResumeDesign. Built for the agent's
-// propose_design_update tool, which edits one or a few fields at a time
-// rather than replacing the whole document (see design.go's package
-// comment). Only fields Schema() exposes are editable this way — the same
-// template-agnostic subset the Design Mode UI offers, so the agent can never
-// propose a value with no visible effect.
 func ValidateFieldValue(key string, value any) error {
 	f := fieldByKey(key)
 	if f == nil {

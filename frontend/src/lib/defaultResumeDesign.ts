@@ -1,12 +1,5 @@
 import type { ResumeDesign } from '@/types/design'
 
-// Mirrors the "classic" template's seeded default_design in
-// backend/internal/db/migrations/000003_design_system.up.sql. Used as a
-// fallback when a resume's draft predates the design field entirely — a
-// draft cached in localStorage before this feature shipped has no `design`
-// key at all, and won't get one until it's re-hydrated from the server
-// (see the schema-version bump planned for the draft/sync phase). Until
-// then, this keeps old drafts renderable instead of crashing.
 export const defaultResumeDesign: ResumeDesign = {
   templateId: '',
   layout: { mode: 'one', columnWidths: { left: 50, right: 50 } },
@@ -28,9 +21,6 @@ export const defaultResumeDesign: ResumeDesign = {
     background: '#ffffff',
     applyAccent: { name: false, headings: false, dates: false, icons: false },
   },
-  // "simple" (no decoration) is what every resume already visually looks
-  // like — this field was never actually rendered until it was wired into
-  // ClassicTemplate, so "simple" is the correct default, not "line".
   heading: { style: 'simple', capitalization: 'uppercase' },
   header: { photo: { show: false, size: 'm' }, alignText: 'left', jobTitlePosition: 'below' },
   entryLayout: { dateDisplayMode: 'right', subtitleStyle: 'italic' },

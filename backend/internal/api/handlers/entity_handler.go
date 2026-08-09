@@ -7,9 +7,6 @@ import (
 	"resume-builder/backend/internal/service"
 )
 
-// EntityHandler is the one HTTP adapter shared by every resume child entity
-// whose service satisfies service.EntityService — see router.go for how each
-// entity (work experiences, educations, ...) is wired from the same type.
 type EntityHandler[TInput any, TOutput any] struct {
 	svc service.EntityService[TInput, TOutput]
 }

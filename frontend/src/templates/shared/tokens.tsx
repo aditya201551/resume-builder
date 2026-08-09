@@ -1,29 +1,13 @@
-// Pure token->CSS mapping shared across templates — like richText.ts, these
-// have no JSX/CSS-module coupling (CSS variable names and data-* attribute
-// names are a cross-template convention every template's own .module.css
-// opts into, not tied to one template's class names), unlike each
-// template's block-building helpers (entryBlock, buildSectionBlocks, etc.),
-// which stay per-template.
 import type { CSSProperties, ReactNode } from 'react'
 import type { ResumeDesign } from '@/types/design'
 
 export interface RawBlock {
   key: string
-  /** Groups blocks that belong to the same content section, so withSpacing
-   * can tell "next entry in the same section" from "next section" apart. */
   sectionKey: string
-  /** Groups blocks that belong to the same entry (e.g. one work experience
-   * entry split across several rich-text fragments). */
   entryKey: string
   node: ReactNode
 }
 
-/** Wraps each block in a margin-bottom sized by whether the next block (in
- * the same column) is part of the same entry, the same section, or a new
- * section — sectionGap/entryGap/bulletGap respectively. The header block
- * never gets a computed gap here; templates give it its own fixed spacing
- * since it's visually distinct (a rule, a border, etc.), not just another
- * section. */
 export function withSpacing(raw: RawBlock[], spacing: ResumeDesign['spacing']): { key: string; node: ReactNode }[] {
   return raw.map((b, i) => {
     const next = raw[i + 1]
@@ -37,9 +21,6 @@ export function withSpacing(raw: RawBlock[], spacing: ResumeDesign['spacing']): 
   })
 }
 
-/** Numeric/color design tokens as CSS custom properties, consumed by every
- * template's .module.css via `var(--rd-*, <fallback matching that
- * template's own default look>)`. */
 export function pageStyleVars(tokens: ResumeDesign): CSSProperties {
   const accent = tokens.colors.accent
   return {
@@ -69,10 +50,6 @@ export function pageStyleVars(tokens: ResumeDesign): CSSProperties {
   } as CSSProperties
 }
 
-/** Enum-driven visual variants that change CSS selectors rather than
- * property values become data-* attributes on the page element — see each
- * template's `.page[data-...]` rules. Keeps templates from having to thread
- * every token into every block-building function. */
 export function pageDataAttrs(tokens: ResumeDesign): Record<string, string> {
   return {
     'data-heading-style': tokens.heading.style,

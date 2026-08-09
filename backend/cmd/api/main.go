@@ -41,7 +41,6 @@ func main() {
 	jwtIssuer := auth.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL)
 	stateSigner := auth.NewStateSigner(cfg.JWTSecret, 10*time.Minute)
 
-	// Repositories
 	users := repository.NewUserRepository(pool)
 	resumes := repository.NewResumeRepository(pool)
 	workExperiences := repository.NewWorkExperienceRepository(pool)
@@ -56,7 +55,6 @@ func main() {
 	templates := repository.NewTemplateRepository(pool)
 	resumeDesigns := repository.NewResumeDesignRepository(pool)
 
-	// Services
 	authService := service.NewAuthService(users)
 	resumeService := service.NewResumeService(resumes, resumeDesigns, templates, workExperiences, educations, skills, projects, certifications, languages, miscEntries, customSections, sectionConfigs)
 	workExperienceService := service.NewWorkExperienceService(resumes, workExperiences)
@@ -72,21 +70,16 @@ func main() {
 	resumeDesignService := service.NewResumeDesignService(resumes, resumeDesigns, templates)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
-	// AI assistant (Phase 2) — optional. Runs in-process inside this binary;
-	// see internal/agent/doc.go for the plan to split it into its own
-	// service later. Absent ANTHROPIC_API_KEY, the API runs without it.
-	var agentHandler *handlers.AgentHandler
-	if agentCfg, err := agent.LoadConfig(); err != nil {
-		log.Printf("warning: AI assistant disabled (%v)", err)
-	} else {
-		aiAgent, err := agent.New(ctx, agentCfg)
-		if err != nil {
-			log.Fatalf("create agent: %v", err)
-		}
-		agentHandler = handlers.NewAgentHandler(aiAgent, resumeService, templateService)
+	agentCfg, err := agent.LoadConfig()
+	if err != nil {
+		log.Fatalf("load agent config: %v", err)
 	}
+	aiAgent, err := agent.New(ctx, agentCfg)
+	if err != nil {
+		log.Fatalf("create agent: %v", err)
+	}
+	agentHandler := handlers.NewAgentHandler(aiAgent, resumeService, templateService)
 
-	// Handlers
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
 		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.InternalBaseURL),
@@ -117,10 +110,6 @@ func main() {
 	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
 
 	log.Printf("api listening on :%s", cfg.Port)
-	// No ReadTimeout/WriteTimeout/IdleTimeout: the agent chat endpoint
-	// streams SSE responses that can legitimately stay open for the
-	// duration of a multi-tool-call model run, so a WriteTimeout here
-	// would kill long conversations mid-stream.
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
 		log.Fatal(err)
 	}

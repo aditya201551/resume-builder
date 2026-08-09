@@ -10,14 +10,6 @@ function formatValue(v: unknown): string {
   return String(v)
 }
 
-/**
- * One propose_* tool call, merged with the proposal it produced: a single
- * collapsible row instead of a separate activity pill plus detail card.
- * Collapsed by default — the header alone (status + description + outcome)
- * is enough to follow along with what the assistant did; the field-level
- * detail of what was actually sent is a click away rather than always
- * taking up space.
- */
 export default function ActionItem({
   item,
   onAccept,

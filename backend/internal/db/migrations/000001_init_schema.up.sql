@@ -1,10 +1,6 @@
--- Resume Builder — initial schema
--- Data ownership model: each resume is a self-contained document.
--- Auth: provider-agnostic — a user can hold multiple SSO identities (Google, GitHub, later LinkedIn).
 
-CREATE EXTENSION IF NOT EXISTS pgcrypto; -- for gen_random_uuid()
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- USERS (provider-agnostic identity — no per-provider fields here)
 CREATE TABLE users (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email          TEXT NOT NULL UNIQUE,
@@ -15,9 +11,6 @@ CREATE TABLE users (
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- AUTH IDENTITIES (one row per linked SSO provider account)
--- provider_user_id is the provider's stable subject identifier (Google "sub", GitHub numeric "id", ...),
--- never the email, since email can change on the provider side while the subject stays fixed.
 CREATE TABLE auth_identities (
     id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id          UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -30,7 +23,6 @@ CREATE TABLE auth_identities (
 );
 CREATE INDEX idx_auth_identities_user_id ON auth_identities(user_id);
 
--- RESUMES (parent document — owns contact info + summary directly)
 CREATE TABLE resumes (
     id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id           UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -49,7 +41,6 @@ CREATE TABLE resumes (
 );
 CREATE INDEX idx_resumes_user_id ON resumes(user_id);
 
--- WORK EXPERIENCE
 CREATE TABLE work_experiences (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id       UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -69,7 +60,6 @@ CREATE TABLE work_experiences (
 );
 CREATE INDEX idx_work_experiences_resume_id ON work_experiences(resume_id);
 
--- EDUCATION
 CREATE TABLE educations (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id          UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -87,7 +77,6 @@ CREATE TABLE educations (
 );
 CREATE INDEX idx_educations_resume_id ON educations(resume_id);
 
--- SKILLS (groups -> items)
 CREATE TABLE skill_groups (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id  UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -105,7 +94,6 @@ CREATE TABLE skill_items (
 );
 CREATE INDEX idx_skill_items_group_id ON skill_items(skill_group_id);
 
--- PROJECTS
 CREATE TABLE projects (
     id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id    UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -120,7 +108,6 @@ CREATE TABLE projects (
 );
 CREATE INDEX idx_projects_resume_id ON projects(resume_id);
 
--- CERTIFICATIONS
 CREATE TABLE certifications (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id      UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -133,7 +120,6 @@ CREATE TABLE certifications (
 );
 CREATE INDEX idx_certifications_resume_id ON certifications(resume_id);
 
--- LANGUAGES
 CREATE TABLE languages (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id   UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -143,7 +129,6 @@ CREATE TABLE languages (
 );
 CREATE INDEX idx_languages_resume_id ON languages(resume_id);
 
--- AWARDS / PUBLICATIONS / VOLUNTEER (merged via kind enum)
 CREATE TYPE misc_entry_kind AS ENUM ('award', 'publication', 'volunteer');
 
 CREATE TABLE misc_entries (
@@ -159,7 +144,6 @@ CREATE TABLE misc_entries (
 );
 CREATE INDEX idx_misc_entries_resume_id ON misc_entries(resume_id);
 
--- CUSTOM SECTIONS
 CREATE TABLE custom_sections (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     resume_id  UUID NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -178,7 +162,6 @@ CREATE TABLE custom_section_entries (
 );
 CREATE INDEX idx_custom_section_entries_section_id ON custom_section_entries(custom_section_id);
 
--- SECTION CONFIG (per-resume visibility, order, title overrides)
 CREATE TYPE section_type AS ENUM (
     'contact', 'summary', 'work_experience', 'education', 'skills',
     'projects', 'certifications', 'languages', 'awards', 'publications',
@@ -197,11 +180,6 @@ CREATE TABLE resume_section_configs (
 );
 CREATE INDEX idx_resume_section_configs_resume_id ON resume_section_configs(resume_id);
 
--- Postgres treats NULL as distinct in a plain UNIQUE constraint, so the
--- constraint above never actually prevents duplicate rows when
--- custom_section_id IS NULL (every non-custom section type). That in turn
--- means ON CONFLICT can't target it for an upsert on non-custom section
--- types. This partial unique index covers exactly that case.
 CREATE UNIQUE INDEX idx_resume_section_configs_main_unique
     ON resume_section_configs (resume_id, section_type)
     WHERE custom_section_id IS NULL;

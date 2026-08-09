@@ -28,8 +28,6 @@ type Resume struct {
 	LastExportedAt *time.Time      `json:"last_exported_at"`
 }
 
-// ResumeMetaInput is the subset of Resume fields a client may set directly;
-// UserID/timestamps/LastExportedAt are server-controlled.
 type ResumeMetaInput struct {
 	Label    string          `json:"label"`
 	FullName string          `json:"full_name"`
@@ -133,8 +131,6 @@ func (r *ResumeRepository) Delete(ctx context.Context, id string) error {
 	return nil
 }
 
-// Duplicate deep-copies a resume and every child row into a brand-new
-// resume owned by the same user, so editing one never affects the other.
 func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Resume, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
@@ -180,7 +176,6 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 		}
 	}
 
-	// skill_groups -> skill_items need an old-group-id -> new-group-id map.
 	groupRows, err := tx.Query(ctx, `SELECT id, group_name, sort_order FROM skill_groups WHERE resume_id = $1`, resumeID)
 	if err != nil {
 		return nil, fmt.Errorf("list skill groups: %w", err)
@@ -219,8 +214,6 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 		}
 	}
 
-	// custom_sections -> custom_section_entries need the same remap, and
-	// resume_section_configs.custom_section_id must follow it too.
 	sectionRows, err := tx.Query(ctx, `SELECT id, title, sort_order FROM custom_sections WHERE resume_id = $1`, resumeID)
 	if err != nil {
 		return nil, fmt.Errorf("list custom sections: %w", err)
@@ -303,9 +296,6 @@ func (r *ResumeRepository) Duplicate(ctx context.Context, resumeID string) (*Res
 		}
 	}
 
-	// resume_designs has no id to remap (it's keyed by resume_id directly) —
-	// a plain INSERT...SELECT is a no-op if the source resume has no design
-	// row yet, which is expected (see resolveResumeDesign's fallback).
 	if _, err := tx.Exec(ctx,
 		`INSERT INTO resume_designs (resume_id, design) SELECT $2, design FROM resume_designs WHERE resume_id = $1`,
 		resumeID, newID); err != nil {

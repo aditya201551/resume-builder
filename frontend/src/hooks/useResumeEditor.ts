@@ -9,7 +9,6 @@ export function fullResumeKey(resumeId: string) {
   return ['resumes', resumeId, 'full'] as const
 }
 
-/** Read-only fetch — used by the dashboard's resume thumbnails, which aren't editing. */
 export function useFullResume(resumeId: string) {
   return useQuery({
     queryKey: fullResumeKey(resumeId),
@@ -61,15 +60,6 @@ function localMutation<TArg, TResult = void>(fn: (arg: TArg) => TResult) {
   }
 }
 
-/**
- * Every child entity (flat or nested) is edited through the same
- * create/update/delete/reorder shape. This used to hit the network directly
- * (via react-query mutations) and invalidate the aggregate query on success;
- * it now applies the change to the local draft instantly (no debounce, no
- * round trip) — the actual network write happens later, batched, via the
- * draft's periodic flush. Callers are unchanged: same `.mutate`/`.mutateAsync`
- * shape as before.
- */
 export function useEntityMutations(resumeId: string, basePath: string) {
   void resumeId
   const { dispatch } = useResumeDraftContext()

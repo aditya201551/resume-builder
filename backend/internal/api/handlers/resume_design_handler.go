@@ -26,8 +26,6 @@ func (h *ResumeDesignHandler) Get(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, d)
 }
 
-// Update is a full replace (PUT), not a patch — same semantics as
-// ResumeHandler.Update on repository.ResumeMetaInput.
 func (h *ResumeDesignHandler) Update(w http.ResponseWriter, r *http.Request) {
 	userID, _ := auth.UserIDFromContext(r.Context())
 	var in design.ResumeDesign

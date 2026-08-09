@@ -8,13 +8,6 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 )
 
-// Returning a Go error from InvokableRun is fatal to the entire run — eino
-// wraps it as "failed to stream tool call ..." and aborts the conversation
-// (compose/tool_node.go). So anything the model could plausibly fix on a
-// retry must come back as a tool *result* with a nil error instead.
-//
-// These cases all run before the tools reach for the proposal sink, so a
-// bare context is enough to exercise them.
 func TestProposeToolsReportBadArgumentsWithoutFailingTheRun(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -23,9 +16,8 @@ func TestProposeToolsReportBadArgumentsWithoutFailingTheRun(t *testing.T) {
 		contains string
 	}{
 		{
-			name: "truncated json",
-			tool: newProposeCreateTool(),
-			// What a token-limit cutoff mid-tool-call actually delivers.
+			name:     "truncated json",
+			tool:     newProposeCreateTool(),
 			args:     `{"entity":"work_experiences","fields":{"company":"Acme","content":"- did a thing`,
 			contains: "could not parse",
 		},
@@ -104,8 +96,6 @@ func TestProposeToolsReportBadArgumentsWithoutFailingTheRun(t *testing.T) {
 	}
 }
 
-// A wiring fault is not something the model can retry its way out of, so it
-// must stay a real error rather than being reported as a bad-arguments result.
 func TestProposeToolsStillErrorWhenSinkIsMissing(t *testing.T) {
 	out, err := newProposeCreateTool().InvokableRun(
 		context.Background(),

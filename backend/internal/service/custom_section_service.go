@@ -23,9 +23,6 @@ func (s *CustomSectionService) ListSections(ctx context.Context, callerUserID, r
 	return s.repo.ListSections(ctx, resumeID)
 }
 
-// CreateSection also seeds a matching resume_section_configs row (visible)
-// since a config row otherwise doesn't exist until a section type is
-// explicitly touched.
 func (s *CustomSectionService) CreateSection(ctx context.Context, callerUserID, resumeID string, in repository.CustomSectionInput) (*repository.CustomSection, error) {
 	if _, err := ensureResumeOwner(ctx, s.resumes, resumeID, callerUserID); err != nil {
 		return nil, err

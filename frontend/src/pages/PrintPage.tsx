@@ -5,12 +5,6 @@ import { apiGet } from '@/lib/http'
 import LivePreview from '@/components/editor/LivePreview'
 import type { FullResume } from '@/types/resume'
 
-/**
- * System route only — navigated by the headless export browser (chromedp),
- * never linked from app navigation. Auth here is a short-lived export_token
- * query param (headless Chrome has no session cookie), not the normal
- * logged-in session — see ExportPDF/ExportData in the Go backend.
- */
 export default function PrintPage() {
   const { id } = useParams<{ id: string }>()
   const [searchParams] = useSearchParams()

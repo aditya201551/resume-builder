@@ -1,8 +1,3 @@
--- Second template: a genuine two-column layout, exercising layout.mode
--- "two" / sectionOrder.two for the first time (previously only "classic",
--- single-column, existed). No Go/design-package changes are needed for
--- this — SectionOrder.Two and Layout.Mode "two" were already fully modeled
--- and validated; only the frontend renderer and this seed row are new.
 
 INSERT INTO templates (renderer_key, name, supported_modes, supported_groups, default_design, sort_order)
 VALUES (

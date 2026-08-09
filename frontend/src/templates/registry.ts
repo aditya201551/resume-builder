@@ -11,10 +11,6 @@ export interface TemplateComponentProps {
 
 export type TemplateComponent = (props: TemplateComponentProps) => React.JSX.Element
 
-// Keyed by the templates table's renderer_key, not its id — the id is a
-// per-database UUID, renderer_key is the stable string this registry and
-// the seeded migrations both agree on. Grows one entry per new renderer
-// without touching call sites.
 export const templateRegistry: Record<string, TemplateComponent> = {
   classic: ClassicTemplate,
   'vertical-split': VerticalSplitTemplate,

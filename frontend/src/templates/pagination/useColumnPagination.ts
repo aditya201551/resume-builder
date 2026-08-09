@@ -13,14 +13,6 @@ export interface PageAssignment {
   column: PaginationColumn
 }
 
-/** Original sequential packer — walks `blocks` in the exact order given,
- * synchronizing both columns whenever a 'full' block appears (both columns
- * advance to whichever is currently taller before it's placed). Used only
- * when the input actually contains 'full' blocks — a page-spanning band, not
- * exercised by any template yet. For pure left/right content, packBalanced
- * below is strictly better: this packer's page-break decisions depend on
- * the caller's interleaving order, which has no reason to track actual
- * rendered height (see packBalanced's comment for what goes wrong). */
 function packSequential(blocks: PaginationBlock[], contentHeight: number, height: (key: string) => number): PageAssignment[][] {
   const newPages: PageAssignment[][] = []
   let current: PageAssignment[] = []
@@ -51,22 +43,6 @@ function packSequential(blocks: PaginationBlock[], contentHeight: number, height
   return newPages
 }
 
-/**
- * Height-balanced packer for pure left/right content (no 'full' blocks): at
- * each step, draws the next block from whichever column's cumulative height
- * *so far* is currently smaller, instead of following the caller's combined
- * array order.
- *
- * This matters because a page closes for BOTH columns the moment EITHER
- * overflows (pages are a shared physical unit) — so if blocks are fed in an
- * order that doesn't track real height (e.g. round-robin by block count), a
- * column with very FEW but visually TALL blocks (a narrow sidebar where
- * long text wraps across several lines) can trigger the shared break long
- * before the other column's page is actually full, stranding whatever
- * hadn't been "given a turn" yet in that column and leaving a visible gap
- * for the rest of that page. Balancing by actual measured height instead of
- * input order keeps both columns filling the same page evenly.
- */
 function packBalanced(blocks: PaginationBlock[], contentHeight: number, height: (key: string) => number): PageAssignment[][] {
   const left = blocks.filter((b) => b.column === 'left')
   const right = blocks.filter((b) => b.column === 'right')
@@ -105,17 +81,6 @@ function packBalanced(blocks: PaginationBlock[], contentHeight: number, height: 
   return newPages
 }
 
-/**
- * Packs blocks into pages by measured height, independently per column. A
- * page closes for BOTH columns the moment either overflows — pages are
- * always a shared physical unit, even though packing height is tracked per
- * column.
- *
- * Single-column templates tag every block 'left' and leave 'right' empty —
- * packBalanced's while-loop degenerates to the same linear greedy-pack
- * behavior the original single-column engine used for that case (right is
- * always exhausted, so every pick takes from left in order).
- */
 export function useColumnPagination(blocks: PaginationBlock[], contentHeight: number, onReady?: () => void) {
   const measureRefs = useRef(new Map<string, HTMLDivElement>())
   const [pages, setPages] = useState<PageAssignment[][]>(() => [blocks.map((b) => ({ key: b.key, column: b.column }))])
@@ -124,15 +89,10 @@ export function useColumnPagination(blocks: PaginationBlock[], contentHeight: nu
     let cancelled = false
 
     async function recompute() {
-      // Web fonts can reflow text after layout has already been measured —
-      // waiting here keeps the pagination measurements (and the PDF
-      // exporter's data-print-ready gate, which depends on onReady firing
-      // only once layout is final) honest once non-system fonts are in use.
       if (typeof document !== 'undefined' && document.fonts && document.fonts.status !== 'loaded') {
         try {
           await document.fonts.ready
         } catch {
-          // best-effort — proceed with whatever layout is current
         }
       }
       if (cancelled) return

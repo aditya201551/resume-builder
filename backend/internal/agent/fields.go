@@ -8,58 +8,15 @@ import (
 	"time"
 )
 
-// The model is free to invent field names for any propose_* payload, because
-// the tool schema can only describe `fields` as a generic object — its real
-// shape depends on which entity was named, and JSON Schema has no way to
-// express that dependency in a single object parameter. Left unchecked, the
-// model falls back on field names it has memorized from other resume formats
-// (JSON Resume's school/area/studyType, camelCase startDate, projects.description
-// instead of content), which then flow straight through the frontend reducer
-// into draft entities missing the keys the UI reads.
-//
-// So this file is where an untrusted propose_* payload becomes a payload the
-// rest of the system can assume is well-formed:
-//
-//  1. normalizeFields renames what it can recognize (camelCase, plus the
-//     known cross-format aliases below),
-//  2. it rejects anything left unrecognized with an error naming the valid
-//     fields — tool errors go back to the model, which retries correctly,
-//  3. it fills required text fields the UI dereferences (content) so a
-//     partial payload can't produce an entity with a missing key.
-//
-// specs is also the source for the tool descriptions the model sees, so the
-// documented shape and the enforced shape can't drift apart.
-
-// entitySpec describes one resume entity's accepted create/update payload.
 type entitySpec struct {
-	// fields are the only keys accepted after alias normalization.
-	fields []string
-	// required must be present and non-empty on a create.
-	required []string
-	// defaults are applied on create when the model omits them. Only
-	// non-nullable columns the UI dereferences belong here.
-	defaults map[string]any
-	// aliases map known-wrong names onto the real field name. Mechanical
-	// camelCase->snake_case is handled globally and doesn't need entries.
-	aliases map[string]string
-	// enums constrain specific fields to a fixed set of values.
-	enums map[string][]string
-	// dateFields names fields that must parse as a date. The system prompt
-	// tells the model to write plain strings like "2023-01", matching
-	// however a human would type — but that's not what the manual editor
-	// actually sends (WorkExperienceSection.tsx etc. always send a full
-	// RFC3339 timestamp via toISOString()), and it's not something
-	// time.Time's default JSON decoding accepts either. Left unchecked, an
-	// agent-authored date reaches the backend's flushDraft POST and fails
-	// there as an opaque "invalid request body" with no indication of why —
-	// so it's normalized to RFC3339 here instead, before it ever leaves this
-	// package.
+	fields     []string
+	required   []string
+	defaults   map[string]any
+	aliases    map[string]string
+	enums      map[string][]string
 	dateFields []string
 }
 
-// flatEntitySpecs covers the propose_create/update/delete entities. Field
-// lists mirror frontend/src/types/resume.ts, minus server-owned columns
-// (id, resume_id, sort_order) the agent must never set.
 var flatEntitySpecs = map[string]entitySpec{
 	"work_experiences": {
 		fields:     []string{"company", "company_url", "title", "location", "employment_type", "start_date", "end_date", "is_current", "content", "technologies"},
@@ -178,8 +135,6 @@ var flatEntitySpecs = map[string]entitySpec{
 	},
 }
 
-// Non-flat entity specs — the skill and custom-section trees, and the
-// resume's own contact/summary block.
 var (
 	skillGroupSpec = entitySpec{
 		fields:   []string{"group_name"},
@@ -220,9 +175,6 @@ var (
 	}
 )
 
-// snakeCase converts camelCase/PascalCase/kebab-case to snake_case so the
-// most common class of wrong name (startDate for start_date) normalizes
-// mechanically instead of needing an alias entry per field.
 func snakeCase(s string) string {
 	var b strings.Builder
 	b.Grow(len(s) + 4)
@@ -246,8 +198,6 @@ func (s entitySpec) allows(field string) bool {
 	return slices.Contains(s.fields, field)
 }
 
-// canonical resolves one model-supplied key onto a spec field, or "" if it
-// can't be recognized.
 func (s entitySpec) canonical(key string) string {
 	k := snakeCase(strings.TrimSpace(key))
 	if s.allows(k) {
@@ -276,22 +226,12 @@ func (s entitySpec) checkEnums(out map[string]any) error {
 	return nil
 }
 
-// dateLayouts are tried in order. RFC3339 first since that's what a manually
-// edited entry already has when it round-trips through read_resume; the
-// shorter layouts are what the system prompt actually tells the model to
-// write.
 var dateLayouts = []string{
 	time.RFC3339,
 	"2006-01-02",
 	"2006-01",
 }
 
-// normalizeDateValue accepts any of dateLayouts (or an explicit null/empty
-// string, meaning "no date") and returns the canonical RFC3339 string the
-// rest of the system already expects — the same format the manual editor's
-// toISOString() call produces, so a normalized proposal needs no special
-// handling anywhere downstream: not in the frontend draft, not in the
-// flushDraft POST, not in the backend's time.Time decoding.
 func normalizeDateValue(field string, v any) (any, error) {
 	if v == nil {
 		return nil, nil
@@ -332,7 +272,6 @@ func (s entitySpec) normalizeDates(out map[string]any) error {
 	return nil
 }
 
-// isBlank reports whether a required field's value is effectively missing.
 func isBlank(v any) bool {
 	if v == nil {
 		return true
@@ -341,20 +280,11 @@ func isBlank(v any) bool {
 	return ok && strings.TrimSpace(s) == ""
 }
 
-// normalizeFields maps a model-supplied payload onto the spec's real field
-// names. Unrecognized keys are an error rather than a silent drop: the error
-// text reaches the model as the tool result, so it retries with the right
-// names instead of the user silently losing content it meant to add.
-//
-// create applies required-field checks and defaults; updates skip both, since
-// a patch legitimately carries only the fields that change.
 func normalizeFields(label string, spec entitySpec, in map[string]any, create bool) (map[string]any, error) {
 	out := make(map[string]any, len(in))
 	var unknown []string
 
 	for k, v := range in {
-		// Server-owned; silently dropped rather than rejected, since the
-		// model including them is harmless and rejecting would waste a turn.
 		switch snakeCase(k) {
 		case "id", "resume_id", "sort_order", "skill_group_id", "custom_section_id", "created_at", "updated_at":
 			continue
@@ -400,9 +330,6 @@ func normalizeFields(label string, spec entitySpec, in map[string]any, create bo
 		return nil, fmt.Errorf("missing required %s field(s): %s", label, strings.Join(missing, ", "))
 	}
 
-	// Defaults last so the client never builds an entity missing a key the
-	// preview dereferences (a nil content is what crashes the Markdown
-	// renderer, not a wrong one).
 	for k, v := range spec.defaults {
 		if _, ok := out[k]; !ok {
 			out[k] = v
@@ -411,9 +338,6 @@ func normalizeFields(label string, spec entitySpec, in map[string]any, create bo
 	return out, nil
 }
 
-// describeFlatEntityFields renders the per-entity field lists into the
-// propose_create tool description, so the schema the model reads is generated
-// from the same specs that validate its output.
 func describeFlatEntityFields() string {
 	names := make([]string, 0, len(flatEntitySpecs))
 	for name := range flatEntitySpecs {
@@ -432,11 +356,6 @@ func describeFlatEntityFields() string {
 	return b.String()
 }
 
-// describeSkillChangeFields and describeCustomSectionChangeFields render
-// propose_skill_change/propose_custom_section_change's `data` field
-// descriptions from the same specs normalizeFields validates against — the
-// same reasoning as describeFlatEntityFields above, so a field added to one
-// of these specs can't silently go undocumented to the model.
 func describeSkillChangeFields() string {
 	return fmt.Sprintf(
 		"For create_group: {%s}. For create_item: {%s}. For update_group/update_item: only the fields that should change.",

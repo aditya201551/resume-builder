@@ -1,26 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-/**
- * Drives which entry's RowCard panel is open within a section, plus which
- * ones are "new" (created via the Add button and not yet closed once) so
- * RowCard can discard them on close if they were left blank — e.g. Add
- * Education then close without typing anything shouldn't leave an empty
- * "Untitled" row behind.
- *
- * `ids` must be the current list of entity ids in this section. A newly
- * created entry gets a client-side temp id that the background draft sync
- * later resolves to a real server id (rewriting `entry.id` app-wide) — if
- * that happens while its panel is open, `openId` would otherwise point at
- * an id that no longer exists and the panel would appear to slam shut. When
- * exactly one id disappears and exactly one new one appears between renders,
- * we treat it as that resolution and carry `openId`/pending-new status over
- * to the new id.
- *
- * `pendingNewIds` is only cleared for an entry the render *after* it stops
- * being the open one, so RowCard's own effect (a descendant, whose effects
- * always run before this hook's) gets one commit where it can see
- * `isNew && !open` together and run its discard check before we drop it.
- */
 export function useEntryPanel(ids: string[]) {
   const [openId, setOpenId] = useState<string | null>(null)
   const [pendingNewIds, setPendingNewIds] = useState<Set<string>>(new Set())

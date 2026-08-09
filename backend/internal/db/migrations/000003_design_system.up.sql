@@ -1,13 +1,3 @@
--- Template/design (customization) system — deliberately decoupled from the
--- content tables above. A resume's visual presentation (template choice,
--- layout mode, colors, typography, section order/visibility/titles) now
--- lives here instead of in resume_section_configs, so content editing and
--- formatting are two independent systems that can be built, tested, and
--- (later) exposed to the AI agent separately.
---
--- This migration only ADDS tables. resume_section_configs is left in place
--- and still authoritative for the current frontend until it migrates onto
--- this system — do not drop it here.
 
 CREATE TABLE templates (
     id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -24,9 +14,6 @@ CREATE TABLE templates (
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- One design per resume. A missing row means "use the default template's
--- preset" (see service.resolveResumeDesign) rather than every resume
--- needing a row from creation.
 CREATE TABLE resume_designs (
     resume_id  UUID PRIMARY KEY REFERENCES resumes(id) ON DELETE CASCADE,
     design     JSONB NOT NULL,
@@ -34,10 +21,6 @@ CREATE TABLE resume_designs (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- Seed the single v1 template. Its default_design reproduces
--- LivePreview.module.css's current hardcoded look field-for-field, so
--- existing resumes render identically the moment this ships — nothing
--- visually changes until a user actually opens the (future) design panel.
 INSERT INTO templates (renderer_key, name, supported_modes, default_design, sort_order)
 VALUES (
     'classic',

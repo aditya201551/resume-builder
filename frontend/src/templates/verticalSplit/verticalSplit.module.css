@@ -96,8 +96,6 @@
   text-transform: var(--rd-heading-transform, uppercase);
   color: var(--rd-heading-color, var(--rd-text, #1f2328));
 }
-/* heading.style — same opt-in decoration set as ClassicTemplate; "simple"
-   (no decoration) is this template's default too. */
 .page[data-heading-style='line'] .sectionTitle {
   padding-bottom: 4px;
   border-bottom: 2px solid var(--rd-accent, #3457d5);

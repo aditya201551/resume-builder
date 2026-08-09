@@ -11,10 +11,6 @@ import styles from './classic.module.css'
 const PAGE_WIDTH = 680
 const PAGE_HEIGHT = 880
 
-// Section types whose entries render as one atomic block per section rather
-// than one block per entry — matches the original single-column engine's
-// granularity for these three (a short skills/languages list, or the
-// one-paragraph summary, never needs an internal page break).
 const ATOMIC_SECTION_TYPES = new Set(['summary', 'skills', 'languages'])
 
 function entryBlock(sectionKey: string, key: string, heading: string | undefined, body: ReactNode, entryKey: string = key): RawBlock {
@@ -31,9 +27,6 @@ function entryBlock(sectionKey: string, key: string, heading: string | undefined
   }
 }
 
-/** An entry's heading/meta line is glued to its first paragraph or bullet;
- * every subsequent paragraph/bullet is its own block so overflow only
- * carries forward what doesn't fit, not the whole entry. */
 function richTextEntryBlocks(sectionKey: string, entryKey: string, heading: string | undefined, head: ReactNode, bodyHtml: string): RawBlock[] {
   const fragments = splitRichTextBlocks(bodyHtml)
   if (fragments.length === 0) {
@@ -88,11 +81,6 @@ function entryHead(entry: ContentEntry) {
   )
 }
 
-/** Renders a section's entries in one of three shapes, matching
- * sectionDisplay.{skills,languages}: `text` reproduces the original
- * single-block-of-lines look exactly (the default, so existing resumes
- * render unchanged), `grid` lays the same lines out in two columns, and
- * `bullets` renders them as a bulleted list. */
 function displayEntries(entries: ContentEntry[], mode: SectionDisplay['skills'], line: (e: ContentEntry) => ReactNode) {
   if (mode === 'bullets') {
     return (
@@ -125,9 +113,6 @@ function buildSectionBlocks(section: ContentSection, sectionDisplay: SectionDisp
       ))
       return [entryBlock(section.key, section.key, section.title, body)]
     }
-    // languages — "text" mode reconstructs the original joined sentence
-    // ("Name — Level · Name — Level") from the per-language entries so its
-    // default look is byte-for-byte what a single pre-joined string produced.
     if (sectionDisplay.languages === 'text') {
       const joined = section.entries.map((e) => [e.title, e.meta].filter(Boolean).join(' — ')).join(' · ')
       return [entryBlock(section.key, section.key, section.title, <p>{joined}</p>)]
@@ -218,11 +203,6 @@ export default function ClassicTemplate({
 }) {
   const contentHeight = PAGE_HEIGHT - tokens.page.marginTop - tokens.page.marginBottom
 
-  // Memoized on content/tokens (not recomputed as fresh array literals every
-  // render): useColumnPagination's effect depends on `paginationBlocks` by
-  // reference, and its own setPages call triggers a re-render — an
-  // unmemoized array here reruns the effect every render, which reruns
-  // setPages, forever. This is load-bearing, not an optimization.
   const blocks = useMemo(
     () => withSpacing(buildRawBlocks(content, tokens.sectionDisplay), tokens.spacing),
     [content, tokens.sectionDisplay, tokens.spacing],

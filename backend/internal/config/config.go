@@ -24,14 +24,8 @@ type Config struct {
 	GithubClientID       string
 	GithubClientSecret   string
 
-	// ChromeExecPath points chromedp at a specific Chrome/headless-shell
-	// binary (set to /headless-shell/headless-shell in the Docker image).
-	// Left empty in local dev so chromedp auto-detects an installed browser.
 	ChromeExecPath string
 
-	// StaticDir, when set, points at the built frontend (frontend/dist) and
-	// makes the API also serve it (see api.NewRouter). Left empty in local
-	// dev, where Vite's own dev server handles the frontend instead.
 	StaticDir string
 }
 
@@ -72,11 +66,6 @@ func Load() (*Config, error) {
 		redirectBaseURL = "http://localhost:" + port
 	}
 
-	// InternalBaseURL is where this process reaches its own HTTP server —
-	// used by chromedp to render the print-only route for PDF export. Now
-	// that the frontend is served from this same Go binary (see NewRouter's
-	// static handler), that's just localhost, avoiding a round-trip through
-	// the public URL/edge for every export.
 	internalBaseURL := os.Getenv("INTERNAL_BASE_URL")
 	if internalBaseURL == "" {
 		internalBaseURL = "http://localhost:" + port

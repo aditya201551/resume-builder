@@ -30,15 +30,6 @@ function TypingIndicator() {
   )
 }
 
-/**
- * One-click entry points for the two PRD-listed Phase 2 asks that had no
- * dedicated UI before this — "AI-generated professional summary from
- * existing Work Experience/Skills data" and "Grammar/style check pass on
- * resume text." The general-purpose chat agent can already do both from a
- * plain-language ask (it has propose_meta_update and propose_update), so
- * this is only a guided shortcut into the same flow, not a new tool or
- * endpoint — clicking one just sends the canned prompt as a normal message.
- */
 const QUICK_ACTIONS = [
   {
     label: 'Write my summary',
@@ -100,13 +91,6 @@ function AssistantParts({
   return (
     <div className="flex flex-col gap-2">
       {items.map((item, i) => {
-        // Text gets its own part every time a tool call interrupts it (a
-        // reply that reads "...creating this: [tool] ...then this: [tool]"
-        // produces several separate text items). Only the very last item in
-        // the message is still growing — every earlier text segment is
-        // already finished, so only the last one should carry the blinking
-        // cursor. Without this check every finished segment kept its own
-        // cursor animating forever.
         const isLast = i === items.length - 1
         return item.kind === 'text' ? (
           <div key={item.key} className="text-sm leading-6 text-foreground">
@@ -127,9 +111,6 @@ function AssistantParts({
   )
 }
 
-/** The assistant's natural-language reply, ignoring tool/proposal parts —
- * what "copy this message" should put on the clipboard, not the structured
- * actions alongside it. */
 function assistantText(parts: AssistantPart[]) {
   return parts.filter((p) => p.kind === 'text').map((p) => p.text).join('')
 }
@@ -199,17 +180,6 @@ export default function ChatPanel() {
     if (shouldStickRef.current) scrollToBottom('auto')
   }, [messages, streamingParts, scrollToBottom])
 
-  // Sending disables the textarea (see `disabled={isStreaming}` below), and a
-  // disabled element loses focus to document.body — the browser does this
-  // for us, we never call blur() ourselves. Once streaming ends and the
-  // textarea is re-enabled, nothing gives focus back automatically, so the
-  // user has to click back in before they can keep typing. Restore it
-  // ourselves — but only when nothing else has since taken focus on
-  // purpose (a resume field the user clicked into while the assistant was
-  // still responding, an accept/reject button, etc.); document.body is what
-  // activeElement is left holding after the disable-triggered blur, so that
-  // check is what distinguishes "nothing else grabbed focus" from "the user
-  // moved on deliberately."
   useEffect(() => {
     if (isStreaming) return
     const active = document.activeElement

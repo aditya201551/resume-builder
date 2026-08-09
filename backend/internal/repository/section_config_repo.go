@@ -51,19 +51,7 @@ func (r *SectionConfigRepository) List(ctx context.Context, resumeID string) ([]
 	return items, rows.Err()
 }
 
-// Update upserts by (resume_id, section_type, custom_section_id) rather than
-// a row id — that triple is the config's real identity (see the schema's
-// UNIQUE constraint), and it's what a client naturally has in hand after
-// listing sections rather than a synthetic config row id. It upserts (not a
-// plain UPDATE) because resume_section_configs is only ever seeded for
-// section types a resume happened to already have data in — a section type
-// that's never been touched before (e.g. reordering a section that's never
-// been dragged) has no row yet, and a plain UPDATE would silently affect 0
-// rows instead of persisting the change.
 func (r *SectionConfigRepository) Update(ctx context.Context, resumeID, sectionType string, customSectionID *string, in SectionConfigInput) (*SectionConfig, error) {
-	// Two conflict targets because a plain UNIQUE constraint treats NULL
-	// custom_section_id as always distinct — ON CONFLICT can't target it for
-	// the non-custom case, hence the partial unique index + branch here.
 	q := `
 		INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, is_visible, display_title_override, sort_order)
 		VALUES ($1, $2, $3, $4, $5, $6)
@@ -88,10 +76,6 @@ func (r *SectionConfigRepository) Update(ctx context.Context, resumeID, sectionT
 	return &c, nil
 }
 
-// EnsureExists creates a default config row for a section_type if one
-// doesn't already exist — used the first time a custom section is added,
-// since resume_section_configs otherwise only gets a row once a section
-// type is touched (reordered, or explicitly configured).
 func (r *SectionConfigRepository) EnsureExists(ctx context.Context, resumeID, sectionType string, customSectionID *string, sortOrder int) error {
 	const q = `
 		INSERT INTO resume_section_configs (resume_id, section_type, custom_section_id, is_visible, sort_order)

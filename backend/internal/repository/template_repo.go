@@ -10,9 +10,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Template is a catalog entry, not resume-scoped — there is no user_id or
-// ownership check on this table; it's a global, read-only (from the API's
-// perspective) list of renderers a resume's design can select.
 type Template struct {
 	ID              string          `json:"id"`
 	RendererKey     string          `json:"renderer_key"`
@@ -50,8 +47,6 @@ func scanTemplate(row pgx.Row) (*Template, error) {
 	return &t, nil
 }
 
-// List returns every published template, in catalog order. There is no
-// per-user filtering — templates are shared across all users.
 func (r *TemplateRepository) List(ctx context.Context) ([]Template, error) {
 	const q = `SELECT ` + templateColumns + ` FROM templates WHERE published = true ORDER BY sort_order`
 	rows, err := r.pool.Query(ctx, q)
@@ -76,10 +71,6 @@ func (r *TemplateRepository) FindByID(ctx context.Context, id string) (*Template
 	return scanTemplate(r.pool.QueryRow(ctx, q, id))
 }
 
-// FindByRendererKey backs the fallback path when a resume has no
-// resume_designs row yet — resolveResumeDesign (internal/service) looks up
-// "classic" by this key rather than a hardcoded id, since ids are generated
-// at migration time.
 func (r *TemplateRepository) FindByRendererKey(ctx context.Context, rendererKey string) (*Template, error) {
 	const q = `SELECT ` + templateColumns + ` FROM templates WHERE renderer_key = $1`
 	return scanTemplate(r.pool.QueryRow(ctx, q, rendererKey))

@@ -198,14 +198,6 @@ function slotContent(resumeId: string, data: FullResume, key: SlotKey): { title:
   }
 }
 
-// Content mode is pure data capture now — order, visibility, and titles are
-// a Design-mode concern (see DesignMode.tsx's SectionsPanel, driven by
-// resolveSectionRefs/design.sectionOrder). Section editors here always
-// render in the same fixed sequence; which ones are visible in Content
-// depends only on whether they have content yet, or were explicitly
-// revealed this session via "Add section" below (that reveal is
-// intentionally ephemeral/local — it's about showing an empty editor to
-// start typing into, not about the resume's rendered structure).
 function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume }) {
   const customSections = useEntityMutations(resumeId, `/api/resumes/${resumeId}/custom-sections`)
   const [revealed, setRevealed] = useState<Set<SlotKey>>(new Set())
@@ -347,10 +339,6 @@ function EditorPageContent() {
     </div>
   )
 
-  // Chat mode swaps the edit pane for the assistant and moves the preview to
-  // the other side, so the user watches the resume update live while
-  // chatting — Content and Design modes keep the same (editor pane | preview)
-  // layout, just swapping what's in the left slot.
   const primaryPane =
     mode === 'chat' ? previewPane : mode === 'design' ? designPane : <div className="h-full overflow-y-auto px-6 py-6">{editPane}</div>
   const secondaryPane = mode === 'chat' ? <ChatPanel /> : previewPane

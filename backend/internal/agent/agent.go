@@ -4,26 +4,21 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/cloudwego/eino-ext/components/model/claude"
+	"resume-builder/backend/internal/ai"
+
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/components/model"
 )
 
-// Agent wraps the resume_chat Eino ChatModelAgent — the multi-turn,
-// multi-tool-call conversation that proposes structured edits across the
-// resume (Chat, see chat.go).
 type Agent struct {
-	chatRunner *adk.Runner
+	chatRunner   *adk.Runner
+	modelOptions []model.Option
 }
 
-// New builds the agent's Claude chat model and the chat agent's runner.
 func New(ctx context.Context, cfg *Config) (*Agent, error) {
-	chatModel, err := claude.NewChatModel(ctx, &claude.Config{
-		APIKey:    cfg.AnthropicAPIKey,
-		Model:     cfg.ClaudeModel,
-		MaxTokens: cfg.MaxTokens,
-	})
+	chatModel, err := ai.NewChatModel(ctx, cfg.AI, cfg.MaxTokens)
 	if err != nil {
-		return nil, fmt.Errorf("create claude chat model: %w", err)
+		return nil, err
 	}
 
 	chatAgent, err := newChatAgent(ctx, chatModel)
@@ -32,11 +27,9 @@ func New(ctx context.Context, cfg *Config) (*Agent, error) {
 	}
 
 	chatRunner := adk.NewRunner(ctx, adk.RunnerConfig{
-		Agent: chatAgent,
-		// Streaming — Chat's caller (agent_handler.go) forwards text as it
-		// arrives over SSE rather than waiting for a complete message.
+		Agent:           chatAgent,
 		EnableStreaming: true,
 	})
 
-	return &Agent{chatRunner: chatRunner}, nil
+	return &Agent{chatRunner: chatRunner, modelOptions: cfg.AI.ChatModelOptions()}, nil
 }

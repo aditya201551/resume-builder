@@ -28,7 +28,6 @@ export const apiPatch = <T>(url: string, body?: unknown) => request<T>('PATCH', 
 export const apiPut = <T>(url: string, body?: unknown) => request<T>('PUT', url, body)
 export const apiDelete = (url: string) => request<void>('DELETE', url)
 
-/** Downloads a binary response (e.g. a generated PDF) and saves it via the browser's normal download flow. */
 export async function apiDownload(url: string, fallbackFilename: string): Promise<void> {
   const res = await fetch(url, { credentials: 'include' })
   if (!res.ok) {

@@ -55,8 +55,6 @@ describe('canApplyProposal', () => {
     expect(canApplyProposal({ type: 'update_meta', patch: { full_name: 'A' } }, emptyDraft()).ok).toBe(true)
   })
 
-  // The case the user hit: accepting a skill without its group would be
-  // dropped by the reducer while the UI reported success.
   it('blocks a skill item whose group is not in the draft', () => {
     const p: AgentProposal = { type: 'skill_item_create', groupId: 'temp-group', tempId: 'temp-item', fields: { name: 'Go' } }
     const result = canApplyProposal(p, emptyDraft())
@@ -70,8 +68,6 @@ describe('canApplyProposal', () => {
     expect(canApplyProposal(p, emptyDraft({ skill_groups: [group('g1')] })).ok).toBe(true)
   })
 
-  // dispatch() doesn't synchronously update the draft snapshot, so a group
-  // accepted moments earlier in the same batch is tracked separately.
   it('allows a skill item whose group was just created but is not yet in the draft', () => {
     const p: AgentProposal = { type: 'skill_item_create', groupId: 'temp-g', tempId: 'temp-item', fields: { name: 'Go' } }
 
@@ -141,12 +137,6 @@ describe('groupAssistantParts', () => {
     expect(items).toEqual([{ kind: 'tool', key: 'read', event: { id: 'read-1', name: 'read_resume', status: 'done' } }])
   })
 
-  // The scenario that made position-based pairing unsafe: several propose_*
-  // calls run concurrently, so their proposal events can arrive in an order
-  // that doesn't match which tool part appears first in the array (in real
-  // state, upsertToolEvent merges same-id tool events into one part in
-  // place — 'running' becomes 'done' rather than adding a second part — so
-  // each id appears once here, as it would in the actual streamingParts).
   it('pairs correctly by id even when proposals arrive out of order relative to their tool calls', () => {
     const parts: AssistantPart[] = [
       toolPart('call-A', 'done'),

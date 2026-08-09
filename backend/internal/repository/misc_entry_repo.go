@@ -13,7 +13,7 @@ import (
 type MiscEntry struct {
 	ID          string     `json:"id"`
 	ResumeID    string     `json:"resume_id"`
-	Kind        string     `json:"kind"` // award | publication | volunteer
+	Kind        string     `json:"kind"`
 	Title       string     `json:"title"`
 	IssuerOrOrg *string    `json:"issuer_or_org"`
 	URL         *string    `json:"url"`

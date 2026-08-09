@@ -11,9 +11,6 @@ import styles from './verticalSplit.module.css'
 const PAGE_WIDTH = 680
 const PAGE_HEIGHT = 880
 
-// Sidebar content (name/contact + Skills/Languages/Certifications) is
-// deliberately short-form — none of these ever need an internal page break,
-// same reasoning as ClassicTemplate's ATOMIC_SECTION_TYPES.
 const ATOMIC_SECTION_TYPES = new Set(['summary', 'skills', 'languages'])
 
 function entryBlock(sectionKey: string, key: string, heading: string | undefined, body: ReactNode, entryKey: string = key): RawBlock {
@@ -84,10 +81,6 @@ function entryHead(entry: ContentEntry) {
   )
 }
 
-/** Same three sectionDisplay shapes as ClassicTemplate (text/grid/bullets) —
- * used here for the sidebar's Skills/Languages/Certifications lists, which
- * default to "bullets" for this template (see the seed migration) since a
- * narrow column reads better as a short bulleted list than a text sentence. */
 function displayEntries(entries: ContentEntry[], mode: SectionDisplay['skills'], line: (e: ContentEntry) => ReactNode) {
   if (mode === 'bullets') {
     return (
@@ -128,9 +121,6 @@ function buildSectionBlocks(section: ContentSection, sectionDisplay: SectionDisp
     return [entryBlock(section.key, section.key, section.title, body)]
   }
 
-  // certifications in the sidebar render the same short-list shape as
-  // skills/languages rather than Classic's full entry-with-date-and-link
-  // treatment — a narrow column has no room for that.
   if (section.type === 'certifications') {
     const body = displayEntries(section.entries, 'bullets', (e) => (
       <>
@@ -193,9 +183,6 @@ function sidebarHeaderBlock(header: ResumeContent['header']): RawBlock {
   }
 }
 
-/** Splits content into sidebar (left) and main (right) raw blocks — column
- * placement comes straight from resolveResumeContent's per-section `column`
- * tag (layout.mode "two" via resolveTwoColumnSectionRefs), not decided here. */
 function buildRawBlocks(content: ResumeContent, sectionDisplay: SectionDisplay): { left: RawBlock[]; right: RawBlock[] } {
   const left: RawBlock[] = [sidebarHeaderBlock(content.header)]
   const right: RawBlock[] = []
@@ -233,17 +220,9 @@ export default function VerticalSplitTemplate({
   const contentHeight = PAGE_HEIGHT - tokens.page.marginTop - tokens.page.marginBottom
   const leftWidthPct = tokens.layout.columnWidths.left
 
-  // Same memoization discipline as ClassicTemplate — see its comment.
-  // useColumnPagination's effect depends on `paginationBlocks` by reference;
-  // an unmemoized array here would rerun the effect (and its setPages call)
-  // every render, forever.
   const raw = useMemo(() => buildRawBlocks(content, tokens.sectionDisplay), [content, tokens.sectionDisplay])
   const leftBlocks = useMemo(() => withSpacing(raw.left, tokens.spacing), [raw.left, tokens.spacing])
   const rightBlocks = useMemo(() => withSpacing(raw.right, tokens.spacing), [raw.right, tokens.spacing])
-  // Order doesn't matter here beyond "left blocks stay in left order, right
-  // blocks stay in right order" — useColumnPagination regroups by column and
-  // balances by actual measured height internally, not by how they're
-  // interleaved in this array.
   const paginationBlocks: PaginationBlock[] = useMemo(() => {
     const tagged = (col: PaginationColumn) => (b: { key: string; node: ReactNode }) => ({ key: b.key, column: col, node: b.node })
     return [...leftBlocks.map(tagged('left')), ...rightBlocks.map(tagged('right'))]

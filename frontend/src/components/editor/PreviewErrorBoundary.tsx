@@ -1,29 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { AlertTriangle } from 'lucide-react'
 
-/**
- * Last line of defence around the live preview.
- *
- * The preview renders whatever the draft holds, and the draft is not fully
- * trusted data: it takes agent proposals, and it rehydrates from localStorage
- * written by possibly-older versions of the app. A single malformed entity
- * used to throw during render, which — with no boundary anywhere above it —
- * unmounted the whole editor and lost the user's unflushed edits along with
- * it. Containing the failure here keeps the editor and its draft alive, so
- * the user can undo or fix whatever produced the bad entity.
- *
- * Class component because React only exposes error boundaries via
- * componentDidCatch/getDerivedStateFromError; there is no hook equivalent.
- */
 interface Props {
   children: ReactNode
-  /**
-   * The data being previewed. Compared by identity to decide when to retry:
-   * a new draft is a new chance to render, so an edit that fixes the
-   * offending entity brings the preview back on its own. Deliberately not
-   * `children` — that's a fresh element on every parent render, which would
-   * retry (and re-throw) on renders that changed nothing.
-   */
   resetKey: unknown
 }
 

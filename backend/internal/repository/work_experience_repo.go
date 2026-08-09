@@ -41,9 +41,7 @@ type WorkExperienceInput struct {
 	Content        string          `json:"content"`
 	Technologies   json.RawMessage `json:"technologies"`
 	SortOrder      int             `json:"sort_order"`
-	// ClientID is the tempId the frontend draft used before this row had a
-	// real id — see idempotent.go for why Create keys off it.
-	ClientID *string `json:"client_id"`
+	ClientID       *string         `json:"client_id"`
 }
 
 type WorkExperienceRepository struct {

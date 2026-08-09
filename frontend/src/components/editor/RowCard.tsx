@@ -16,11 +16,7 @@ import { useEditorPanel } from '@/hooks/useEditorPanel'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 
 interface RowCardProps {
-  /** Commits the currently edited fields — called only when the user clicks Done. */
   onDone?: () => void
-  /** Reverts in-progress edits — called when the panel closes without saving (confirmed
-   * discard via X/Escape, or opening a different entry) so the next open starts from the
-   * last-saved values again. */
   onDiscard?: () => void
   isDirty?: boolean
   onDelete: () => void
@@ -28,20 +24,12 @@ interface RowCardProps {
   subtitle?: ReactNode
   dragHandle?: ReactNode
   editorTitle?: string
-  /** True for an entry that was just created and hasn't been closed once yet — if it's
-   * closed any way other than Done (X, Escape, opening another entry), the add is
-   * treated as cancelled and the entry is discarded instead of left empty. */
   isNew?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   children: ReactNode
 }
 
-// NOTE: X/Escape now confirm before discarding dirty edits (see
-// attemptCloseRef below). Switching to a *different* entry while this one is
-// dirty still silently discards — that path closes this panel via a prop
-// change from the parent's shared open-id state, not a call this component
-// makes, so there's no point to intercept a confirmation at.
 
 export default function RowCard({
   onDone,
@@ -65,16 +53,12 @@ export default function RowCard({
 
   const committedRef = useRef(false)
 
-  // Ctrl/Cmd+S commits without closing — keep a ref so the panel-stack handle
-  // (registered once per open, below) always calls the latest onDone/form.
   const commitRef = useRef(() => {})
   commitRef.current = () => {
     committedRef.current = true
     onDone?.()
   }
 
-  // X / Escape close with unsaved form edits go through this instead of
-  // closing straight away, so work isn't silently lost — see attemptClose.
   const attemptCloseRef = useRef(() => {})
   attemptCloseRef.current = () => {
     if (isDirty) setConfirmCloseOpen(true)
@@ -87,11 +71,6 @@ export default function RowCard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, pushOpen])
 
-  // Uncommitted form edits are real unsaved work even though they haven't
-  // reached the draft yet — register a commit callback so the app-wide
-  // "unsaved changes" signal (EditorNavbar's SyncStatus) knows about it, and
-  // "Save & leave" (also in EditorNavbar) can commit this panel the same way
-  // Ctrl+S already does via the panel stack above.
   useEffect(() => {
     if (open && isDirty) registerPanel(panelKey, () => commitRef.current())
     else registerPanel(panelKey, null)
@@ -107,8 +86,6 @@ export default function RowCard({
     const wasCommitted = committedRef.current
     committedRef.current = false
     if (wasCommitted) return
-    // Closed without clicking Done — a fresh, never-saved entry is a cancelled
-    // add and goes away entirely; an existing one just reverts its edits.
     if (isNew) {
       onDelete()
     } else {

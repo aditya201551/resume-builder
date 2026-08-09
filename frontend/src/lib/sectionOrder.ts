@@ -1,9 +1,6 @@
 import type { FullResume } from '@/types/resume'
 import type { SectionRef } from '@/types/design'
 
-// The fixed catalog of non-custom section types and their default display
-// labels — used both to back-fill missing refs and to resolve a ref's
-// title when no override is set.
 export const SECTION_LABELS: Record<string, string> = {
   summary: 'Summary',
   work_experience: 'Experience',
@@ -46,21 +43,6 @@ function hasContent(data: FullResume, type: string): boolean {
   }
 }
 
-/**
- * Resolves the single-column ("one" layout mode) section order — the sole
- * source of truth for order/visibility/title-overrides now that
- * resume_section_configs is retired from the frontend. Both
- * resolveResumeContent (rendering) and DesignMode (the reorder UI) call
- * this same function so they can never disagree about what "the current
- * order" is.
- *
- * Default (non-custom) types back-fill onto the end only once they have
- * actual content — an empty "Certifications" a user hasn't touched yet
- * shouldn't clutter the design panel's order list. Custom sections
- * back-fill as soon as they exist (creating one is an explicit action, not
- * an ambient default), and a stored ref whose custom section no longer
- * exists is dropped rather than left dangling.
- */
 export function resolveSectionRefs(data: FullResume): SectionRef[] {
   const stored = data.design.sectionOrder.one.sections.filter(
     (r) => r.sectionType !== 'custom' || data.custom_sections.some((s) => s.id === r.customSectionId),
@@ -88,14 +70,6 @@ export function sectionRefKey(ref: SectionRef): string {
   return ref.sectionType === 'custom' ? `custom-${ref.customSectionId}` : ref.sectionType
 }
 
-/**
- * Same role as resolveSectionRefs, for two-column templates (layout.mode
- * "two") — reads/backfills against sectionOrder.two.{left,right} instead of
- * .one.sections. The only behavioral difference: an unassigned type (new
- * content, or a ref present in neither list) back-fills into `right` (the
- * main column) rather than a single flat list — sidebar placement should be
- * deliberate (seeded by the template's default_design), not incidental.
- */
 export function resolveTwoColumnSectionRefs(data: FullResume): { left: SectionRef[]; right: SectionRef[] } {
   const dropOrphanCustom = (r: SectionRef) => r.sectionType !== 'custom' || data.custom_sections.some((s) => s.id === r.customSectionId)
   const left = data.design.sectionOrder.two.left.filter(dropOrphanCustom)

@@ -90,10 +90,6 @@ function DownloadButton({ resume }: { resume: Resume }) {
   async function handleDownload() {
     setError(null)
     try {
-      // The export renders whatever the backend already has — commit any
-      // open panel's in-progress edits and flush the draft first (same as
-      // Ctrl+S/"Save & leave"), so the PDF reflects what's on screen instead
-      // of stale, previously-saved data.
       setPhase('saving')
       commitDirtyPanels()
       await new Promise((resolve) => setTimeout(resolve, 0))
@@ -161,13 +157,6 @@ function BackButton() {
   const [saveError, setSaveError] = useState(false)
 
   function discardAndLeave() {
-    // The draft persists to localStorage on every edit (so a closed tab can
-    // recover unsaved work) — that's the right default, but an explicit
-    // "discard" means the user wants those edits gone, not just off-screen.
-    // Without clearing it here, the next time this resume opens it would
-    // hydrate from the same stale local draft and silently bring the
-    // "discarded" changes right back. Clearing it forces the next mount to
-    // fall through to GET /full instead (see useResumeDraft's hydrate effect).
     clearDraft(resumeId)
     blocker.proceed?.()
   }
@@ -175,9 +164,6 @@ function BackButton() {
   async function saveAndLeave() {
     setSaving(true)
     setSaveError(false)
-    // Commit any open panel's in-progress edits first — same thing Ctrl+S
-    // does — then wait a tick for that dispatch to land before flushing,
-    // otherwise flushNow reads the pre-commit state.
     commitDirtyPanels()
     await new Promise((resolve) => setTimeout(resolve, 0))
     const ok = await flushNow()
@@ -200,9 +186,6 @@ function BackButton() {
       <AlertDialog
         open={blocker.state === 'blocked'}
         onOpenChange={(open) => {
-          // AlertDialogAction/Cancel auto-close on click, which would fire
-          // this and reset the blocker mid-save — Save & leave is a plain
-          // Button (below) specifically so its async work can't race this.
           if (!open && !saving) {
             blocker.reset?.()
             setSaveError(false)

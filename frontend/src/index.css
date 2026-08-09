@@ -48,7 +48,6 @@
     --radius-4xl: calc(var(--radius) * 2.6);
 }
 
-/* Direction A — "Slate & Signal" (locked palette, see design/colors artifact) */
 :root {
     --background: #F4F6F8;
     --foreground: #1B2B3A;
@@ -151,21 +150,11 @@
   *::-webkit-scrollbar {
     display: none;
     }
-  /* Component focus rings (shadcn) use box-shadow, not outline — safe to drop
-     the browser's native focus outline everywhere so plain buttons/links
-     (e.g. row pills) don't flash an unstyled border on click. */
   *:focus {
     outline: none;
     }
 }
 
-/* Unlayered on purpose: Tailwind's `focus-visible:ring-*` utility (inputs, buttons,
-   switches, badges…) lives in the utilities layer, which always wins over @layer base
-   regardless of specificity. Design choice: no glow/ring on focus, but the element's
-   normal border should stay visible and unchanged — the `focus-visible:border-*` color
-   swap is removed per-component instead (see input.tsx, textarea.tsx, etc.), since the
-   "resting" border color differs per component and there's no single value to fall back
-   to here. */
 :focus-visible {
   box-shadow: none !important;
 }

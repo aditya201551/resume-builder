@@ -7,10 +7,6 @@ import (
 	"resume-builder/backend/internal/repository"
 )
 
-// FullResume is the aggregate read the frontend doesn't need today (it
-// renders from local state) but a Phase 2+ agent will, since it has no
-// browser-side state to read from — one call returns everything needed to
-// reason about or export the resume.
 type FullResume struct {
 	Resume          repository.Resume           `json:"resume"`
 	Design          design.ResumeDesign         `json:"design"`
@@ -103,10 +99,6 @@ func (s *ResumeService) Duplicate(ctx context.Context, callerUserID, resumeID st
 	return s.resumes.Duplicate(ctx, resumeID)
 }
 
-// GetFullResume assembles the resume and every child collection into one
-// document — the shape both a "load for editing" call and a future MCP
-// read-only tool want, so it lives here once rather than being reinvented
-// per adapter.
 func (s *ResumeService) GetFullResume(ctx context.Context, callerUserID, resumeID string) (*FullResume, error) {
 	resume, err := ensureResumeOwner(ctx, s.resumes, resumeID, callerUserID)
 	if err != nil {

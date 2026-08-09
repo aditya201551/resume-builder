@@ -22,12 +22,6 @@ interface SortableListProps<T extends { id: string }> {
   onReorder: (orderedIds: string[]) => void
   renderItem: (item: T, index: number, dragHandle: ReactNode) => ReactNode
   className?: string
-  /**
-   * 'gutter' (default) draws the grip in its own column to the left of the
-   * row, matching the original entry-row layout. 'inline' skips that column
-   * and hands the grip to `renderItem` so it can be placed inside a card
-   * header instead (used by the top-level section list).
-   */
   dragHandlePlacement?: 'gutter' | 'inline'
 }
 

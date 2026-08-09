@@ -29,9 +29,6 @@ func NewLanguageService(resumes *repository.ResumeRepository, repo *repository.L
 
 var validMiscEntryKinds = map[string]bool{"award": true, "publication": true, "volunteer": true}
 
-// miscEntryService wraps the generic implementation to validate Kind against
-// the misc_entry_kind enum before it ever reaches Postgres, so a bad value
-// comes back as a clean validation error instead of a raw DB constraint error.
 type miscEntryService struct {
 	EntityService[repository.MiscEntryInput, repository.MiscEntry]
 }

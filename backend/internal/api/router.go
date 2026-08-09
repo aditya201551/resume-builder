@@ -26,9 +26,7 @@ type Handlers struct {
 	Template       *handlers.TemplateHandler
 	ResumeDesign   *handlers.ResumeDesignHandler
 	DesignSchema   *handlers.DesignSchemaHandler
-	// Agent is nil when ANTHROPIC_API_KEY isn't configured — see NewRouter,
-	// which skips registering its routes in that case.
-	Agent *handlers.AgentHandler
+	Agent          *handlers.AgentHandler
 }
 
 func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc, staticDir string) http.Handler {
@@ -51,8 +49,6 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("GET /api/resumes/{resumeID}/full", h.Resume.GetFull)
 	handle("POST /api/resumes/{resumeID}/duplicate", h.Resume.Duplicate)
 	handle("GET /api/resumes/{resumeID}/export/pdf", h.Resume.ExportPDF)
-	// Not wrapped by `protect` — headless Chrome has no session cookie and
-	// self-validates via the short-lived export_token query param instead.
 	mux.HandleFunc("GET /api/resumes/{resumeID}/export/data", h.Resume.ExportData)
 
 	registerEntityRoutes(handle, "/api/resumes/{resumeID}/work-experiences", h.WorkExperience)
@@ -85,20 +81,13 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("GET /api/resumes/{resumeID}/section-configs", h.SectionConfig.List)
 	handle("PATCH /api/resumes/{resumeID}/section-configs/{sectionType}", h.SectionConfig.Update)
 
-	// Templates are a global catalog, not resume-scoped — still behind
-	// RequireAuth (this app has no anonymous browsing anywhere else) but
-	// with no ownership check, since there's no resume in scope.
 	handle("GET /api/templates", h.Template.List)
 	handle("GET /api/design-schema", h.DesignSchema.Get)
 	handle("GET /api/resumes/{resumeID}/design", h.ResumeDesign.Get)
 	handle("PUT /api/resumes/{resumeID}/design", h.ResumeDesign.Update)
 
-	if h.Agent != nil {
-		handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
-	}
+	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 
-	// Serve the built frontend from this same binary. staticDir is empty in
-	// local dev (Vite's own dev server handles the frontend there instead).
 	if staticDir != "" {
 		mux.Handle("/", spaFileServer(staticDir))
 	}
@@ -106,10 +95,6 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	return mux
 }
 
-// spaFileServer serves files out of dir, falling back to dir/index.html for
-// any path that doesn't match a real file — needed so react-router's
-// client-side routes (e.g. /resumes/{id}) resolve on a hard refresh instead
-// of 404ing.
 func spaFileServer(dir string) http.HandlerFunc {
 	fileServer := http.FileServer(http.Dir(dir))
 	return func(w http.ResponseWriter, r *http.Request) {

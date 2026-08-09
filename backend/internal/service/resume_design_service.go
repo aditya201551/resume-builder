@@ -10,15 +10,8 @@ import (
 	"resume-builder/backend/internal/repository"
 )
 
-// defaultTemplateRendererKey is the fallback template a resume resolves to
-// when it has no resume_designs row yet — see resolveResumeDesign.
 const defaultTemplateRendererKey = "classic"
 
-// resolveResumeDesign returns a resume's stored design, or — if it has never
-// saved one — the default template's preset with TemplateID filled in. This
-// is shared by ResumeDesignService.Get (the dedicated endpoint) and
-// ResumeService.GetFullResume (which embeds Design in the aggregate), so
-// both ever have exactly one definition of "what a resume's design is."
 func resolveResumeDesign(
 	ctx context.Context,
 	designs *repository.ResumeDesignRepository,
@@ -74,10 +67,6 @@ func (s *ResumeDesignService) Get(ctx context.Context, callerUserID, resumeID st
 	return &d, nil
 }
 
-// Update replaces a resume's design wholesale — same PUT semantics as
-// ResumeRepository.UpdateMeta, not a patch. in must already be a complete,
-// valid ResumeDesign; Validate is the single gate a future
-// propose_design_update agent tool would also call before this.
 func (s *ResumeDesignService) Update(ctx context.Context, callerUserID, resumeID string, in design.ResumeDesign) (*design.ResumeDesign, error) {
 	if _, err := ensureResumeOwner(ctx, s.resumes, resumeID, callerUserID); err != nil {
 		return nil, err

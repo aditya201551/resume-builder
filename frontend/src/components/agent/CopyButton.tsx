@@ -2,9 +2,6 @@ import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-/** Small "Copy" affordance shown under a chat message. Self-contained state
- * (no lifted "which message was just copied" tracking needed) — each button
- * owns its own brief "Copied" flash. */
 export default function CopyButton({ getText, className }: { getText: () => string; className?: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -14,8 +11,6 @@ export default function CopyButton({ getText, className }: { getText: () => stri
     try {
       await navigator.clipboard.writeText(text)
     } catch {
-      // Clipboard API can be unavailable (insecure context, denied
-      // permission) — not worth surfacing an error over a copy button.
       return
     }
     setCopied(true)

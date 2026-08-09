@@ -9,9 +9,6 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-// Matches LivePreview.module.css's .page box (680x880 CSS px) converted to
-// inches at 96dpi, so the PDF page is proportion-identical to the on-screen
-// preview instead of being forced into a generic Letter size.
 const (
 	pdfPageWidthInches  = 680.0 / 96.0
 	pdfPageHeightInches = 880.0 / 96.0
@@ -25,10 +22,6 @@ func NewExportService(chromeExecPath string) *ExportService {
 	return &ExportService{chromeExecPath: chromeExecPath}
 }
 
-// RenderPDF drives headless Chrome to load printURL — the print-only resume
-// route, already carrying a valid export token — and returns the rendered
-// PDF bytes. A fresh browser process is spawned per call; simplest correct
-// behavior for now, revisit with a pooled browser if latency matters later.
 func (s *ExportService) RenderPDF(ctx context.Context, printURL string) ([]byte, error) {
 	ctx, cancelTimeout := context.WithTimeout(ctx, 20*time.Second)
 	defer cancelTimeout()

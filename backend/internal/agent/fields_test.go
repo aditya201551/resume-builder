@@ -24,9 +24,6 @@ func TestSnakeCase(t *testing.T) {
 	}
 }
 
-// The exact payload from the crash report: the model used JSON Resume field
-// names for projects, which produced a draft project with no `content` key
-// and took down the live preview's Markdown renderer.
 func TestNormalizeFieldsRecoversJSONResumeProjectNames(t *testing.T) {
 	in := map[string]any{
 		"description": "Built a thing.",
@@ -78,8 +75,6 @@ func TestNormalizeFieldsRecoversJSONResumeEducationNames(t *testing.T) {
 	}
 }
 
-// content is what the live preview dereferences; a create that omits it must
-// still produce an entity that has the key.
 func TestNormalizeFieldsAppliesDefaults(t *testing.T) {
 	out, err := normalizeFields("work_experiences", flatEntitySpecs["work_experiences"], map[string]any{
 		"company": "Acme",
@@ -99,8 +94,6 @@ func TestNormalizeFieldsAppliesDefaults(t *testing.T) {
 	}
 }
 
-// An unrecognizable field has to come back as an error the model can act on,
-// not be dropped — dropping it silently loses content the user asked for.
 func TestNormalizeFieldsRejectsUnknownField(t *testing.T) {
 	_, err := normalizeFields("languages", flatEntitySpecs["languages"], map[string]any{
 		"name":          "English",
@@ -125,15 +118,12 @@ func TestNormalizeFieldsRequiresRequiredFieldsOnCreate(t *testing.T) {
 		t.Fatalf("expected a missing-title error, got: %v", err)
 	}
 
-	// Present-but-blank counts as missing.
 	_, err = normalizeFields("languages", flatEntitySpecs["languages"], map[string]any{"name": "   "}, true)
 	if err == nil {
 		t.Fatal("expected blank required field to be rejected")
 	}
 }
 
-// A patch legitimately carries only what changes, so required/defaults must
-// not apply on update.
 func TestNormalizeFieldsUpdateSkipsRequiredAndDefaults(t *testing.T) {
 	out, err := normalizeFields("work_experiences", flatEntitySpecs["work_experiences"], map[string]any{
 		"description": "New bullets.",
@@ -204,12 +194,6 @@ func TestNormalizeFieldsMetaPatch(t *testing.T) {
 	}
 }
 
-// The exact failure from the bug report: the agent (correctly following the
-// system prompt) sent start_date "2020-06", which flowed unmodified through
-// the draft into flushDraft's POST and failed there because the backend
-// decodes *time.Time with encoding/json's default RFC3339-only unmarshaling.
-// Normalizing at propose time means the draft never holds a date the backend
-// will reject.
 func TestNormalizeFieldsNormalizesShorthandDatesToRFC3339(t *testing.T) {
 	out, err := normalizeFields("work_experiences", flatEntitySpecs["work_experiences"], map[string]any{
 		"company":    "CloudScale Inc",
@@ -242,8 +226,6 @@ func TestNormalizeFieldsPassesThroughAlreadyRFC3339Dates(t *testing.T) {
 	}
 }
 
-// A null/empty date (e.g. end_date on a still-current role) must pass
-// through as "no date," not be rejected as unparseable.
 func TestNormalizeFieldsTreatsEmptyDateAsNull(t *testing.T) {
 	out, err := normalizeFields("work_experiences", flatEntitySpecs["work_experiences"], map[string]any{
 		"company":    "Acme",
@@ -271,9 +253,6 @@ func TestNormalizeFieldsTreatsEmptyDateAsNull(t *testing.T) {
 	}
 }
 
-// A garbage date is exactly the case that must close the retry loop: the
-// model gets an error back naming accepted formats instead of the change
-// silently reaching the frontend broken.
 func TestNormalizeFieldsRejectsUnparseableDate(t *testing.T) {
 	_, err := normalizeFields("work_experiences", flatEntitySpecs["work_experiences"], map[string]any{
 		"company":    "Acme",
@@ -321,8 +300,6 @@ func TestSkillSpecFor(t *testing.T) {
 	}
 }
 
-// The tool description the model reads is generated from the same specs that
-// validate its output, so the two can't drift.
 func TestDescribeFlatEntityFields(t *testing.T) {
 	desc := describeFlatEntityFields()
 	for name, spec := range flatEntitySpecs {
@@ -337,9 +314,6 @@ func TestDescribeFlatEntityFields(t *testing.T) {
 	}
 }
 
-// Same guarantee as TestDescribeFlatEntityFields for the two tree-shaped
-// tools — a field added to a spec must show up in what the model is told,
-// not just in what normalizeFields silently accepts.
 func TestDescribeSkillChangeFields(t *testing.T) {
 	desc := describeSkillChangeFields()
 	for _, f := range skillGroupSpec.fields {

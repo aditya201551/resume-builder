@@ -1,12 +1,4 @@
-// Pure HTML-splitting logic shared across templates — no JSX/CSS coupling,
-// unlike each template's block-building helpers (entryBlock, buildSectionBlocks,
-// etc.), which stay per-template since they're tied to that template's own
-// CSS module and JSX shape (templates are meant to be independent custom
-// code, not funneled through one shared renderer).
 
-/** Splits rendered rich-text HTML into one fragment per top-level paragraph
- * or list item, so pagination can flow bullet-by-bullet instead of treating
- * a whole description as one atomic unit. */
 export function splitRichTextBlocks(html: string): string[] {
   if (!html.trim()) return []
   const root = new DOMParser().parseFromString(`<div>${html}</div>`, 'text/html').body.firstElementChild

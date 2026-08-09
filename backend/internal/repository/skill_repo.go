@@ -46,9 +46,6 @@ func NewSkillRepository(pool *pgxpool.Pool) *SkillRepository {
 	return &SkillRepository{pool: pool}
 }
 
-// ListGroups returns every skill group for the resume, each with its items
-// loaded — the grouping is intrinsic to how skills render, so callers never
-// want groups without their items.
 func (r *SkillRepository) ListGroups(ctx context.Context, resumeID string) ([]SkillGroup, error) {
 	rows, err := r.pool.Query(ctx, `SELECT id, resume_id, group_name, sort_order FROM skill_groups WHERE resume_id = $1 ORDER BY sort_order`, resumeID)
 	if err != nil {
@@ -144,8 +141,6 @@ func (r *SkillRepository) ReorderGroups(ctx context.Context, resumeID string, or
 	return reorder(ctx, r.pool, "skill_groups", "resume_id", resumeID, orderedIDs)
 }
 
-// groupBelongsToResume guards item mutations: skill_items has no resume_id of
-// its own, so ownership is proven by checking its parent group's resume_id.
 func (r *SkillRepository) groupBelongsToResume(ctx context.Context, resumeID, groupID string) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM skill_groups WHERE id = $1 AND resume_id = $2)`, groupID, resumeID).Scan(&exists)

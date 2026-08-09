@@ -7,6 +7,7 @@ require (
 	github.com/chromedp/chromedp v0.16.0
 	github.com/cloudwego/eino v0.9.12
 	github.com/cloudwego/eino-ext/components/model/claude v0.1.23
+	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/golang-migrate/migrate/v4 v4.19.1
 	github.com/jackc/pgx/v5 v5.10.0
@@ -40,7 +41,6 @@ require (
 	github.com/bytedance/sonic/loader v0.5.0 // indirect
 	github.com/chromedp/sysutil v1.1.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino-ext/components/model/openai v0.1.13 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.17 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/eino-contrib/jsonschema v1.0.3 // indirect

@@ -100,13 +100,24 @@ type Search struct {
 	SavedOnly      bool
 }
 
+// MapJob is a lightweight projection of every matching, open workplace job.
+// It is independent of list pagination and omits descriptions and application data.
+type MapJob struct {
+	ID        string     `json:"id"`
+	Title     string     `json:"title"`
+	Company   string     `json:"company"`
+	Workplace string     `json:"workplace"`
+	Locations []Location `json:"locations"`
+}
+
 type SearchResult struct {
 	Jobs        []Job          `json:"jobs"`
+	MapJobs     []MapJob       `json:"mapJobs"`
 	Total       int            `json:"total"` // indexed, matching unique listings, never a provider's global inventory
 	Page        int            `json:"page"`
 	PageSize    int            `json:"pageSize"`
 	HasMore     bool           `json:"hasMore"`
-	Mapped      int            `json:"mapped"` // jobs on this page with physical coordinates
+	Mapped      int            `json:"mapped"` // matching open jobs with physical coordinates in the search area, across all pages
 	RemoteCount int            `json:"remoteCount"`
 	Sources     []SourceStatus `json:"sources"`
 	Refreshing  bool           `json:"refreshing"`

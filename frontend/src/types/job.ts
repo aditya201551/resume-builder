@@ -37,6 +37,8 @@ export interface Job {
   saved: boolean
 }
 
+export type MapJob = Pick<Job, 'id' | 'title' | 'company' | 'workplace' | 'locations'>
+
 export interface JobSource {
   id: string
   name: string
@@ -49,6 +51,7 @@ export interface JobSource {
 
 export interface JobSearchResult {
   jobs: Job[]
+  mapJobs: MapJob[]
   total: number
   page: number
   pageSize: number

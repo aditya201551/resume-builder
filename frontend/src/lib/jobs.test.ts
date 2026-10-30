@@ -13,6 +13,14 @@ describe('job map data boundaries', () => {
     expect(locationLabel(job({ workplace: 'remote' }))).toContain('unspecified')
     expect(locationLabel(job({ workplace: 'remote', remote: { scope: 'worldwide', regions: [], timezones: [] } }))).toBe('Remote worldwide')
   })
+  it('renders lightweight map results independently of the current list page', () => {
+    const pageJob = job({ id: 'page-one' })
+    const mapOnlyJob = { id: 'another-page', title: 'Backend Engineer', company: 'Elsewhere', workplace: 'hybrid' as const, locations: pageJob.locations }
+    const result = { jobs: [pageJob], mapJobs: [pageJob, mapOnlyJob] }
+    const features = jobFeatures(result.mapJobs).features
+    expect(features.map(feature => feature.properties.jobId)).toEqual(['page-one', 'another-page'])
+    expect(result.jobs).toHaveLength(1)
+  })
   it('keeps presentation and selection outside the search query, with independent remote country', () => {
     const params = new URLSearchParams('q=backend&country=DE&remoteCountry=IN&job=a&view=map&lat=52&place=Berlin')
     const query = new URLSearchParams(jobSearchQuery(params))

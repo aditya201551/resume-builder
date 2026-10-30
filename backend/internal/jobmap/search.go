@@ -12,7 +12,7 @@ import (
 func ExternalSearch(s Search) (string, string) {
 	query, code := strings.TrimSpace(s.Query), s.Country
 	if query == "" {
-		return "", ""
+		query = "technology jobs"
 	}
 	if s.Workplace == "remote" {
 		code = s.RemoteCountry
@@ -23,7 +23,7 @@ func ExternalSearch(s Search) (string, string) {
 	}
 	if s.Bounds != nil {
 		b := *s.Bounds
-		if b[2] > b[0] && b[2]-b[0] < 5 && b[3]-b[1] < 5 {
+		if b[2] > b[0] && b[2]-b[0] < 20 && b[3]-b[1] < 20 {
 			if p := NearestPlace((b[1]+b[3])/2, (b[0]+b[2])/2); p != nil && (code == "" || p.CountryCode == code) {
 				return query + " in " + p.Name + ", " + p.Country, p.CountryCode
 			}
@@ -107,6 +107,14 @@ func FilterJobs(jobs []Job, s Search, now time.Time) SearchResult {
 		filtered = append(filtered, j)
 	}
 	sort.SliceStable(filtered, func(i, j int) bool {
+		// Show nearby workplaces before remote roles in an area search. Remote
+		// eligibility still uses its own country preference and never the viewport.
+		if s.Bounds != nil || s.Country != "" {
+			aRemote, bRemote := filtered[i].Workplace == "remote", filtered[j].Workplace == "remote"
+			if aRemote != bRemote {
+				return !aRemote
+			}
+		}
 		a, b := filtered[i].PostedAt, filtered[j].PostedAt
 		if a == nil && b != nil {
 			return false
@@ -144,19 +152,27 @@ func FilterJobs(jobs []Job, s Search, now time.Time) SearchResult {
 	page := max(1, s.Page)
 	start := min((page-1)*pageSize, len(dedup))
 	end := min(start+pageSize, len(dedup))
-	result := SearchResult{Jobs: dedup[start:end], Total: len(dedup), Page: page, PageSize: pageSize, HasMore: end < len(dedup), Sources: []SourceStatus{}}
-	for _, j := range result.Jobs {
+	result := SearchResult{Jobs: dedup[start:end], MapJobs: []MapJob{}, Total: len(dedup), Page: page, PageSize: pageSize, HasMore: end < len(dedup), Sources: []SourceStatus{}}
+	for _, j := range dedup {
 		if j.Workplace == "remote" {
 			result.RemoteCount++
 			continue
 		}
+		if j.Closed {
+			continue
+		}
+		locations := []Location{}
 		for _, l := range j.Locations {
-			if l.Latitude != nil && l.Longitude != nil {
-				result.Mapped++
-				break
+			if l.Latitude == nil || l.Longitude == nil || (s.Country != "" && l.CountryCode != s.Country) || (s.Bounds != nil && !InBounds(l, *s.Bounds)) {
+				continue
 			}
+			locations = append(locations, l)
+		}
+		if len(locations) > 0 {
+			result.MapJobs = append(result.MapJobs, MapJob{ID: j.ID, Title: j.Title, Company: j.Company, Workplace: j.Workplace, Locations: locations})
 		}
 	}
+	result.Mapped = len(result.MapJobs)
 	return result
 }
 

@@ -1,4 +1,4 @@
-import type { Bounds, Job, JobSearchResult } from '@/types/job'
+import type { Bounds, Job, JobSearchResult, MapJob } from '@/types/job'
 
 export function safeJobUrl(raw: string | undefined): string | undefined {
   if (!raw) return undefined
@@ -42,7 +42,7 @@ export function locationLabel(job: Job): string {
   return job.locations.map(l => l.name).filter(Boolean).join(' / ') || 'Location unspecified'
 }
 
-export function jobFeatures(jobs: Job[], bounds?: Bounds) {
+export function jobFeatures(jobs: (MapJob & { closed?: boolean })[], bounds?: Bounds) {
   const features = jobs.flatMap(job => job.workplace === 'remote' || job.closed ? [] : job.locations.flatMap((location, index) => {
     const { longitude: lng, latitude: lat } = location
     if (lng === undefined || lat === undefined || !Number.isFinite(lat) || !Number.isFinite(lng)) return []

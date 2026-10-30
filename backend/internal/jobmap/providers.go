@@ -340,33 +340,45 @@ func (c *Client) FetchHimalayas(ctx context.Context) ([]Job, error) {
 func (c *Client) FetchJSearch(ctx context.Context, query, country string) ([]Job, error) {
 	var body struct {
 		Status string `json:"status"`
-		Data   []struct {
-			ID          string `json:"job_id"`
-			Title       string `json:"job_title"`
-			Company     string `json:"employer_name"`
-			Website     string `json:"employer_website"`
-			Description string `json:"job_description"`
-			ApplyURL    string `json:"job_apply_link"`
-			Remote      *bool  `json:"job_is_remote"`
-			Location    string `json:"job_location"`
-			City        string `json:"job_city"`
-			Country     string `json:"job_country"`
-			Workplace   string `json:"work_arrangement"`
-			Employment  string `json:"job_employment_type"`
-			Seniority   string `json:"seniority_level"`
-			Salary      string `json:"job_salary_string"`
-			Published   string `json:"job_posted_at_datetime_utc"`
+		Data   *struct {
+			Jobs []struct {
+				ID          string `json:"job_id"`
+				Title       string `json:"job_title"`
+				Company     string `json:"employer_name"`
+				Website     string `json:"employer_website"`
+				Description string `json:"job_description"`
+				ApplyURL    string `json:"job_apply_link"`
+				Remote      *bool  `json:"job_is_remote"`
+				Location    string `json:"job_location"`
+				City        string `json:"job_city"`
+				Country     string `json:"job_country"`
+				Workplace   string `json:"work_arrangement"`
+				Employment  string `json:"job_employment_type"`
+				Seniority   string `json:"seniority_level"`
+				Salary      string `json:"job_salary_string"`
+				Published   string `json:"job_posted_at_datetime_utc"`
+			} `json:"jobs"`
 		} `json:"data"`
 	}
-	values := url.Values{"query": {query}, "country": {strings.ToLower(country)}}
-	if err := c.get(ctx, "https://api.openwebninja.com/jsearch/search-v2?"+values.Encode(), map[string]string{"x-api-key": c.Config.JSearchKey}, &body); err != nil {
+	values := url.Values{"query": {query}, "country": {strings.ToLower(country)}, "num_pages": {"1"}}
+	endpoint := "https://api.openwebninja.com/jsearch/search-v2"
+	headers := map[string]string{"x-api-key": c.Config.JSearchKey}
+	switch c.Config.JSearchProvider {
+	case "rapidapi":
+		endpoint = "https://jsearch.p.rapidapi.com/search-v2"
+		headers = map[string]string{"x-rapidapi-key": c.Config.JSearchKey, "x-rapidapi-host": "jsearch.p.rapidapi.com"}
+	case "", "openwebninja":
+	default:
+		return nil, fmt.Errorf("unsupported JSearch provider")
+	}
+	if err := c.get(ctx, endpoint+"?"+values.Encode(), headers, &body); err != nil {
 		return nil, err
 	}
-	if body.Status != "OK" {
+	if body.Status != "OK" || body.Data == nil || body.Data.Jobs == nil {
 		return nil, fmt.Errorf("search provider did not return usable results")
 	}
 	jobs := []Job{}
-	for _, j := range body.Data {
+	for _, j := range body.Data.Jobs {
 		job := Job{ProviderID: j.ID, Source: "jsearch", SourceName: "JSearch", SourceKind: "aggregator", Company: j.Company, CompanyURL: j.Website, Title: j.Title, Description: j.Description, SourceURL: j.ApplyURL, ApplyURL: j.ApplyURL, Workplace: Workplace(j.Workplace, j.Remote, j.Location), Salary: j.Salary, PostedAt: parseTime(j.Published), EmploymentType: Employment(j.Employment), Seniority: Seniority(j.Seniority)}
 		if job.Workplace == "remote" {
 			job.Remote = RemoteFromLocations([]string{j.Location})

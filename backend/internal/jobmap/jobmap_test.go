@@ -2,6 +2,7 @@ package jobmap
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -52,6 +53,75 @@ func TestSupplementalSearchFollowsAreaButKeepsRemotePreference(t *testing.T) {
 	}
 	if q, _ := ExternalSearch(Search{Query: "backend"}); q != "" {
 		t.Fatal("unscoped search silently used a country")
+	}
+}
+
+func TestSupplementalSearchDiscoversTechJobsWithoutKeywords(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		search   Search
+		country  string
+		contains string
+	}{
+		{"city", Search{Bounds: &[4]float64{77.3, 12.6, 77.9, 13.3}}, "IN", "technology jobs in Bengaluru"},
+		{"regional map", Search{Bounds: &[4]float64{73, 8, 83, 18}}, "IN", "technology jobs in"},
+		{"country", Search{Country: "IN"}, "IN", "technology jobs in India"},
+		{"remote country", Search{Workplace: "remote", RemoteCountry: "IN"}, "IN", "technology jobs remote in India"},
+		{"global", Search{}, "", ""},
+		{"world map", Search{Bounds: &[4]float64{-180, -80, 180, 80}}, "", ""},
+		{"remote without country", Search{Workplace: "remote", Bounds: &[4]float64{77.3, 12.6, 77.9, 13.3}}, "", ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			query, country := ExternalSearch(test.search)
+			if country != test.country || (test.contains == "" && query != "") || (test.contains != "" && !strings.Contains(query, test.contains)) {
+				t.Fatalf("unexpected scoped query: %q country=%q", query, country)
+			}
+		})
+	}
+}
+
+func TestMapJobsCoverAllPagesAndOnlyMatchingWorkplaces(t *testing.T) {
+	berlin, tokyo := ResolveLocation("Berlin", "DE"), ResolveLocation("Tokyo", "JP")
+	jobs := []Job{}
+	for i := 0; i < 55; i++ {
+		id := fmt.Sprintf("office-%02d", i)
+		jobs = append(jobs, Job{ID: id, Title: "Software Engineer", Company: "Example", ApplyURL: "https://example.com/" + id, Workplace: "hybrid", Locations: []Location{berlin, tokyo}})
+	}
+	for i := 0; i < 60; i++ {
+		id := fmt.Sprintf("remote-%02d", i)
+		posted := time.Now()
+		jobs = append(jobs, Job{ID: id, Title: "Software Engineer", ApplyURL: "https://example.com/" + id, Workplace: "remote", PostedAt: &posted, Locations: []Location{berlin}, Remote: RemotePolicy{Scope: "worldwide"}})
+	}
+	jobs = append(jobs, Job{ID: "closed", ApplyURL: "https://example.com/closed", Closed: true, Workplace: "hybrid", Locations: []Location{berlin}})
+	jobs = append(jobs, Job{ID: "outside", ApplyURL: "https://example.com/outside", Workplace: "hybrid", Locations: []Location{tokyo}})
+	search := Search{Bounds: &[4]float64{12, 51, 14, 54}, PageSize: 50}
+	first := FilterJobs(jobs, search, time.Now())
+	if len(first.Jobs) != 50 || first.Mapped != 55 || len(first.MapJobs) != 55 || first.RemoteCount != 60 || first.Total != 115 || !first.HasMore {
+		t.Fatalf("page one should map every matching workplace: %+v", first)
+	}
+	for _, job := range first.Jobs {
+		if job.Workplace == "remote" {
+			t.Fatal("remote roles pushed nearby workplaces out of page one")
+		}
+	}
+	for _, job := range first.MapJobs {
+		if len(job.Locations) != 1 || job.Locations[0].CountryCode != "DE" {
+			t.Fatal("outside secondary office leaked onto map")
+		}
+	}
+	search.Page = 2
+	second := FilterJobs(jobs, search, time.Now())
+	if len(second.Jobs) != 50 || len(second.MapJobs) != 55 || second.MapJobs[0].ID != first.MapJobs[0].ID || second.RemoteCount != 60 {
+		t.Fatal("list pagination changed map coverage or full-result totals")
+	}
+	search.SavedOnly = true
+	saved := FilterJobs(jobs, search, time.Now())
+	if saved.Mapped != 55 {
+		t.Fatal("closed saved jobs should never gain map pins")
+	}
+	search.Workplace = "remote"
+	if remote := FilterJobs(jobs, search, time.Now()); len(remote.MapJobs) != 0 || remote.Mapped != 0 || remote.RemoteCount != 60 {
+		t.Fatal("remote roles acquired map pins")
 	}
 }
 

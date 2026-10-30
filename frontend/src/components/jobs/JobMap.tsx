@@ -6,14 +6,14 @@ import { MapPin, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { jobFeatures } from '@/lib/jobs'
 import { defaultJobMapCamera, jobMapCameraTarget, readJobMapViewport, sameJobMapCamera, type JobMapCamera, type JobMapViewport } from '@/lib/jobMapViewport'
-import type { Bounds, Job } from '@/types/job'
+import type { Bounds, MapJob } from '@/types/job'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
 // MapLibre 6 requires an explicit bundled worker URL in Vite (dev and build).
 setWorkerUrl(workerUrl)
 
 type Props = {
-  jobs: Job[]
+  jobs: MapJob[]
   selected: string | null
   center?: JobMapCamera
   bounds?: Bounds
@@ -38,7 +38,7 @@ export default function JobMap({ jobs, selected, center, bounds, onSelect, onVie
   const [failed, setFailed] = useState(false)
   const [loaded, setLoaded] = useState(false)
   const [revision, setRevision] = useState(0)
-  const [clusterJobs, setClusterJobs] = useState<{ longitude: number; latitude: number; jobs: Job[] } | null>(null)
+  const [clusterJobs, setClusterJobs] = useState<{ longitude: number; latitude: number; jobs: MapJob[] } | null>(null)
   const [palette, setPalette] = useState(() => ({ ink: tokenColor('--color-ink'), paper: tokenColor('--color-cotton'), accent: tokenColor('--color-signal'), dark: document.documentElement.classList.contains('dark') }))
   const data = useMemo(() => {
     const collection = jobFeatures(jobs, bounds)
@@ -94,7 +94,7 @@ export default function JobMap({ jobs, selected, center, bounds, onSelect, onVie
     const id = feature.properties?.cluster_id
     if (!source || id === undefined || feature.geometry.type !== 'Point') return
     try {
-      const leaves = await source.getClusterLeaves(Number(id), 1000, 0)
+      const leaves = await source.getClusterLeaves(Number(id), Number(feature.properties?.point_count ?? 1), 0)
       const ids = new Set(leaves.map(f => String(f.properties?.jobId)))
       const matches = jobs.filter(j => ids.has(j.id))
       const [longitude, latitude] = feature.geometry.coordinates
@@ -118,6 +118,6 @@ export default function JobMap({ jobs, selected, center, bounds, onSelect, onVie
     </Map>}
     {failed && <div className="jobs-map-fallback"><MapPin size={28} /><h3>The map could not load</h3><p>You can still browse and save every job in the list.</p><Button variant="outline" onClick={() => { setLoaded(false); setFailed(false); setRevision(n => n + 1) }}><RotateCcw size={16} />Retry map</Button></div>}
     {!failed && !loaded && <p className="jobs-map-status" role="status">Loading the basemap…</p>}
-    {!failed && <div className="jobs-map-caption"><MapPin size={14} /><span>{pointCount} workplace {pointCount === 1 ? 'marker' : 'markers'} from this page. City positions are approximate.</span></div>}
+    {!failed && <div className="jobs-map-caption"><MapPin size={14} /><span>{pointCount} workplace {pointCount === 1 ? 'marker' : 'markers'} across all matching results. City positions are approximate.</span></div>}
   </section>
 }

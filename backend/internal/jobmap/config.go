@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -17,6 +18,7 @@ var companyData []byte
 type Config struct {
 	Companies       []Company
 	JSearchKey      string
+	JSearchProvider string
 	JSearchLimit    int
 	HimalayasKey    string
 	GeoapifyKey     string
@@ -26,6 +28,13 @@ type Config struct {
 
 func LoadConfig() (Config, error) {
 	c := Config{JSearchKey: os.Getenv("JSEARCH_API_KEY"), HimalayasKey: os.Getenv("HIMALAYAS_API_KEY"), GeoapifyKey: os.Getenv("GEOAPIFY_API_KEY"), JSearchLimit: 200, GeoapifyLimit: 1000, RefreshInterval: 6 * time.Hour}
+	c.JSearchProvider = strings.ToLower(strings.TrimSpace(os.Getenv("JSEARCH_PROVIDER")))
+	if c.JSearchProvider == "" {
+		c.JSearchProvider = "openwebninja"
+	}
+	if c.JSearchProvider != "openwebninja" && c.JSearchProvider != "rapidapi" {
+		return c, fmt.Errorf("JSEARCH_PROVIDER must be openwebninja or rapidapi")
+	}
 	data := companyData
 	if path := os.Getenv("JOB_MAP_COMPANIES_FILE"); path != "" {
 		var err error

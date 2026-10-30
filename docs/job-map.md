@@ -9,7 +9,9 @@ Run `npm install` after pulling the feature, then restart `npm run dev`. The API
 Optional settings in `backend/.env`:
 
 ```dotenv
-# Direct OpenWeb Ninja key, not a RapidAPI key. Never exposed to the browser.
+# Use rapidapi for a RapidAPI subscription; openwebninja (default) for a direct key.
+JSEARCH_PROVIDER=rapidapi
+# Key for the selected provider. Never exposed to the browser.
 JSEARCH_API_KEY=
 JSEARCH_MONTHLY_LIMIT=200
 
@@ -27,7 +29,9 @@ JOB_MAP_REFRESH_INTERVAL=6h
 JOB_MAP_COMPANIES_FILE=
 ```
 
-JSearch is optional. Without its key the page still combines curated employer feeds with Himalayas remote-job searches. With a key, an explicit role query and workplace country, focused map area, or independent remote-work country can trigger a supplemental search. Repeated queries share a 24-hour cache lease. Atomic database counters enforce a maximum of 200 outbound JSearch requests per UTC calendar month, across users and process restarts. No automatic paid fallback is implemented. The quota covers this app's requests only; another app using the same key can consume the vendor's allowance independently.
+JSearch is optional. Without its key the page still combines curated employer feeds with Himalayas remote-job searches. With a key, a workplace country, focused map area (under 20 degrees across), or independent remote-work country can trigger a supplemental search. An empty role field searches for technology jobs in that location; an unscoped world view does not call the provider. Each search requests one provider page, not every opening in the area. Repeated queries share a 24-hour cache lease. Atomic database counters enforce a maximum of 200 outbound JSearch requests per UTC calendar month, across users and process restarts. No automatic paid fallback is implemented. The quota covers this app's requests only; another app using the same key can consume the vendor's allowance independently.
+
+For RapidAPI, subscribe to [JSearch](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch) and set `JSEARCH_PROVIDER=rapidapi`. Requests use `jsearch.p.rapidapi.com/search-v2` with `X-RapidAPI-Key` and `X-RapidAPI-Host`. Direct keys use `api.openwebninja.com/jsearch/search-v2` with `x-api-key`. Both adapters read the current `data.jobs` response and request one page per search. There is no automatic retry through the other provider. Restart the backend after changing these settings.
 
 ## Sources and collection
 
@@ -60,7 +64,7 @@ Workplace bounds/country never change the independently selected remote-work cou
 
 When a map is displayed, initial load, pan, zoom and resize automatically search the actual visible bounds after a 400ms pause. There is no Search this area button. Viewport changes replace the current browser history entry, reset pagination, and avoid rounded-coordinate feedback loops. Previous results remain visible while the next area loads; superseded requests are cancelled. Listing selection highlights its marker without moving the camera, so an asynchronous result cannot pull the view away from the user's area. Native MapLibre camera calls use `center: [longitude, latitude]`; React's `initialViewState` latitude/longitude fields are not valid native jump coordinates.
 
-Map clusters represent workplace markers from the current result page, including multiple workplaces for a single job. The UI separately reports unique jobs mapped on that page and matching indexed listings. A cluster opens an accessible list of its loaded jobs, including coincident city-centre markers.
+Map clusters represent workplaces across all matching indexed results, independently of the paginated list. The search API returns lightweight `mapJobs` without descriptions or application data, and excludes remote roles, closed jobs and offices outside the selected area. Multiple matching workplaces for one job can produce multiple markers. `mapped` counts unique jobs across all list pages and `remoteCount` counts all matching remote roles. The UI reports both separately from the combined indexed total. Area searches show physical workplaces before remote roles in the list. A cluster opens an accessible list of its jobs, including coincident city-centre markers.
 
 ## Architecture
 

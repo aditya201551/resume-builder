@@ -1,6 +1,5 @@
 import { NavLink, Outlet } from 'react-router'
 import {
-  ArrowUpRight,
   ChevronDown,
   Files,
   House,
@@ -102,18 +101,6 @@ export default function AppShell() {
         </DropdownMenu>
       </aside>
       <main className="app-main">
-        <header className="app-topbar">
-          <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="size-1.5 rounded-full bg-primary/60" /> Your career
-            workspace
-          </span>
-          <NavLink
-            to="/resumes/library"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-primary"
-          >
-            Resume library <ArrowUpRight className="size-3.5" aria-hidden />
-          </NavLink>
-        </header>
         <Outlet />
       </main>
     </div>

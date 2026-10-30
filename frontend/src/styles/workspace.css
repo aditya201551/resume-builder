@@ -77,13 +77,6 @@
   min-width: 0;
   flex: 1;
 }
-.app-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 24px 42px;
-  gap: 16px;
-}
 .dashboard-page {
   max-width: 1260px;
   margin: 0 auto;
@@ -397,6 +390,86 @@
   border-top: 1px solid var(--border);
   color: var(--muted-foreground);
   font-size: 10px;
+}
+/* Keep the home composer and recent resumes within a desktop viewport. The full
+   library and small/zoomed screens retain natural scrolling for access to content. */
+@media (min-width: 1101px) and (min-height: 700px) {
+  .dashboard-home {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-block: 24px 16px;
+  }
+  .dashboard-home .home-intro {
+    width: 100%;
+    margin: 0 auto;
+    flex-shrink: 0;
+  }
+  .dashboard-home .home-intro > h1 {
+    font-size: clamp(30px, 3vw, 42px);
+    margin-block: 12px 8px;
+  }
+  .dashboard-home .home-composer {
+    margin-top: 18px;
+    padding: 18px;
+  }
+  .dashboard-home .home-prompt[data-slot='textarea'] {
+    min-height: 64px;
+    max-height: 112px;
+    resize: none;
+    overflow-y: auto;
+  }
+  .dashboard-home .composer-toolbar { margin-top: 12px; }
+  .dashboard-home .starter-grid { margin-top: 12px; }
+  .dashboard-home .starter-button { padding-block: 10px; }
+  .dashboard-home .manual-start { margin-top: 10px; }
+  .dashboard-home .home-composer:has(.job-context-field) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .dashboard-home .home-composer:has(.job-context-field) .composer-toolbar {
+    grid-column: 1 / -1;
+    margin-top: 0;
+  }
+  .dashboard-home .job-context-field { margin: 0; padding: 8px; }
+  .dashboard-home .job-context-field textarea {
+    min-height: 64px;
+    max-height: 64px;
+    resize: none;
+    overflow-y: auto;
+  }
+  .dashboard-home .resume-library {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .dashboard-home .library-heading { margin-bottom: 12px; gap: 12px; }
+  .dashboard-home .library-title { font-size: 21px; margin-top: 5px; }
+  .dashboard-home .resume-grid {
+    flex: 1;
+    min-height: 0;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-rows: minmax(0, 1fr);
+    gap: 14px;
+  }
+  .dashboard-home .resume-card { display: flex; flex-direction: column; }
+  .dashboard-home .resume-card-preview { flex: 1; min-height: 0; height: auto; }
+  .dashboard-home .resume-card-details { flex-shrink: 0; padding: 12px; }
+  .dashboard-home .resume-card-details p:last-child { margin-top: 6px; }
+  .dashboard-home .library-empty,
+  .dashboard-home .library-loading { flex: 1; min-height: 0; padding: 12px; gap: 8px; }
+  .dashboard-home .dashboard-footer { margin-top: 0; padding-top: 12px; }
+}
+@media (min-width: 1101px) and (min-height: 700px) and (max-height: 820px) {
+  .dashboard-home { gap: 14px; padding-top: 20px; }
+  .dashboard-home .home-intro > h1 { font-size: 32px; margin-block: 8px 6px; }
+  .dashboard-home .home-composer { padding: 14px; margin-top: 14px; }
+  .dashboard-home .home-prompt[data-slot='textarea'] { min-height: 56px; }
+  .dashboard-home .starter-button { padding-block: 6px; }
+  .dashboard-home .starter-button small { display: none; }
 }
 /* Shared, responsive editor shell. Hidden modes remain mounted to retain forms and chat. */
 .workspace-shell {
@@ -804,9 +877,6 @@
     width: 185px;
     padding-inline: 12px;
   }
-  .app-topbar {
-    padding-inline: 28px;
-  }
   .dashboard-page {
     padding-inline: 28px;
   }
@@ -906,12 +976,6 @@
   .app-nav-link {
     padding: 9px 13px;
     font-size: 12px;
-  }
-  .app-topbar {
-    padding: 12px 22px;
-  }
-  .app-topbar > a {
-    display: none;
   }
   .dashboard-page {
     padding: 16px 20px 20px;

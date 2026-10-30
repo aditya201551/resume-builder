@@ -128,7 +128,7 @@ export default function DashboardPage({
     deleteMutation.isError
 
   return (
-    <div className="dashboard-page">
+    <div className={`dashboard-page${libraryOnly ? '' : ' dashboard-home'}`}>
       {!libraryOnly && (
         <section className="home-intro" aria-labelledby="home-heading">
           <div className="eyebrow">

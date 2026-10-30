@@ -6,6 +6,16 @@ the summary, headline, work descriptions and project descriptions. The chat star
 buttons include Add work experience and Write my summary. Ordinary prose and all
 existing manual editing, automatic sync, design and PDF behavior remain supported.
 
+The assistant defaults to normal mutation tools when the request is clear and
+required facts are available. It asks only for blocking missing facts or ambiguous
+targets, preserving details already supplied in the conversation. For example,
+"Google, Germany, Jan 2026 to present" needs only a job-title question before the
+entry can be added; missing responsibilities or metrics do not require a form.
+Cards are reserved for explicitly requested guided input or alternatives, or
+unresolved questions that benefit from structured input or comparison. Ordinary
+summary rewrites and the default starter buttons use the normal proposal flow.
+Existing review and automatic acceptance settings still govern tool proposals.
+
 ## Request and action flow
 
 1. The Go/Eino agent calls `show_resume_ui` with a bounded OpenUI Lang program.

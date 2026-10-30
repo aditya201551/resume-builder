@@ -15,7 +15,7 @@ const TextBlock = defineComponent({
 })
 
 const ExperienceForm = defineComponent({
-  name: 'ExperienceForm', description: 'Collect one NEW work experience for user review. Prefill only facts the user already supplied; use empty strings for unknown facts. Dates are YYYY-MM or empty.',
+  name: 'ExperienceForm', description: 'Guided input for one NEW work experience only when explicitly requested or unresolved questions benefit from a form. If required facts are known, use create_resume_entry directly; for one missing field, ask a short chat question. Prefill facts already supplied in the conversation; use empty strings for unknown facts. Dates are YYYY-MM or empty.',
   props: z.object({
     company: z.string().max(200), role: z.string().max(200), location: z.string().max(200),
     startDate: z.string().max(7), endDate: z.string().max(7), current: z.boolean(), details: z.string().max(12000),
@@ -53,7 +53,7 @@ const ExperienceForm = defineComponent({
 })
 
 const RewriteComparison = defineComponent({
-  name: 'RewriteComparison', description: 'Offer 2 or 3 grounded alternatives for the one rewrite target bound by show_resume_ui. The original text comes from the app. No invented metrics, skills or facts.',
+  name: 'RewriteComparison', description: 'Offer 2 or 3 grounded alternatives only when the user requests options or needs to resolve materially different directions. Ordinary rewrites use the normal update tool directly. One rewrite target is bound by show_resume_ui; original text comes from the app. No invented metrics, skills or facts.',
   props: z.object({ options: z.array(z.object({ label: z.string().min(1).max(80), text: z.string().min(1).max(16000) })).min(2).max(3) }),
   component: function RewriteChoices({ props }) {
     const context = useUIInteraction()
@@ -83,6 +83,7 @@ export const assistantLibrary = createLibrary({ root: 'AssistantPanel', componen
 export const assistantPromptOptions: PromptOptions = {
   toolCalls: false, bindings: false, builtinFunctions: false,
   additionalRules: [
+    'Default to normal mutation tools when the request is clear and required facts are known. Use a card only for explicitly requested guided input or alternatives, or an unresolved question that benefits from structured input or comparison. Ask a short chat question for one missing required field; never collect optional details as a prerequisite to editing.',
     'Return the program only as the code argument of show_resume_ui, never in normal chat text.',
     'Use one AssistantPanel root and exactly one ExperienceForm or one RewriteComparison. No Query, Mutation, actions, functions or external URLs.',
     'The experience_form kind requires ExperienceForm; rewrite_comparison requires RewriteComparison. Do not mix the kinds.',

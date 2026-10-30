@@ -115,7 +115,8 @@ func (t *proposeCreateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 		Desc: "Add a new entry to a resume section (work experience, education, project, certification, language, or misc entry). " +
 			"Use this when the user describes new experience in natural language; turn their description into well-structured, " +
 			"achievement-focused fields rather than asking them to fill out a form, but only include numbers or outcomes the user " +
-			"actually stated — do not invent metrics. Never include sort_order; the app places new entries.",
+			"actually stated — do not invent metrics. Work experience requires company and title; ask only for missing required facts, " +
+			"then use this tool directly. Optional descriptions, metrics, location and dates may be omitted. Never include sort_order; the app places new entries.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"fields": {

@@ -63,7 +63,7 @@ const QUICK_ACTIONS = [
     label: 'Write my summary',
     icon: FileText,
     prompt:
-      'Offer two or three professional summary alternatives grounded in my current experience and skills, so I can compare, edit and choose one.',
+      'Write a professional summary grounded in my current experience and skills and propose the update directly. Ask only if a missing fact or ambiguity prevents the change.',
   },
   {
     label: 'Find a layout that fits',
@@ -80,7 +80,7 @@ const QUICK_ACTIONS = [
   {
     label: 'Add work experience',
     icon: Plus,
-    prompt: "Help me add a new work experience using a guided form. Leave any details I haven't provided blank for me to fill in.",
+    prompt: 'Help me add a new work experience. Use details I have already supplied and ask only for missing required facts or ambiguities, then propose the entry directly.',
   },
 ] as const
 

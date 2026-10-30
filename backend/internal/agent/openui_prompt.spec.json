@@ -11,11 +11,11 @@
     },
     "ExperienceForm": {
       "signature": "ExperienceForm(company: string, role: string, location: string, startDate: string, endDate: string, current: boolean, details: string)",
-      "description": "Collect one NEW work experience for user review. Prefill only facts the user already supplied; use empty strings for unknown facts. Dates are YYYY-MM or empty."
+      "description": "Guided input for one NEW work experience only when explicitly requested or unresolved questions benefit from a form. If required facts are known, use create_resume_entry directly; for one missing field, ask a short chat question. Prefill facts already supplied in the conversation; use empty strings for unknown facts. Dates are YYYY-MM or empty."
     },
     "RewriteComparison": {
       "signature": "RewriteComparison(options: {label: string, text: string}[])",
-      "description": "Offer 2 or 3 grounded alternatives for the one rewrite target bound by show_resume_ui. The original text comes from the app. No invented metrics, skills or facts."
+      "description": "Offer 2 or 3 grounded alternatives only when the user requests options or needs to resolve materially different directions. Ordinary rewrites use the normal update tool directly. One rewrite target is bound by show_resume_ui; original text comes from the app. No invented metrics, skills or facts."
     }
   },
   "schema": {
@@ -132,7 +132,7 @@
           "details"
         ],
         "additionalProperties": false,
-        "description": "Collect one NEW work experience for user review. Prefill only facts the user already supplied; use empty strings for unknown facts. Dates are YYYY-MM or empty."
+        "description": "Guided input for one NEW work experience only when explicitly requested or unresolved questions benefit from a form. If required facts are known, use create_resume_entry directly; for one missing field, ask a short chat question. Prefill facts already supplied in the conversation; use empty strings for unknown facts. Dates are YYYY-MM or empty."
       },
       "RewriteComparison": {
         "type": "object",
@@ -167,7 +167,7 @@
           "options"
         ],
         "additionalProperties": false,
-        "description": "Offer 2 or 3 grounded alternatives for the one rewrite target bound by show_resume_ui. The original text comes from the app. No invented metrics, skills or facts."
+        "description": "Offer 2 or 3 grounded alternatives only when the user requests options or needs to resolve materially different directions. Ordinary rewrites use the normal update tool directly. One rewrite target is bound by show_resume_ui; original text comes from the app. No invented metrics, skills or facts."
       }
     }
   }

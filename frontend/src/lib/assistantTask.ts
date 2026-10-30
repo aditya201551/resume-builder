@@ -8,7 +8,7 @@ export function assistantMessage(
   jobDescription: string,
 ): string {
   if (!jobDescription.trim()) return prompt.trim()
-  return `${prompt.trim()}\n\nUse this supplied job description as context when suggesting changes. Emphasize relevant experience already present in my resume. Ask me for missing facts; do not invent skills, responsibilities, or achievement metrics.\n\n<job_description>\n${jobDescription.trim()}\n</job_description>`
+  return `${prompt.trim()}\n\nUse this supplied job description as context when suggesting changes. Emphasize relevant experience already present in my resume. Ask only when a missing required fact or ambiguity prevents the requested change; do not invent skills, responsibilities, or achievement metrics.\n\n<job_description>\n${jobDescription.trim()}\n</job_description>`
 }
 
 export const ASSISTANT_STARTERS = [
@@ -16,7 +16,7 @@ export const ASSISTANT_STARTERS = [
     title: 'Strengthen my writing',
     description: 'Clearer words. Stronger experience.',
     prompt:
-      'Review my resume and propose clearer, more concise wording for my summary and experience. Preserve the facts and ask me for missing details.',
+      'Review my resume and propose clearer, more concise wording for my summary and experience. Preserve the facts and propose updates directly. Ask only when a missing required fact or ambiguity prevents the change.',
   },
   {
     title: 'Review my resume',

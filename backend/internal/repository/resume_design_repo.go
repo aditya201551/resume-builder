@@ -16,7 +16,7 @@ type ResumeDesign struct {
 }
 
 type ResumeDesignRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewResumeDesignRepository(pool *pgxpool.Pool) *ResumeDesignRepository {

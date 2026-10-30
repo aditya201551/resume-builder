@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"resume-builder/backend/internal/agent"
+	"resume-builder/backend/internal/ai"
 	"resume-builder/backend/internal/api"
 	"resume-builder/backend/internal/api/handlers"
 	"resume-builder/backend/internal/auth"
@@ -78,10 +79,16 @@ func main() {
 		log.Fatalf("create agent: %v", err)
 	}
 	agentHandler := handlers.NewAgentHandler(aiAgent, resumeService, templateService)
+	importAIConfig, err := ai.LoadConfig()
+	if err != nil {
+		log.Fatalf("load resume import AI config: %v", err)
+	}
+	resumeImportService := service.NewResumeImportService(ai.NewPDFClient(importAIConfig), repository.NewResumeImportRepository(pool))
 
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
 		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.InternalBaseURL),
+		ResumeImport:   handlers.NewResumeImportHandler(resumeImportService),
 		WorkExperience: handlers.NewEntityHandler(workExperienceService),
 		Education:      handlers.NewEntityHandler(educationService),
 		Project:        handlers.NewEntityHandler(projectService),

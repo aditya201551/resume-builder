@@ -23,6 +23,7 @@ import {
   Puzzle,
   Sparkles,
   Trophy,
+  X,
 } from 'lucide-react'
 import { Accordion } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
@@ -434,9 +435,11 @@ function EditorPageContent() {
     location.state as {
       assistantTask?: AssistantTask
       mode?: EditorMode
+      importWarnings?: string[]
     } | null,
   )
   const started = useRef(false)
+  const [importWarnings, setImportWarnings] = useState(launch.current?.importWarnings ?? [])
   const [mode, setMode] = useState<EditorMode>(
     launch.current?.mode === 'content' ? 'content' : 'chat',
   )
@@ -503,6 +506,21 @@ function EditorPageContent() {
         mode={mode}
         onModeChange={changeMode}
       />
+      {importWarnings.length > 0 && (
+        <div role="status" className="mx-4 mt-2 flex max-h-32 shrink-0 items-start gap-3 overflow-y-auto rounded-2xl border border-primary/15 bg-secondary px-4 py-3 text-xs leading-relaxed sm:mx-6">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Your resume has been imported.</p>
+            <ul className="mt-1 list-disc space-y-1 pl-4">
+              {importWarnings.map((warning, index) => (
+                <li key={index} className="break-words text-muted-foreground">{warning}</li>
+              ))}
+            </ul>
+          </div>
+          <button type="button" aria-label="Dismiss import notice" className="shrink-0 rounded-full p-1 hover:bg-background" onClick={() => setImportWarnings([])}>
+            <X className="size-4" />
+          </button>
+        </div>
+      )}
       <div
         className="mobile-view-switch"
         role="group"

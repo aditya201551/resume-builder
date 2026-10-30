@@ -45,7 +45,7 @@ type WorkExperienceInput struct {
 }
 
 type WorkExperienceRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewWorkExperienceRepository(pool *pgxpool.Pool) *WorkExperienceRepository {

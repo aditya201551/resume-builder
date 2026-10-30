@@ -41,7 +41,7 @@ type ResumeMetaInput struct {
 }
 
 type ResumeRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewResumeRepository(pool *pgxpool.Pool) *ResumeRepository {

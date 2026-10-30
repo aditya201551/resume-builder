@@ -37,7 +37,7 @@ type ProjectInput struct {
 }
 
 type ProjectRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewProjectRepository(pool *pgxpool.Pool) *ProjectRepository {

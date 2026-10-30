@@ -25,7 +25,7 @@ type LanguageInput struct {
 }
 
 type LanguageRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewLanguageRepository(pool *pgxpool.Pool) *LanguageRepository {

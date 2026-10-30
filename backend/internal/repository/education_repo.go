@@ -40,7 +40,7 @@ type EducationInput struct {
 }
 
 type EducationRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewEducationRepository(pool *pgxpool.Pool) *EducationRepository {

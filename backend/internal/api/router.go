@@ -14,6 +14,7 @@ import (
 type Handlers struct {
 	Auth           *handlers.AuthHandler
 	Resume         *handlers.ResumeHandler
+	ResumeImport   *handlers.ResumeImportHandler
 	WorkExperience *handlers.EntityHandler[repository.WorkExperienceInput, repository.WorkExperience]
 	Education      *handlers.EntityHandler[repository.EducationInput, repository.Education]
 	Project        *handlers.EntityHandler[repository.ProjectInput, repository.Project]
@@ -43,6 +44,7 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	handle("GET /api/resumes", h.Resume.List)
 	handle("POST /api/resumes", h.Resume.Create)
+	handle("POST /api/resumes/import", h.ResumeImport.Import)
 	handle("GET /api/resumes/{resumeID}", h.Resume.Get)
 	handle("PATCH /api/resumes/{resumeID}", h.Resume.Update)
 	handle("DELETE /api/resumes/{resumeID}", h.Resume.Delete)

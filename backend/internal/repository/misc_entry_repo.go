@@ -34,7 +34,7 @@ type MiscEntryInput struct {
 }
 
 type MiscEntryRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewMiscEntryRepository(pool *pgxpool.Pool) *MiscEntryRepository {

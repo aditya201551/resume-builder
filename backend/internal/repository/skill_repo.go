@@ -39,7 +39,7 @@ type SkillGroupInput struct {
 }
 
 type SkillRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewSkillRepository(pool *pgxpool.Pool) *SkillRepository {

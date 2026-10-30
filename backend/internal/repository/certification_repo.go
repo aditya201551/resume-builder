@@ -32,7 +32,7 @@ type CertificationInput struct {
 }
 
 type CertificationRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewCertificationRepository(pool *pgxpool.Pool) *CertificationRepository {

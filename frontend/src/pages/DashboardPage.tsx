@@ -6,6 +6,7 @@ import {
   Check,
   Copy,
   FileText,
+  FileUp,
   Loader2,
   MoreHorizontal,
   Plus,
@@ -39,6 +40,7 @@ import {
   AlertDialogCancel,
 } from '@/components/ui/alert-dialog'
 import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
+import ImportResumeDialog from '@/components/dashboard/ImportResumeDialog'
 
 const resumesKey = ['resumes'] as const
 const starterIcons = [WandSparkles, Check, Target]
@@ -57,6 +59,7 @@ export default function DashboardPage({
   const [jobDescription, setJobDescription] = useState('')
   const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
   const resumesQuery = useQuery({
     queryKey: resumesKey,
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
@@ -298,12 +301,15 @@ export default function DashboardPage({
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {!libraryOnly && resumes.length > 0 && (
               <Link to="/resumes/library" className="view-all-link">
                 View all <ArrowRight className="size-3.5" />
               </Link>
             )}
+            <Button variant="outline" onClick={() => setImportOpen(true)}>
+              <FileUp className="size-4" /> Import existing resume
+            </Button>
             <Button
               variant="outline"
               onClick={() => createMutation.mutate(undefined)}
@@ -437,6 +443,7 @@ export default function DashboardPage({
           words. You're in control.
         </span>
       </footer>
+      <ImportResumeDialog open={importOpen} onOpenChange={setImportOpen} />
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {

@@ -42,7 +42,7 @@ type CustomSectionInput struct {
 }
 
 type CustomSectionRepository struct {
-	pool *pgxpool.Pool
+	pool dbExecutor
 }
 
 func NewCustomSectionRepository(pool *pgxpool.Pool) *CustomSectionRepository {

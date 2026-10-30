@@ -1,92 +1,187 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Check, ChevronDown, Loader2, Lock, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { canApplyProposal, describeProposal, proposalDetailEntries, type DisplayItem } from '@/lib/agentProposal'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  canApplyProposal,
+  describeProposal,
+  isEditableProposalText,
+  proposalCurrentValues,
+  proposalDetailEntries,
+  type DisplayItem,
+} from '@/lib/agentProposal'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 
-function formatValue(v: unknown): string {
-  if (v === null || v === undefined) return '—'
-  if (typeof v === 'boolean') return v ? 'yes' : 'no'
-  return String(v)
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined || value === '') return 'Not set'
+  if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+  if (Array.isArray(value)) return value.map(formatValue).join(', ')
+  if (typeof value === 'object') return JSON.stringify(value, null, 2)
+  return String(value)
 }
 
 export default function ActionItem({
   item,
   onAccept,
   onReject,
+  canResolve = true,
 }: {
   item: Extract<DisplayItem, { kind: 'action' }>
-  onAccept: () => void
+  onAccept: (edits?: Record<string, string>) => void
   onReject: () => void
+  canResolve?: boolean
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
+  const [editing, setEditing] = useState(false)
+  const [edits, setEdits] = useState<Record<string, string>>({})
   const { event, part } = item
   const { proposal, status } = part
-  const entries = proposalDetailEntries(proposal)
-
-  const isRunning = event.status === 'running'
-  const isToolError = event.status === 'error'
-
   const { state, resolveEntryId } = useResumeDraftContext()
-  const applicability = canApplyProposal(resolveEntryReferences(proposal, resolveEntryId), state.data)
+  const resolved = resolveEntryReferences(proposal, resolveEntryId)
+  const entries = proposalDetailEntries(resolved)
+  // Retain the original values after accepting so the comparison remains meaningful.
+  const original = useRef(proposalCurrentValues(resolved, state.data))
+  if (status === 'pending')
+    original.current = proposalCurrentValues(resolved, state.data)
+  const currentValues = original.current
+  const applicability = canApplyProposal(resolved, state.data)
+  const running = event.status === 'running'
+  const error = event.status === 'error'
+  const isRemoval = proposal.type.endsWith('_delete')
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 overflow-hidden rounded-lg border border-border bg-card text-sm duration-200">
+    <section
+      className="proposal-card animate-in fade-in slide-in-from-bottom-1 duration-150"
+      aria-label={describeProposal(proposal)}
+    >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left"
+        className="proposal-summary"
+        onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        {isRunning ? (
-          <Loader2 className="size-3.5 shrink-0 animate-spin text-accent" />
-        ) : isToolError ? (
+        {running ? (
+          <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" />
+        ) : error ? (
           <X className="size-3.5 shrink-0 text-destructive" />
         ) : (
-          <Check className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+            <Check className="size-3" />
+          </span>
         )}
-
-        <span className="min-w-0 flex-1 truncate font-medium text-foreground">{describeProposal(proposal)}</span>
-
-        {isToolError && <span className="shrink-0 text-xs text-destructive">{event.error || 'failed'}</span>}
-        {status === 'accepted' && <span className="shrink-0 text-xs font-medium text-emerald-600 dark:text-emerald-400">Accepted</span>}
-        {status === 'rejected' && <span className="shrink-0 text-xs font-medium text-muted-foreground">Rejected</span>}
-        {status === 'pending' && !isRunning && !isToolError && (
-          <div className="flex shrink-0 items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-            <Button type="button" size="sm" onClick={onAccept} disabled={!applicability.ok}>
-              <Check className="size-3.5" /> Accept
-            </Button>
-            <Button type="button" size="sm" variant="secondary" onClick={onReject}>
-              <X className="size-3.5" /> Reject
-            </Button>
-          </div>
+        <span className="min-w-0 flex-1 text-left font-medium">
+          {describeProposal(proposal)}
+        </span>
+        {status !== 'pending' && (
+          <span className="text-[10px] text-muted-foreground">
+            {status === 'accepted' ? 'Accepted' : 'Rejected'}
+          </span>
         )}
-
-        <ChevronDown className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden />
+        <ChevronDown
+          className={`size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ${open ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
       </button>
-
       {open && (
-        <div className="flex flex-col gap-2 border-t border-border px-3 py-2">
-          {entries.length > 0 && (
-            <dl className="flex flex-col gap-0.5 text-xs text-muted-foreground">
-              {entries.map(([key, value]) => (
-                <div key={key} className="flex gap-1.5">
-                  <dt className="shrink-0 font-medium">{key.replace(/_/g, ' ')}:</dt>
-                  <dd className="min-w-0">{formatValue(value)}</dd>
-                </div>
-              ))}
-            </dl>
+        <div className="proposal-body">
+          {error && (
+            <p role="alert" className="mb-2 text-xs text-destructive">
+              {event.error || 'This suggestion could not be completed.'}
+            </p>
           )}
-
+          <div className="proposal-comparison">
+            {(isRemoval ? Object.entries(currentValues) : entries).map(
+              ([key, value]) => (
+                <div key={key}>
+                  {Object.hasOwn(currentValues, key) &&
+                    currentValues[key] !== undefined &&
+                    !isRemoval && (
+                      <div className="proposal-value">
+                        <span className="proposal-value-label">
+                          Current · {key.replace(/_/g, ' ')}
+                        </span>
+                        {formatValue(currentValues[key])}
+                      </div>
+                    )}
+                  <div
+                    className={`proposal-value ${isRemoval ? '' : 'is-suggestion'}`}
+                  >
+                    <span className="proposal-value-label">
+                      {isRemoval ? 'Remove' : 'Suggested'} ·{' '}
+                      {key.replace(/_/g, ' ')}
+                    </span>
+                    {editing &&
+                    status === 'pending' &&
+                    isEditableProposalText(key, value) ? (
+                      <Textarea
+                        aria-label={`Suggested ${key.replace(/_/g, ' ')}`}
+                        rows={4}
+                        value={edits[key] ?? value}
+                        onChange={(event) =>
+                          setEdits((values) => ({
+                            ...values,
+                            [key]: event.target.value,
+                          }))
+                        }
+                      />
+                    ) : (
+                      formatValue(edits[key] ?? value)
+                    )}
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
+          {status === 'pending' && !running && !error && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={!applicability.ok || !canResolve}
+                onClick={() => onAccept(edits)}
+              >
+                <Check className="size-3.5" />{' '}
+                {isRemoval ? 'Accept removal' : 'Accept change'}
+              </Button>
+              {!isRemoval &&
+                entries.some(([key, value]) =>
+                  isEditableProposalText(key, value),
+                ) && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={!canResolve}
+                    onClick={() => setEditing(!editing)}
+                  >
+                    {editing ? 'Done editing' : 'Edit suggestion'}
+                  </Button>
+                )}
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={!canResolve}
+                onClick={onReject}
+              >
+                <X className="size-3.5" /> Reject
+              </Button>
+              {!canResolve && (
+                <span className="text-[10px] text-muted-foreground">
+                  Finishing this response...
+                </span>
+              )}
+            </div>
+          )}
           {status === 'pending' && !applicability.ok && (
-            <div className="flex items-center gap-1.5 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">
+            <div className="mt-3 flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Lock className="size-3 shrink-0" />
-              <span>{applicability.reason}</span>
+              {applicability.reason}
             </div>
           )}
         </div>
       )}
-    </div>
+    </section>
   )
 }

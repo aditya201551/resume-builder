@@ -1,5 +1,24 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ArrowDown, Check, FileText, Loader2, Send, SpellCheck, Sparkles, Square, X } from 'lucide-react'
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
+import {
+  ArrowDown,
+  ArrowUpRight,
+  Check,
+  FileText,
+  Loader2,
+  Palette,
+  Plus,
+  Send,
+  SpellCheck,
+  Sparkles,
+  Square,
+  X,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Message, MessageContent } from '@/components/ui/message'
@@ -8,7 +27,11 @@ import ChatMarkdown from '@/components/agent/ChatMarkdown'
 import CopyButton from '@/components/agent/CopyButton'
 import StreamingMarkdown from '@/components/agent/StreamingMarkdown'
 import { groupAssistantParts } from '@/lib/agentProposal'
-import { useAgentChat, type AssistantPart, type ChatMessage } from '@/hooks/useAgentChat'
+import {
+  type AgentChatController,
+  type AssistantPart,
+  type ChatMessage,
+} from '@/hooks/useAgentChat'
 
 function isNearBottom(el: HTMLDivElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 96
@@ -38,6 +61,12 @@ const QUICK_ACTIONS = [
       'Generate a professional summary for my resume based on my current work experience and skills, and propose it as a contact-info update.',
   },
   {
+    label: 'Find a layout that fits',
+    icon: Palette,
+    prompt:
+      'Review my resume and recommend a suitable available template and layout. Explain your choice and propose design changes while preserving all my content.',
+  },
+  {
     label: 'Check grammar & style',
     icon: SpellCheck,
     prompt:
@@ -55,7 +84,11 @@ const TOOL_LABELS: Record<string, string> = {
   propose_meta_update: 'Updating contact info',
 }
 
-function ToolActivity({ event }: { event: Extract<AssistantPart, { kind: 'tool' }>['event'] }) {
+function ToolActivity({
+  event,
+}: {
+  event: Extract<AssistantPart, { kind: 'tool' }>['event']
+}) {
   const label = TOOL_LABELS[event.name] ?? event.name.replace(/_/g, ' ')
   const isRunning = event.status === 'running'
   const isError = event.status === 'error'
@@ -70,9 +103,18 @@ function ToolActivity({ event }: { event: Extract<AssistantPart, { kind: 'tool' 
         <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
       )}
       <span>{label}</span>
-      {isRunning && <span className="size-1 rounded-full bg-accent/70 [animation:chat-dot_1.05s_ease-in-out_infinite]" aria-hidden />}
-      {!isRunning && !isError && <span className="text-muted-foreground/70">done</span>}
-      {isError && <span className="text-destructive">{event.error || 'failed'}</span>}
+      {isRunning && (
+        <span
+          className="size-1 rounded-full bg-accent/70 [animation:chat-dot_1.05s_ease-in-out_infinite]"
+          aria-hidden
+        />
+      )}
+      {!isRunning && !isError && (
+        <span className="text-muted-foreground/70">done</span>
+      )}
+      {isError && (
+        <span className="text-destructive">{event.error || 'failed'}</span>
+      )}
     </div>
   )
 }
@@ -84,7 +126,11 @@ function AssistantParts({
 }: {
   parts: AssistantPart[]
   streaming?: boolean
-  onResolve?: (key: string, accept: boolean) => void
+  onResolve?: (
+    key: string,
+    accept: boolean,
+    edits?: Record<string, string>,
+  ) => void
 }) {
   const items = groupAssistantParts(parts)
 
@@ -94,7 +140,11 @@ function AssistantParts({
         const isLast = i === items.length - 1
         return item.kind === 'text' ? (
           <div key={item.key} className="text-sm leading-6 text-foreground">
-            {streaming && isLast ? <StreamingMarkdown text={item.text} streaming /> : <ChatMarkdown text={item.text} />}
+            {streaming && isLast ? (
+              <StreamingMarkdown text={item.text} streaming />
+            ) : (
+              <ChatMarkdown text={item.text} />
+            )}
           </div>
         ) : item.kind === 'tool' ? (
           <ToolActivity key={item.key} event={item.event} />
@@ -102,7 +152,8 @@ function AssistantParts({
           <ActionItem
             key={item.key}
             item={item}
-            onAccept={() => onResolve?.(item.part.key, true)}
+            canResolve={Boolean(onResolve)}
+            onAccept={(edits) => onResolve?.(item.part.key, true, edits)}
             onReject={() => onResolve?.(item.part.key, false)}
           />
         )
@@ -112,7 +163,10 @@ function AssistantParts({
 }
 
 function assistantText(parts: AssistantPart[]) {
-  return parts.filter((p) => p.kind === 'text').map((p) => p.text).join('')
+  return parts
+    .filter((p) => p.kind === 'text')
+    .map((p) => p.text)
+    .join('')
 }
 
 function MessageRow({
@@ -122,11 +176,19 @@ function MessageRow({
 }: {
   message: ChatMessage
   index: number
-  onResolve: (index: number, key: string, accept: boolean) => void
+  onResolve: (
+    index: number,
+    key: string,
+    accept: boolean,
+    edits?: Record<string, string>,
+  ) => void
 }) {
   if (message.role === 'user') {
     return (
-      <Message align="end" className="animate-in fade-in slide-in-from-bottom-1 duration-200">
+      <Message
+        align="end"
+        className="animate-in fade-in slide-in-from-bottom-1 duration-200"
+      >
         <MessageContent>
           <div className="max-w-[85%] self-end rounded-2xl bg-primary px-3.5 py-2 text-sm whitespace-pre-wrap text-primary-foreground">
             {message.content}
@@ -140,9 +202,17 @@ function MessageRow({
   const hasText = message.parts.some((p) => p.kind === 'text' && p.text.trim())
 
   return (
-    <Message align="start" className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-      <MessageContent className="max-w-[90%]">
-        <AssistantParts parts={message.parts} onResolve={(key, accept) => onResolve(index, key, accept)} />
+    <Message
+      align="start"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-200"
+    >
+      <MessageContent className="max-w-full">
+        <AssistantParts
+          parts={message.parts}
+          onResolve={(key, accept, edits) =>
+            onResolve(index, key, accept, edits)
+          }
+        />
         {hasText && <CopyButton getText={() => assistantText(message.parts)} />}
       </MessageContent>
     </Message>
@@ -151,18 +221,43 @@ function MessageRow({
 
 function StreamingMessage({ parts }: { parts: AssistantPart[] }) {
   return (
-    <Message align="start" className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-      <MessageContent className="max-w-[90%]">
-        {parts.length === 0 ? <TypingIndicator /> : <AssistantParts parts={parts} streaming />}
+    <Message
+      align="start"
+      className="animate-in fade-in slide-in-from-bottom-1 duration-200"
+    >
+      <MessageContent className="max-w-full">
+        {parts.length === 0 ? (
+          <TypingIndicator />
+        ) : (
+          <AssistantParts parts={parts} streaming />
+        )}
       </MessageContent>
     </Message>
   )
 }
 
-export default function ChatPanel() {
-  const { messages, streamingParts, isStreaming, autoAccept, setAutoAccept, error, sendMessage, cancel, resolveProposal } =
-    useAgentChat()
+export default function ChatPanel({
+  chat,
+  jobDescription,
+  onJobDescriptionChange,
+}: {
+  chat: AgentChatController
+  jobDescription: string
+  onJobDescriptionChange: (value: string) => void
+}) {
+  const {
+    messages,
+    streamingParts,
+    isStreaming,
+    autoAccept,
+    setAutoAccept,
+    error,
+    sendMessage,
+    cancel,
+    resolveProposal,
+  } = chat
   const [input, setInput] = useState('')
+  const [jobOpen, setJobOpen] = useState(false)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickRef = useRef(true)
@@ -171,7 +266,12 @@ export default function ChatPanel() {
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current
     if (!el) return
-    el.scrollTo({ top: el.scrollHeight, behavior })
+    el.scrollTo({
+      top: el.scrollHeight,
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'instant'
+        : behavior,
+    })
     shouldStickRef.current = true
     setShowJumpToLatest(false)
   }, [])
@@ -193,7 +293,9 @@ export default function ChatPanel() {
     if (!el) return
     const pinned = isNearBottom(el)
     shouldStickRef.current = pinned
-    setShowJumpToLatest(!pinned && (messages.length > 0 || Boolean(streamingParts)))
+    setShowJumpToLatest(
+      !pinned && (messages.length > 0 || Boolean(streamingParts)),
+    )
   }
 
   function handleSend() {
@@ -201,13 +303,13 @@ export default function ChatPanel() {
     if (!content) return
     setInput('')
     shouldStickRef.current = true
-    void sendMessage(content)
+    void sendMessage(content, jobDescription)
   }
 
   function runQuickAction(prompt: string) {
     if (isStreaming) return
     shouldStickRef.current = true
-    void sendMessage(prompt)
+    void sendMessage(prompt, jobDescription)
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
@@ -218,33 +320,113 @@ export default function ChatPanel() {
   }
 
   return (
-    <div className="flex h-full min-h-0 w-full flex-col bg-background">
+    <div className="assistant-panel flex h-full min-h-0 w-full flex-col">
+      <header className="assistant-header">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-secondary text-primary">
+              <Sparkles className="size-4" aria-hidden />
+            </span>
+            <h1>Resume assistant</h1>
+          </div>
+          <span role="status" className="text-[10px] text-muted-foreground">
+            {isStreaming ? 'Working on it...' : 'Here to help'}
+          </span>
+        </div>
+        <div className="assistant-scope">
+          <span>
+            <FileText className="size-3" aria-hidden /> Current resume
+          </span>
+          <button
+            type="button"
+            onClick={() => setJobOpen(!jobOpen)}
+            aria-expanded={jobOpen}
+            aria-controls="assistant-job-context"
+          >
+            {jobDescription.trim() ? (
+              <Check className="size-3" />
+            ) : (
+              <Plus className="size-3" />
+            )}{' '}
+            {jobDescription.trim() ? 'Job context added' : 'Add job context'}
+          </button>
+        </div>
+        {jobOpen && (
+          <div id="assistant-job-context" className="job-context-field">
+            <label htmlFor="assistant-job" className="text-xs font-medium">
+              Job description
+            </label>
+            <Textarea
+              id="assistant-job"
+              value={jobDescription}
+              maxLength={16000}
+              onChange={(event) => onJobDescriptionChange(event.target.value)}
+              rows={4}
+              placeholder="Paste a job description to guide your next request."
+            />
+            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+              <span>Used as context for your next message.</span>
+              <button
+                type="button"
+                onClick={() => {
+                  onJobDescriptionChange('')
+                  setJobOpen(false)
+                }}
+                className="rounded-md p-1 hover:text-primary"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+      </header>
       <div className="relative min-h-0 flex-1">
-        <div ref={scrollRef} onScroll={handleScroll} className="h-full overflow-y-auto scroll-smooth">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="h-full overflow-y-auto scroll-smooth"
+        >
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
             {messages.length === 0 && !streamingParts && (
-              <div className="flex flex-col items-center gap-4 py-16 text-center">
-                <Sparkles className="size-8 text-muted-foreground" />
-                <p className="max-w-sm text-sm text-muted-foreground">
-                  Ask me to add, rewrite, or reorganize anything on your resume. I&apos;ll propose changes for you to review.
+              <div className="assistant-welcome">
+                <span className="assistant-welcome-mark">
+                  <Sparkles className="size-6" aria-hidden />
+                </span>
+                <h2>
+                  A fresh perspective.
+                  <br />
+                  Still entirely you.
+                </h2>
+                <p>
+                  Let's bring your experience into focus. Ask for a rewrite,
+                  build a new section, or find a layout that fits. You'll review
+                  the changes.
                 </p>
-                <div className="flex flex-wrap justify-center gap-2">
+                <div className="assistant-starters">
                   {QUICK_ACTIONS.map(({ label, icon: Icon, prompt }) => (
                     <button
                       key={label}
                       type="button"
                       onClick={() => runQuickAction(prompt)}
-                      className="flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-secondary"
                     >
-                      <Icon className="size-3.5 text-muted-foreground" />
-                      {label}
+                      <Icon className="size-4 text-primary" aria-hidden />
+                      <span className="flex-1">{label}</span>
+                      <ArrowUpRight
+                        className="size-3.5 text-muted-foreground"
+                        aria-hidden
+                      />
                     </button>
                   ))}
                 </div>
               </div>
             )}
             {messages.map((m, i) => (
-              <MessageRow key={i} message={m} index={i} onResolve={resolveProposal} />
+              <MessageRow
+                key={i}
+                message={m}
+                index={i}
+                onResolve={resolveProposal}
+              />
             ))}
             {streamingParts && <StreamingMessage parts={streamingParts} />}
           </div>
@@ -266,20 +448,39 @@ export default function ChatPanel() {
 
       {error && (
         <div className="mx-auto w-full max-w-2xl px-4">
-          <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">{error}</div>
+          <div
+            role="alert"
+            className="flex flex-wrap items-center gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          >
+            <span className="flex-1">{error}</span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const last = messages.findLast(
+                  (message) => message.role === 'user',
+                )
+                if (last?.role === 'user') setInput(last.content)
+                textareaRef.current?.focus()
+              }}
+            >
+              Edit and retry
+            </Button>
+          </div>
         </div>
       )}
 
       <div className="mx-auto w-full max-w-2xl p-3 pt-2">
-        <div className="rounded-xl border border-input bg-background px-2.5 py-1.5 transition-colors focus-within:border-ring">
+        <div className="assistant-composer">
           <Textarea
             ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message the assistant..."
+            placeholder="What would you like to work on?"
+            aria-label="Message the resume assistant"
             rows={1}
-            className="min-h-7 resize-none border-0 bg-transparent px-0 py-0.5 text-sm shadow-none focus-visible:ring-0"
+            className="min-h-12 resize-none border-0 bg-transparent! px-0 py-0.5 text-sm leading-6 shadow-none focus-visible:ring-0"
             disabled={isStreaming}
           />
           <div className="flex items-center justify-between gap-3 pt-0.5">
@@ -303,11 +504,25 @@ export default function ChatPanel() {
             </button>
 
             {isStreaming ? (
-              <Button type="button" size="icon-xs" variant="secondary" onClick={cancel} aria-label="Stop response">
+              <Button
+                type="button"
+                size="icon"
+                className="rounded-full"
+                variant="secondary"
+                onClick={cancel}
+                aria-label="Stop response"
+              >
                 <Square className="size-3.5" />
               </Button>
             ) : (
-              <Button type="button" size="icon-xs" onClick={handleSend} disabled={!input.trim()} aria-label="Send message">
+              <Button
+                type="button"
+                size="icon"
+                className="rounded-full"
+                onClick={handleSend}
+                disabled={!input.trim()}
+                aria-label="Send message"
+              >
                 <Send className="size-3.5" />
               </Button>
             )}

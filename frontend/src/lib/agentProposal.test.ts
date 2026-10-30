@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { canApplyProposal, groupAssistantParts, proposalToDraftAction } from './agentProposal'
+import {
+  canApplyProposal,
+  groupAssistantParts,
+  proposalCurrentValues,
+  editProposalText,
+  proposalToDraftAction,
+} from './agentProposal'
 import type { AgentProposal } from './agentChat'
 import type { AssistantPart } from '@/hooks/useAgentChat'
 import type { FullResume, SkillGroup, CustomSection } from '@/types/resume'
@@ -41,22 +47,40 @@ function group(id: string, items: SkillGroup['items'] = []): SkillGroup {
   return { id, resume_id: 'r1', group_name: 'Languages', sort_order: 0, items }
 }
 
-function customSection(id: string, entries: CustomSection['entries'] = []): CustomSection {
+function customSection(
+  id: string,
+  entries: CustomSection['entries'] = [],
+): CustomSection {
   return { id, resume_id: 'r1', title: 'Extras', sort_order: 0, entries }
 }
 
 describe('canApplyProposal', () => {
   it('allows creates that have no parent', () => {
-    const p: AgentProposal = { type: 'flat_create', entity: 'projects', tempId: 'temp-1', fields: { name: 'X' } }
+    const p: AgentProposal = {
+      type: 'flat_create',
+      entity: 'projects',
+      tempId: 'temp-1',
+      fields: { name: 'X' },
+    }
     expect(canApplyProposal(p, emptyDraft()).ok).toBe(true)
   })
 
   it('allows metadata updates unconditionally', () => {
-    expect(canApplyProposal({ type: 'update_meta', patch: { full_name: 'A' } }, emptyDraft()).ok).toBe(true)
+    expect(
+      canApplyProposal(
+        { type: 'update_meta', patch: { full_name: 'A' } },
+        emptyDraft(),
+      ).ok,
+    ).toBe(true)
   })
 
   it('blocks a skill item whose group is not in the draft', () => {
-    const p: AgentProposal = { type: 'skill_item_create', groupId: 'temp-group', tempId: 'temp-item', fields: { name: 'Go' } }
+    const p: AgentProposal = {
+      type: 'skill_item_create',
+      groupId: 'temp-group',
+      tempId: 'temp-item',
+      fields: { name: 'Go' },
+    }
     const result = canApplyProposal(p, emptyDraft())
 
     expect(result.ok).toBe(false)
@@ -64,68 +88,184 @@ describe('canApplyProposal', () => {
   })
 
   it('allows a skill item once its group exists in the draft', () => {
-    const p: AgentProposal = { type: 'skill_item_create', groupId: 'g1', tempId: 'temp-item', fields: { name: 'Go' } }
-    expect(canApplyProposal(p, emptyDraft({ skill_groups: [group('g1')] })).ok).toBe(true)
+    const p: AgentProposal = {
+      type: 'skill_item_create',
+      groupId: 'g1',
+      tempId: 'temp-item',
+      fields: { name: 'Go' },
+    }
+    expect(
+      canApplyProposal(p, emptyDraft({ skill_groups: [group('g1')] })).ok,
+    ).toBe(true)
   })
 
   it('allows a skill item whose group was just created but is not yet in the draft', () => {
-    const p: AgentProposal = { type: 'skill_item_create', groupId: 'temp-g', tempId: 'temp-item', fields: { name: 'Go' } }
+    const p: AgentProposal = {
+      type: 'skill_item_create',
+      groupId: 'temp-g',
+      tempId: 'temp-item',
+      fields: { name: 'Go' },
+    }
 
     expect(canApplyProposal(p, emptyDraft()).ok).toBe(false)
     expect(canApplyProposal(p, emptyDraft(), new Set(['temp-g'])).ok).toBe(true)
   })
 
   it('blocks a custom entry whose section is missing, and allows it once present', () => {
-    const p: AgentProposal = { type: 'custom_entry_create', sectionId: 's1', tempId: 'temp-e', fields: { title: 'X' } }
+    const p: AgentProposal = {
+      type: 'custom_entry_create',
+      sectionId: 's1',
+      tempId: 'temp-e',
+      fields: { title: 'X' },
+    }
 
     expect(canApplyProposal(p, emptyDraft()).ok).toBe(false)
-    expect(canApplyProposal(p, emptyDraft({ custom_sections: [customSection('s1')] })).ok).toBe(true)
+    expect(
+      canApplyProposal(
+        p,
+        emptyDraft({ custom_sections: [customSection('s1')] }),
+      ).ok,
+    ).toBe(true)
   })
 
   it('blocks updates and deletes naming an entry the draft does not have', () => {
     const draft = emptyDraft({
-      projects: [{ id: 'p1', resume_id: 'r1', name: 'A', content: '', role: null, technologies: [], url: null, start_date: null, end_date: null, sort_order: 0 }],
+      projects: [
+        {
+          id: 'p1',
+          resume_id: 'r1',
+          name: 'A',
+          content: '',
+          role: null,
+          technologies: [],
+          url: null,
+          start_date: null,
+          end_date: null,
+          sort_order: 0,
+        },
+      ],
     })
 
-    expect(canApplyProposal({ type: 'flat_update', entity: 'projects', id: 'p1', patch: { name: 'B' } }, draft).ok).toBe(true)
-    expect(canApplyProposal({ type: 'flat_update', entity: 'projects', id: 'nope', patch: { name: 'B' } }, draft).ok).toBe(false)
-    expect(canApplyProposal({ type: 'flat_delete', entity: 'projects', id: 'nope' }, draft).ok).toBe(false)
+    expect(
+      canApplyProposal(
+        {
+          type: 'flat_update',
+          entity: 'projects',
+          id: 'p1',
+          patch: { name: 'B' },
+        },
+        draft,
+      ).ok,
+    ).toBe(true)
+    expect(
+      canApplyProposal(
+        {
+          type: 'flat_update',
+          entity: 'projects',
+          id: 'nope',
+          patch: { name: 'B' },
+        },
+        draft,
+      ).ok,
+    ).toBe(false)
+    expect(
+      canApplyProposal(
+        { type: 'flat_delete', entity: 'projects', id: 'nope' },
+        draft,
+      ).ok,
+    ).toBe(false)
   })
 
   it('blocks a skill item update when the item is gone from an existing group', () => {
     const draft = emptyDraft({
-      skill_groups: [group('g1', [{ id: 'i1', skill_group_id: 'g1', name: 'Go', proficiency: null, sort_order: 0 }])],
+      skill_groups: [
+        group('g1', [
+          {
+            id: 'i1',
+            skill_group_id: 'g1',
+            name: 'Go',
+            proficiency: null,
+            sort_order: 0,
+          },
+        ]),
+      ],
     })
 
-    expect(canApplyProposal({ type: 'skill_item_update', groupId: 'g1', id: 'i1', patch: { name: 'Rust' } }, draft).ok).toBe(true)
-    expect(canApplyProposal({ type: 'skill_item_update', groupId: 'g1', id: 'gone', patch: { name: 'Rust' } }, draft).ok).toBe(false)
+    expect(
+      canApplyProposal(
+        {
+          type: 'skill_item_update',
+          groupId: 'g1',
+          id: 'i1',
+          patch: { name: 'Rust' },
+        },
+        draft,
+      ).ok,
+    ).toBe(true)
+    expect(
+      canApplyProposal(
+        {
+          type: 'skill_item_update',
+          groupId: 'g1',
+          id: 'gone',
+          patch: { name: 'Rust' },
+        },
+        draft,
+      ).ok,
+    ).toBe(false)
   })
 
   it('blocks an unknown entity rather than throwing', () => {
-    const result = canApplyProposal({ type: 'flat_update', entity: 'not_a_section', id: 'x', patch: {} }, emptyDraft())
+    const result = canApplyProposal(
+      { type: 'flat_update', entity: 'not_a_section', id: 'x', patch: {} },
+      emptyDraft(),
+    )
     expect(result.ok).toBe(false)
   })
 })
 
 describe('proposalToDraftAction', () => {
   it('returns null for a proposal missing the ids its action requires', () => {
-    expect(proposalToDraftAction({ type: 'flat_create', entity: 'projects' })).toBeNull()
-    expect(proposalToDraftAction({ type: 'skill_item_create', tempId: 'temp-1' })).toBeNull()
+    expect(
+      proposalToDraftAction({ type: 'flat_create', entity: 'projects' }),
+    ).toBeNull()
+    expect(
+      proposalToDraftAction({ type: 'skill_item_create', tempId: 'temp-1' }),
+    ).toBeNull()
     expect(proposalToDraftAction({ type: 'who_knows' })).toBeNull()
   })
 })
 
-function toolPart(id: string, status: 'running' | 'done' | 'error' = 'done'): Extract<AssistantPart, { kind: 'tool' }> {
-  return { kind: 'tool', key: id, event: { id, name: 'propose_meta_update', status } }
+function toolPart(
+  id: string,
+  status: 'running' | 'done' | 'error' = 'done',
+): Extract<AssistantPart, { kind: 'tool' }> {
+  return {
+    kind: 'tool',
+    key: id,
+    event: { id, name: 'propose_meta_update', status },
+  }
 }
 
-function proposalPart(key: string, toolCallId?: string, status: 'pending' | 'accepted' | 'rejected' = 'pending'): Extract<AssistantPart, { kind: 'proposal' }> {
-  return { kind: 'proposal', key, status, proposal: { type: 'update_meta', patch: { summary: 'x' }, toolCallId } }
+function proposalPart(
+  key: string,
+  toolCallId?: string,
+  status: 'pending' | 'accepted' | 'rejected' = 'pending',
+): Extract<AssistantPart, { kind: 'proposal' }> {
+  return {
+    kind: 'proposal',
+    key,
+    status,
+    proposal: { type: 'update_meta', patch: { summary: 'x' }, toolCallId },
+  }
 }
 
 describe('groupAssistantParts', () => {
   it('merges a tool part with the proposal sharing its id into one action item', () => {
-    const parts: AssistantPart[] = [toolPart('call-1'), proposalPart('p1', 'call-1')]
+    const parts: AssistantPart[] = [
+      toolPart('call-1'),
+      proposalPart('p1', 'call-1'),
+    ]
     const items = groupAssistantParts(parts)
 
     expect(items).toHaveLength(1)
@@ -133,8 +273,20 @@ describe('groupAssistantParts', () => {
   })
 
   it('keeps a tool part with no matching proposal as a plain tool item', () => {
-    const items = groupAssistantParts([{ kind: 'tool', key: 'read', event: { id: 'read-1', name: 'read_resume', status: 'done' } }])
-    expect(items).toEqual([{ kind: 'tool', key: 'read', event: { id: 'read-1', name: 'read_resume', status: 'done' } }])
+    const items = groupAssistantParts([
+      {
+        kind: 'tool',
+        key: 'read',
+        event: { id: 'read-1', name: 'read_resume', status: 'done' },
+      },
+    ])
+    expect(items).toEqual([
+      {
+        kind: 'tool',
+        key: 'read',
+        event: { id: 'read-1', name: 'read_resume', status: 'done' },
+      },
+    ])
   })
 
   it('pairs correctly by id even when proposals arrive out of order relative to their tool calls', () => {
@@ -148,20 +300,136 @@ describe('groupAssistantParts', () => {
 
     expect(items).toHaveLength(2)
     const byKey = new Map(items.map((i) => [i.key, i]))
-    expect(byKey.get('call-A')).toMatchObject({ kind: 'action', part: { key: 'pA' } })
-    expect(byKey.get('call-B')).toMatchObject({ kind: 'action', part: { key: 'pB' } })
+    expect(byKey.get('call-A')).toMatchObject({
+      kind: 'action',
+      part: { key: 'pA' },
+    })
+    expect(byKey.get('call-B')).toMatchObject({
+      kind: 'action',
+      part: { key: 'pB' },
+    })
   })
 
   it('still renders a proposal with no matching tool event, as a standalone action', () => {
     const items = groupAssistantParts([proposalPart('orphan', undefined)])
     expect(items).toHaveLength(1)
-    expect(items[0]).toMatchObject({ kind: 'action', key: 'orphan', event: { status: 'done' } })
+    expect(items[0]).toMatchObject({
+      kind: 'action',
+      key: 'orphan',
+      event: { status: 'done' },
+    })
   })
 
   it('preserves text parts and their position relative to actions', () => {
-    const parts: AssistantPart[] = [{ kind: 'text', text: 'Hello' }, toolPart('call-1'), proposalPart('p1', 'call-1')]
+    const parts: AssistantPart[] = [
+      { kind: 'text', text: 'Hello' },
+      toolPart('call-1'),
+      proposalPart('p1', 'call-1'),
+    ]
     const items = groupAssistantParts(parts)
 
     expect(items.map((i) => i.kind)).toEqual(['text', 'action'])
   })
+})
+
+describe('proposal comparisons', () => {
+  it('reads the targeted resume metadata without exposing identity fields', () => {
+    const values = proposalCurrentValues(
+      { type: 'update_meta', patch: { full_name: 'New name' } },
+      emptyDraft(),
+    )
+    expect(values.full_name).toBe('Aditya Raj')
+    expect(values.email).toBeNull()
+    expect(values).not.toHaveProperty('id')
+  })
+
+  it('reads a nested skill rather than its parent group', () => {
+    const draft = emptyDraft({
+      skill_groups: [
+        group('g1', [
+          {
+            id: 'i1',
+            skill_group_id: 'g1',
+            name: 'Go',
+            proficiency: null,
+            sort_order: 0,
+          },
+        ]),
+      ],
+    })
+    const before = structuredClone(draft)
+    expect(
+      proposalCurrentValues(
+        {
+          type: 'skill_item_update',
+          groupId: 'g1',
+          id: 'i1',
+          patch: { name: 'Rust' },
+        },
+        draft,
+      ).name,
+    ).toBe('Go')
+    expect(draft).toEqual(before)
+  })
+
+  it('supports dotted design fields and leaves unavailable display labels unset', () => {
+    const draft = emptyDraft()
+    const values = proposalCurrentValues(
+      {
+        type: 'design_update',
+        designUpdates: {
+          'typography.baseFontSizePt': 15,
+          template: 'New template',
+        },
+      },
+      draft,
+    )
+    expect(values['typography.baseFontSizePt']).toBe(
+      draft.design.typography.baseFontSizePt,
+    )
+    expect(values.template).toBeUndefined()
+  })
+
+  it('does not invent current values for a new entity', () => {
+    expect(
+      proposalCurrentValues(
+        {
+          type: 'flat_create',
+          entity: 'languages',
+          tempId: 'temp-new',
+          fields: { name: 'English' },
+        },
+        emptyDraft(),
+      ),
+    ).toEqual({})
+  })
+})
+
+it('edits proposed wording without allowing target, date, or typed-field changes', () => {
+  const proposal: AgentProposal = {
+    type: 'flat_update',
+    entity: 'work_experiences',
+    id: 'w1',
+    patch: {
+      content: 'AI wording',
+      is_current: true,
+      start_date: '2023-01-01',
+      technologies: ['Go'],
+    },
+  }
+  const result = editProposalText(proposal, {
+    content: 'My reviewed wording',
+    id: 'other',
+    is_current: 'false',
+    start_date: 'invalid',
+    technologies: 'Rust',
+  })
+  expect(result.id).toBe('w1')
+  expect(result.patch).toEqual({
+    content: 'My reviewed wording',
+    is_current: true,
+    start_date: '2023-01-01',
+    technologies: ['Go'],
+  })
+  expect(proposal.patch?.content).toBe('AI wording')
 })

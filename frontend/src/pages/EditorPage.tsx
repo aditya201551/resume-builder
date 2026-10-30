@@ -1,6 +1,16 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { useParams } from 'react-router'
-import { EditorPanelContext, type OpenPanelHandle } from '@/hooks/useEditorPanel'
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router'
+import {
+  EditorPanelContext,
+  type OpenPanelHandle,
+} from '@/hooks/useEditorPanel'
 import {
   Award,
   Briefcase,
@@ -15,12 +25,17 @@ import {
   Trophy,
 } from 'lucide-react'
 import { Accordion } from '@/components/ui/accordion'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
-import { ResumeDraftProvider, useResumeDraftContext, useResumeDraftData } from '@/hooks/useResumeDraft'
+import {
+  ResumeDraftProvider,
+  useResumeDraftContext,
+  useResumeDraftData,
+} from '@/hooks/useResumeDraft'
 import SectionAccordionItem from '@/components/editor/SectionAccordionItem'
-import AddSectionDialog, { type AddSectionOption } from '@/components/editor/AddSectionDialog'
+import AddSectionDialog, {
+  type AddSectionOption,
+} from '@/components/editor/AddSectionDialog'
 import ContactSection from '@/components/editor/sections/ContactSection'
 import WorkExperienceSection from '@/components/editor/sections/WorkExperienceSection'
 import EducationSection from '@/components/editor/sections/EducationSection'
@@ -31,8 +46,9 @@ import LanguagesSection from '@/components/editor/sections/LanguagesSection'
 import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
 import DesignMode from '@/components/editor/DesignMode'
-import LivePreview from '@/components/editor/LivePreview'
-import PreviewErrorBoundary from '@/components/editor/PreviewErrorBoundary'
+import ResumePreview from '@/components/editor/ResumePreview'
+import { useAgentChat } from '@/hooks/useAgentChat'
+import { type AssistantTask } from '@/lib/assistantTask'
 import EditorNavbar, { type EditorMode } from '@/components/editor/EditorNavbar'
 import ChatPanel from '@/components/agent/ChatPanel'
 import type { FullResume } from '@/types/resume'
@@ -52,11 +68,15 @@ const DEFAULT_SLOT_ORDER = [
 
 type SlotKey = (typeof DEFAULT_SLOT_ORDER)[number]
 
-const SLOT_META: Record<SlotKey, { title: string; icon: typeof Briefcase; description: string }> = {
+const SLOT_META: Record<
+  SlotKey,
+  { title: string; icon: typeof Briefcase; description: string }
+> = {
   work_experience: {
     title: 'Professional Experience',
     icon: Briefcase,
-    description: 'Add your professional roles and employer history, including internships.',
+    description:
+      'Add your professional roles and employer history, including internships.',
   },
   education: {
     title: 'Education',
@@ -76,7 +96,8 @@ const SLOT_META: Record<SlotKey, { title: string; icon: typeof Briefcase; descri
   certifications: {
     title: 'Certificates',
     icon: Award,
-    description: 'Add your industry certificates or licences, with issuer and date.',
+    description:
+      'Add your industry certificates or licences, with issuer and date.',
   },
   languages: {
     title: 'Languages',
@@ -86,12 +107,14 @@ const SLOT_META: Record<SlotKey, { title: string; icon: typeof Briefcase; descri
   awards: {
     title: 'Awards',
     icon: Trophy,
-    description: 'Add awards and recognitions from industry, competitions, or academia.',
+    description:
+      'Add awards and recognitions from industry, competitions, or academia.',
   },
   publications: {
     title: 'Publications',
     icon: BookOpen,
-    description: 'Add publications, articles, or books you wrote or contributed to.',
+    description:
+      'Add publications, articles, or books you wrote or contributed to.',
   },
   volunteer: {
     title: 'Volunteer',
@@ -130,22 +153,60 @@ function slotCount(data: FullResume, key: SlotKey): number {
   }
 }
 
-function slotContent(resumeId: string, data: FullResume, key: SlotKey): { title: string; count: number; node: ReactNode } {
+function slotContent(
+  resumeId: string,
+  data: FullResume,
+  key: SlotKey,
+): { title: string; count: number; node: ReactNode } {
   const title = SLOT_META[key].title
   const count = slotCount(data, key)
   switch (key) {
     case 'work_experience':
-      return { title, count, node: <WorkExperienceSection resumeId={resumeId} items={data.work_experiences} /> }
+      return {
+        title,
+        count,
+        node: (
+          <WorkExperienceSection
+            resumeId={resumeId}
+            items={data.work_experiences}
+          />
+        ),
+      }
     case 'education':
-      return { title, count, node: <EducationSection resumeId={resumeId} items={data.educations} /> }
+      return {
+        title,
+        count,
+        node: <EducationSection resumeId={resumeId} items={data.educations} />,
+      }
     case 'skills':
-      return { title, count, node: <SkillsSection resumeId={resumeId} items={data.skill_groups} /> }
+      return {
+        title,
+        count,
+        node: <SkillsSection resumeId={resumeId} items={data.skill_groups} />,
+      }
     case 'projects':
-      return { title, count, node: <ProjectsSection resumeId={resumeId} items={data.projects} /> }
+      return {
+        title,
+        count,
+        node: <ProjectsSection resumeId={resumeId} items={data.projects} />,
+      }
     case 'certifications':
-      return { title, count, node: <CertificationsSection resumeId={resumeId} items={data.certifications} /> }
+      return {
+        title,
+        count,
+        node: (
+          <CertificationsSection
+            resumeId={resumeId}
+            items={data.certifications}
+          />
+        ),
+      }
     case 'languages':
-      return { title, count, node: <LanguagesSection resumeId={resumeId} items={data.languages} /> }
+      return {
+        title,
+        count,
+        node: <LanguagesSection resumeId={resumeId} items={data.languages} />,
+      }
     case 'awards':
       return {
         title,
@@ -192,22 +253,49 @@ function slotContent(resumeId: string, data: FullResume, key: SlotKey): { title:
         ),
       }
     case 'custom':
-      return { title: 'Custom Sections', count, node: <CustomSectionsSection resumeId={resumeId} items={data.custom_sections} /> }
+      return {
+        title: 'Custom Sections',
+        count,
+        node: (
+          <CustomSectionsSection
+            resumeId={resumeId}
+            items={data.custom_sections}
+          />
+        ),
+      }
   }
 }
 
-function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume }) {
-  const customSections = useEntityMutations(resumeId, `/api/resumes/${resumeId}/custom-sections`)
+function ContentMode({
+  resumeId,
+  data,
+}: {
+  resumeId: string
+  data: FullResume
+}) {
+  const customSections = useEntityMutations(
+    resumeId,
+    `/api/resumes/${resumeId}/custom-sections`,
+  )
   const [revealed, setRevealed] = useState<Set<SlotKey>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
 
-  const isActive = (key: SlotKey) => slotCount(data, key) > 0 || revealed.has(key)
+  const isActive = (key: SlotKey) =>
+    slotCount(data, key) > 0 || revealed.has(key)
 
-  const sections = DEFAULT_SLOT_ORDER.filter(isActive).map((key) => ({ key, ...slotContent(resumeId, data, key) }))
+  const sections = DEFAULT_SLOT_ORDER.filter(isActive).map((key) => ({
+    key,
+    ...slotContent(resumeId, data, key),
+  }))
 
-  const addableOptions: AddSectionOption[] = DEFAULT_SLOT_ORDER.filter((key) => key !== 'custom' && !isActive(key)).map(
-    (key) => ({ key, title: SLOT_META[key].title, description: SLOT_META[key].description, icon: SLOT_META[key].icon }),
-  )
+  const addableOptions: AddSectionOption[] = DEFAULT_SLOT_ORDER.filter(
+    (key) => key !== 'custom' && !isActive(key),
+  ).map((key) => ({
+    key,
+    title: SLOT_META[key].title,
+    description: SLOT_META[key].description,
+    icon: SLOT_META[key].icon,
+  }))
   addableOptions.push({
     key: 'custom',
     title: SLOT_META.custom.title,
@@ -218,7 +306,10 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
 
   function handleAdd(key: string) {
     if (key === 'custom') {
-      customSections.create.mutate({ title: '', sort_order: data.custom_sections.length })
+      customSections.create.mutate({
+        title: '',
+        sort_order: data.custom_sections.length,
+      })
     } else {
       setRevealed((prev) => new Set(prev).add(key as SlotKey))
     }
@@ -227,29 +318,57 @@ function ContentMode({ resumeId, data }: { resumeId: string; data: FullResume })
   return (
     <div className="flex flex-col gap-3">
       <Accordion type="single" collapsible className="flex flex-col gap-3">
-        <SectionAccordionItem value="contact" title="Contact & Summary" count={0}>
+        <SectionAccordionItem
+          value="contact"
+          title="Contact & Summary"
+          count={0}
+        >
           <ContactSection resume={data.resume} />
         </SectionAccordionItem>
       </Accordion>
 
       <Accordion type="single" collapsible className="flex flex-col gap-3">
         {sections.map((section) => (
-          <SectionAccordionItem key={section.key} value={section.key} title={section.title} count={section.count}>
+          <SectionAccordionItem
+            key={section.key}
+            value={section.key}
+            title={section.title}
+            count={section.count}
+          >
             {section.node}
           </SectionAccordionItem>
         ))}
       </Accordion>
 
-      <Button type="button" variant="secondary" size="sm" className="mt-2 w-fit" onClick={() => setAddOpen(true)}>
+      <Button
+        type="button"
+        variant="secondary"
+        size="sm"
+        className="mt-2 w-fit"
+        onClick={() => setAddOpen(true)}
+      >
         <Plus className="size-3.5" /> Add section
       </Button>
 
-      <AddSectionDialog open={addOpen} onOpenChange={setAddOpen} options={addableOptions} onSelect={handleAdd} />
+      <AddSectionDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        options={addableOptions}
+        onSelect={handleAdd}
+      />
     </div>
   )
 }
 
-function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
+function EditPane({
+  resumeId,
+  data,
+  active,
+}: {
+  resumeId: string
+  data: FullResume
+  active: boolean
+}) {
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
   const openStack = useRef<OpenPanelHandle[]>([])
 
@@ -261,6 +380,7 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
   }, [])
 
   useEffect(() => {
+    if (!active) return
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
         const top = openStack.current[openStack.current.length - 1]
@@ -270,16 +390,22 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [])
+  }, [active])
 
-  const panelContext = useMemo(() => ({ slot: panelSlot, pushOpen }), [panelSlot, pushOpen])
+  const panelContext = useMemo(
+    () => ({ slot: panelSlot, pushOpen }),
+    [panelSlot, pushOpen],
+  )
 
   return (
     <EditorPanelContext.Provider value={panelContext}>
       <div className="relative h-full flex-1 overflow-y-auto pb-10">
         <ContentMode resumeId={resumeId} data={data} />
         {/* Entry editors portal in here, replacing the list in place while it's open. */}
-        <div ref={setPanelSlot} className="absolute inset-0 z-10 empty:pointer-events-none" />
+        <div
+          ref={setPanelSlot}
+          className="absolute inset-0 z-10 empty:pointer-events-none"
+        />
       </div>
     </EditorPanelContext.Provider>
   )
@@ -288,10 +414,51 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
   const { flushNow } = useResumeDraftContext()
-  const [mode, setMode] = useState<EditorMode>('content')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const launch = useRef(
+    location.state as {
+      assistantTask?: AssistantTask
+      mode?: EditorMode
+    } | null,
+  )
+  const started = useRef(false)
+  const [mode, setMode] = useState<EditorMode>(
+    launch.current?.mode === 'content' ? 'content' : 'chat',
+  )
+  const [mobilePreview, setMobilePreview] = useState(false)
+  const [jobDescription, setJobDescription] = useState(
+    launch.current?.assistantTask?.jobDescription ?? '',
+  )
+  const chat = useAgentChat()
+  const { sendMessage } = chat
+
+  useEffect(() => {
+    const task = launch.current?.assistantTask
+    if (
+      !data ||
+      started.current ||
+      typeof task?.prompt !== 'string' ||
+      !task.prompt.trim()
+    )
+      return
+    // Schedule after hydration; StrictMode's initial effect cleanup cancels the first timer.
+    const timer = setTimeout(() => {
+      if (started.current) return
+      started.current = true
+      void sendMessage(task.prompt, task.jobDescription ?? '')
+      void navigate(location.pathname, { replace: true, state: null })
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [data, sendMessage, navigate, location.pathname])
+
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        !e.altKey &&
+        e.key.toLowerCase() === 's'
+      ) {
         e.preventDefault()
         void flushNow()
       }
@@ -300,62 +467,100 @@ function EditorPageContent() {
     return () => window.removeEventListener('keydown', onKeyDown, true)
   }, [flushNow])
 
-  if (isLoading || !data) {
-    return <div className="p-10 text-sm text-muted-foreground">Loading resume…</div>
+  if (isLoading || !data)
+    return (
+      <div role="status" className="p-10 text-sm text-muted-foreground">
+        Opening your workspace...
+      </div>
+    )
+  const resumeId = data.resume.id
+  function changeMode(next: EditorMode) {
+    setMode(next)
+    setMobilePreview(false)
   }
 
-  const resumeId = data.resume.id
-  const previewData = data
-
-  const editPane = <EditPane resumeId={resumeId} data={data} />
-  const designPane = (
-    <div className="h-full overflow-y-auto px-6 py-6">
-      <DesignMode />
-    </div>
-  )
-
-  const previewPane = (
-    <div className="h-full overflow-y-auto bg-secondary/40 p-6">
-      <PreviewErrorBoundary resetKey={previewData}>
-        <LivePreview data={previewData} />
-      </PreviewErrorBoundary>
-    </div>
-  )
-
-  const primaryPane =
-    mode === 'chat' ? previewPane : mode === 'design' ? designPane : <div className="h-full overflow-y-auto px-6 py-6">{editPane}</div>
-  const secondaryPane = mode === 'chat' ? <ChatPanel /> : previewPane
-
   return (
-    <div className="flex h-svh flex-col">
-      <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
-
-      <div className="min-h-0 flex-1">
-        {/* Desktop split pane */}
-        <div className="hidden min-[900px]:grid min-[900px]:h-full min-[900px]:grid-cols-2">
-          {primaryPane}
-          {secondaryPane}
-        </div>
-
-        {/* Mobile: Edit/Chat + Preview tab switcher */}
-        <div className="h-full overflow-y-auto min-[900px]:hidden">
-          <Tabs defaultValue="edit">
-            <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
-              <TabsList>
-                <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : mode === 'design' ? 'Design' : 'Edit'}</TabsTrigger>
-                <TabsTrigger value="preview">Preview</TabsTrigger>
-              </TabsList>
+    <div className="workspace-shell">
+      <EditorNavbar
+        resume={data.resume}
+        mode={mode}
+        onModeChange={changeMode}
+      />
+      <div
+        className="mobile-view-switch"
+        role="group"
+        aria-label="Workspace surface"
+      >
+        <button
+          type="button"
+          aria-pressed={!mobilePreview}
+          onClick={() => setMobilePreview(false)}
+        >
+          {mode === 'chat'
+            ? 'Assistant'
+            : mode === 'design'
+              ? 'Design'
+              : 'Edit'}
+        </button>
+        <button
+          type="button"
+          aria-pressed={mobilePreview}
+          onClick={() => setMobilePreview(true)}
+        >
+          Preview
+        </button>
+      </div>
+      <div
+        className="workspace-content"
+        data-mode={mode}
+        data-mobile-preview={mobilePreview}
+      >
+        <div className="workspace-controls">
+          <div className="workspace-pane" hidden={mode !== 'chat'}>
+            <ChatPanel
+              chat={chat}
+              jobDescription={jobDescription}
+              onJobDescriptionChange={setJobDescription}
+            />
+          </div>
+          <div className="workspace-pane" hidden={mode !== 'content'}>
+            <div className="workspace-pane-heading">
+              <div>
+                <h1>Make it yours.</h1>
+                <p>
+                  Your experience, one section at a time. Changes save
+                  automatically.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="context-chip"
+                onClick={() => changeMode('chat')}
+              >
+                <Sparkles className="size-3.5" /> Ask AI
+              </button>
             </div>
-            <TabsContent value="edit" className={mode === 'chat' ? 'h-[calc(100svh-8.5rem)]' : 'px-4 py-4'}>
-              {mode === 'chat' ? <ChatPanel /> : mode === 'design' ? <DesignMode /> : editPane}
-            </TabsContent>
-            <TabsContent value="preview" className="bg-secondary/40 p-4">
-              <PreviewErrorBoundary resetKey={previewData}>
-                <LivePreview data={previewData} />
-              </PreviewErrorBoundary>
-            </TabsContent>
-          </Tabs>
+            <div className="workspace-form">
+              <EditPane
+                resumeId={resumeId}
+                data={data}
+                active={mode === 'content' && !mobilePreview}
+              />
+            </div>
+          </div>
+          <div className="workspace-pane" hidden={mode !== 'design'}>
+            <div className="workspace-pane-heading">
+              <div>
+                <h1>A look that feels like you.</h1>
+                <p>Fine-tune your template, layout, and finishing touches.</p>
+              </div>
+            </div>
+            <div className="workspace-form">
+              <DesignMode />
+            </div>
+          </div>
         </div>
+        <ResumePreview data={data} />
       </div>
     </div>
   )
@@ -365,7 +570,11 @@ export default function EditorPage() {
   const { id } = useParams<{ id: string }>()
 
   if (!id) {
-    return <div className="p-10 text-sm text-muted-foreground">Resume not found.</div>
+    return (
+      <div className="p-10 text-sm text-muted-foreground">
+        Resume not found.
+      </div>
+    )
   }
 
   return (

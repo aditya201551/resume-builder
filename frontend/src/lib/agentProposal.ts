@@ -8,17 +8,31 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
   switch (p.type) {
     case 'flat_create':
       if (!p.entity || !p.tempId) return null
-      return { type: 'flat_create', entity: p.entity as FlatKind, tempId: p.tempId, fields: p.fields ?? {} }
+      return {
+        type: 'flat_create',
+        entity: p.entity as FlatKind,
+        tempId: p.tempId,
+        fields: p.fields ?? {},
+      }
     case 'flat_update':
       if (!p.entity || !p.id) return null
-      return { type: 'flat_update', entity: p.entity as FlatKind, id: p.id, patch: p.patch ?? {} }
+      return {
+        type: 'flat_update',
+        entity: p.entity as FlatKind,
+        id: p.id,
+        patch: p.patch ?? {},
+      }
     case 'flat_delete':
       if (!p.entity || !p.id) return null
       return { type: 'flat_delete', entity: p.entity as FlatKind, id: p.id }
 
     case 'skill_group_create':
       if (!p.tempId) return null
-      return { type: 'skill_group_create', tempId: p.tempId, fields: p.fields ?? {} }
+      return {
+        type: 'skill_group_create',
+        tempId: p.tempId,
+        fields: p.fields ?? {},
+      }
     case 'skill_group_update':
       if (!p.id) return null
       return { type: 'skill_group_update', id: p.id, patch: p.patch ?? {} }
@@ -28,17 +42,31 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
 
     case 'skill_item_create':
       if (!p.groupId || !p.tempId) return null
-      return { type: 'skill_item_create', groupId: p.groupId, tempId: p.tempId, fields: p.fields ?? {} }
+      return {
+        type: 'skill_item_create',
+        groupId: p.groupId,
+        tempId: p.tempId,
+        fields: p.fields ?? {},
+      }
     case 'skill_item_update':
       if (!p.groupId || !p.id) return null
-      return { type: 'skill_item_update', groupId: p.groupId, id: p.id, patch: p.patch ?? {} }
+      return {
+        type: 'skill_item_update',
+        groupId: p.groupId,
+        id: p.id,
+        patch: p.patch ?? {},
+      }
     case 'skill_item_delete':
       if (!p.groupId || !p.id) return null
       return { type: 'skill_item_delete', groupId: p.groupId, id: p.id }
 
     case 'custom_section_create':
       if (!p.tempId) return null
-      return { type: 'custom_section_create', tempId: p.tempId, fields: p.fields ?? {} }
+      return {
+        type: 'custom_section_create',
+        tempId: p.tempId,
+        fields: p.fields ?? {},
+      }
     case 'custom_section_update':
       if (!p.id) return null
       return { type: 'custom_section_update', id: p.id, patch: p.patch ?? {} }
@@ -48,10 +76,20 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
 
     case 'custom_entry_create':
       if (!p.sectionId || !p.tempId) return null
-      return { type: 'custom_entry_create', sectionId: p.sectionId, tempId: p.tempId, fields: p.fields ?? {} }
+      return {
+        type: 'custom_entry_create',
+        sectionId: p.sectionId,
+        tempId: p.tempId,
+        fields: p.fields ?? {},
+      }
     case 'custom_entry_update':
       if (!p.sectionId || !p.id) return null
-      return { type: 'custom_entry_update', sectionId: p.sectionId, id: p.id, patch: p.patch ?? {} }
+      return {
+        type: 'custom_entry_update',
+        sectionId: p.sectionId,
+        id: p.id,
+        patch: p.patch ?? {},
+      }
     case 'custom_entry_delete':
       if (!p.sectionId || !p.id) return null
       return { type: 'custom_entry_delete', sectionId: p.sectionId, id: p.id }
@@ -60,7 +98,10 @@ export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
       return { type: 'update_meta', patch: p.patch ?? {} }
 
     case 'design_update':
-      return { type: 'design_update', patch: (p.designPatch ?? {}) as Partial<ResumeDesign> }
+      return {
+        type: 'design_update',
+        patch: (p.designPatch ?? {}) as Partial<ResumeDesign>,
+      }
 
     default:
       return null
@@ -83,13 +124,15 @@ export function canApplyProposal(
   const flatEntity = (): ProposalApplicability => {
     const list = draft[p.entity as FlatKind] as { id: string }[] | undefined
     if (!list) return blocked(`Unknown section "${p.entity}"`)
-    if (!list.some((i) => i.id === p.id)) return blocked('The entry this changes no longer exists')
+    if (!list.some((i) => i.id === p.id))
+      return blocked('The entry this changes no longer exists')
     return APPLICABLE
   }
 
   const group = () => draft.skill_groups.find((g) => g.id === p.groupId)
   const section = () => draft.custom_sections.find((s) => s.id === p.sectionId)
-  const justCreated = (id: string | undefined) => !!id && justCreatedParentIds.has(id)
+  const justCreated = (id: string | undefined) =>
+    !!id && justCreatedParentIds.has(id)
 
   switch (p.type) {
     case 'flat_update':
@@ -98,28 +141,40 @@ export function canApplyProposal(
 
     case 'skill_group_update':
     case 'skill_group_delete':
-      return draft.skill_groups.some((g) => g.id === p.id) ? APPLICABLE : blocked('That skill group no longer exists')
+      return draft.skill_groups.some((g) => g.id === p.id)
+        ? APPLICABLE
+        : blocked('That skill group no longer exists')
 
     case 'skill_item_create':
-      return group() || justCreated(p.groupId) ? APPLICABLE : blocked('Accept the skill group this belongs to first')
+      return group() || justCreated(p.groupId)
+        ? APPLICABLE
+        : blocked('Accept the skill group this belongs to first')
     case 'skill_item_update':
     case 'skill_item_delete': {
       const g = group()
       if (!g) return blocked('That skill group no longer exists')
-      return g.items.some((i) => i.id === p.id) ? APPLICABLE : blocked('That skill no longer exists')
+      return g.items.some((i) => i.id === p.id)
+        ? APPLICABLE
+        : blocked('That skill no longer exists')
     }
 
     case 'custom_section_update':
     case 'custom_section_delete':
-      return draft.custom_sections.some((s) => s.id === p.id) ? APPLICABLE : blocked('That section no longer exists')
+      return draft.custom_sections.some((s) => s.id === p.id)
+        ? APPLICABLE
+        : blocked('That section no longer exists')
 
     case 'custom_entry_create':
-      return section() || justCreated(p.sectionId) ? APPLICABLE : blocked('Accept the section this belongs to first')
+      return section() || justCreated(p.sectionId)
+        ? APPLICABLE
+        : blocked('Accept the section this belongs to first')
     case 'custom_entry_update':
     case 'custom_entry_delete': {
       const s = section()
       if (!s) return blocked('That section no longer exists')
-      return s.entries.some((e) => e.id === p.id) ? APPLICABLE : blocked('That entry no longer exists')
+      return s.entries.some((e) => e.id === p.id)
+        ? APPLICABLE
+        : blocked('That entry no longer exists')
     }
 
     default:
@@ -195,13 +250,112 @@ export function proposalDetailEntries(p: AgentProposal): [string, unknown][] {
   return Object.entries(data).filter(([k]) => k !== 'id' && k !== 'sort_order')
 }
 
+const EDITABLE_TEXT_FIELDS = new Set([
+  'summary',
+  'content',
+  'description',
+  'honors_description',
+  'headline',
+  'title',
+  'name',
+  'company',
+  'institution',
+  'role',
+  'issuer_or_org',
+  'group_name',
+  'degree',
+  'field_of_study',
+  'location',
+  'employment_type',
+])
+
+export function isEditableProposalText(
+  key: string,
+  value: unknown,
+): value is string {
+  return EDITABLE_TEXT_FIELDS.has(key) && typeof value === 'string'
+}
+
+export function editProposalText(
+  proposal: AgentProposal,
+  edits: Record<string, string>,
+): AgentProposal {
+  const field = proposal.patch ? 'patch' : 'fields'
+  const values = proposal[field]
+  if (!values) return proposal
+  const allowed = Object.fromEntries(
+    Object.entries(edits).filter(([key]) =>
+      isEditableProposalText(key, values[key]),
+    ),
+  )
+  return { ...proposal, [field]: { ...values, ...allowed } }
+}
+
+export function proposalCurrentValues(
+  p: AgentProposal,
+  draft: FullResume,
+): Record<string, unknown> {
+  let target: object | undefined
+  if (p.type === 'update_meta') target = draft.resume
+  else if (p.type.startsWith('flat_'))
+    target = (
+      draft[p.entity as FlatKind] as { id: string }[] | undefined
+    )?.find((item) => item.id === p.id)
+  else if (p.type.startsWith('skill_group_'))
+    target = draft.skill_groups.find((group) => group.id === p.id)
+  else if (p.type.startsWith('skill_item_'))
+    target = draft.skill_groups
+      .find((group) => group.id === p.groupId)
+      ?.items.find((item) => item.id === p.id)
+  else if (p.type.startsWith('custom_section_'))
+    target = draft.custom_sections.find((section) => section.id === p.id)
+  else if (p.type.startsWith('custom_entry_'))
+    target = draft.custom_sections
+      .find((section) => section.id === p.sectionId)
+      ?.entries.find((entry) => entry.id === p.id)
+  else if (p.type === 'design_update') {
+    return Object.fromEntries(
+      proposalDetailEntries(p).map(([key]) => {
+        const value = key
+          .split('.')
+          .reduce<unknown>(
+            (value, part) =>
+              value && typeof value === 'object'
+                ? (value as Record<string, unknown>)[part]
+                : undefined,
+            draft.design,
+          )
+        return [key, value]
+      }),
+    )
+  }
+  return target
+    ? Object.fromEntries(
+        Object.entries(target).filter(
+          ([key]) =>
+            !['id', 'resume_id', 'sort_order', 'items', 'entries'].includes(
+              key,
+            ),
+        ),
+      )
+    : {}
+}
+
 export type DisplayItem =
   | { kind: 'text'; key: string; text: string }
   | { kind: 'tool'; key: string; event: AgentToolEvent }
-  | { kind: 'action'; key: string; event: AgentToolEvent; part: Extract<AssistantPart, { kind: 'proposal' }> }
+  | {
+      kind: 'action'
+      key: string
+      event: AgentToolEvent
+      part: Extract<AssistantPart, { kind: 'proposal' }>
+    }
 
 export function groupAssistantParts(parts: AssistantPart[]): DisplayItem[] {
-  const proposalByToolCallId = new Map<string, Extract<AssistantPart, { kind: 'proposal' }>>()
+  const proposalByToolCallId = new Map<
+    string,
+    Extract<AssistantPart, { kind: 'proposal' }>
+  >()
   for (const part of parts) {
     if (part.kind === 'proposal' && part.proposal.toolCallId) {
       proposalByToolCallId.set(part.proposal.toolCallId, part)
@@ -217,17 +371,29 @@ export function groupAssistantParts(parts: AssistantPart[]): DisplayItem[] {
       continue
     }
     if (part.kind === 'tool') {
-      const matched = part.event.id ? proposalByToolCallId.get(part.event.id) : undefined
+      const matched = part.event.id
+        ? proposalByToolCallId.get(part.event.id)
+        : undefined
       if (matched) {
         consumed.add(matched.key)
-        items.push({ kind: 'action', key: part.key, event: part.event, part: matched })
+        items.push({
+          kind: 'action',
+          key: part.key,
+          event: part.event,
+          part: matched,
+        })
       } else {
         items.push({ kind: 'tool', key: part.key, event: part.event })
       }
       continue
     }
     if (!consumed.has(part.key)) {
-      items.push({ kind: 'action', key: part.key, event: { name: part.proposal.type, status: 'done' }, part })
+      items.push({
+        kind: 'action',
+        key: part.key,
+        event: { name: part.proposal.type, status: 'done' },
+        part,
+      })
     }
   }
 

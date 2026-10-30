@@ -83,7 +83,7 @@ export default function RowCard({
       {open &&
         slot &&
         createPortal(
-          <div className="absolute inset-0 flex flex-col bg-background">
+          <div className="workspace-entry-panel absolute inset-0 flex flex-col">
             <div className="flex items-center justify-between gap-2 border-b border-border p-4">
               <h2 className="text-lg font-bold">{editorTitle}</h2>
               <div className="flex items-center gap-1">

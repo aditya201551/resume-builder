@@ -14,7 +14,10 @@ export const router = createBrowserRouter([
     children: [
       {
         element: <AppShell />,
-        children: [{ path: '/resumes', element: <DashboardPage /> }],
+        children: [
+          { path: '/resumes', element: <DashboardPage /> },
+          { path: '/resumes/library', element: <DashboardPage libraryOnly /> },
+        ],
       },
       { path: '/resumes/:id/edit', element: <EditorPage /> },
     ],

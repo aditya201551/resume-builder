@@ -1,6 +1,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useBlocker } from 'react-router'
-import { ArrowLeft, Check, Download, Loader2, Pencil } from 'lucide-react'
+import {
+  ArrowLeft,
+  Check,
+  Download,
+  FilePenLine,
+  Loader2,
+  Palette,
+  Pencil,
+  Sparkles,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -16,6 +25,7 @@ import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
 import { apiDownload } from '@/lib/http'
 import { cn } from '@/lib/utils'
+import Brand from '@/components/layout/Brand'
 import type { Resume } from '@/types/resume'
 
 function EditableResumeName({ resume }: { resume: Resume }) {
@@ -37,13 +47,20 @@ function EditableResumeName({ resume }: { resume: Resume }) {
         <Input
           ref={inputRef}
           value={resume.label}
-          onChange={(e) => dispatch({ type: 'update_meta', patch: { label: e.target.value } })}
+          onChange={(e) =>
+            dispatch({ type: 'update_meta', patch: { label: e.target.value } })
+          }
           onKeyDown={(e) => {
             if (e.key === 'Enter' || e.key === 'Escape') setEditing(false)
           }}
           className="h-8 max-w-72 text-sm font-semibold"
         />
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-accent" onClick={() => setEditing(false)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-8 shrink-0 text-accent"
+          onClick={() => setEditing(false)}
+        >
           <Check className="size-4" />
         </Button>
       </div>
@@ -54,9 +71,12 @@ function EditableResumeName({ resume }: { resume: Resume }) {
     <button
       type="button"
       onClick={startEditing}
-      className="flex w-fit min-w-0 max-w-72 items-center gap-1.5 text-left"
+      aria-label="Rename resume"
+      className="flex w-fit min-w-0 max-w-48 items-center gap-1.5 rounded-md text-left"
     >
-      <span className="truncate text-sm font-semibold text-foreground">{resume.label || 'Untitled resume'}</span>
+      <span className="truncate text-sm font-semibold text-foreground">
+        {resume.label || 'Untitled resume'}
+      </span>
       <Pencil className="size-3 shrink-0 text-muted-foreground" />
     </button>
   )
@@ -73,11 +93,16 @@ function DownloadButton({ resume }: { resume: Resume }) {
       setPhase('saving')
       const saved = await flushNow()
       if (!saved) {
-        setError("Couldn't save your latest changes — try again before downloading.")
+        setError(
+          "Couldn't save your latest changes — try again before downloading.",
+        )
         return
       }
       setPhase('generating')
-      await apiDownload(`/api/resumes/${resume.id}/export/pdf`, `${resume.label || 'resume'}.pdf`)
+      await apiDownload(
+        `/api/resumes/${resume.id}/export/pdf`,
+        `${resume.label || 'resume'}.pdf`,
+      )
     } catch {
       setError("Couldn't generate PDF")
     } finally {
@@ -87,10 +112,28 @@ function DownloadButton({ resume }: { resume: Resume }) {
 
   return (
     <div className="flex items-center gap-2">
-      {error && <span className="text-xs text-destructive">{error}</span>}
-      <Button type="button" variant="secondary" size="sm" disabled={phase !== 'idle'} onClick={handleDownload}>
-        {phase !== 'idle' ? <Loader2 className="size-3.5 animate-spin" /> : <Download className="size-3.5" />}
-        {phase === 'saving' ? 'Saving…' : phase === 'generating' ? 'Generating…' : 'Download'}
+      {error && (
+        <span className="max-w-40 text-xs text-destructive" role="alert">
+          {error}
+        </span>
+      )}
+      <Button
+        type="button"
+        size="sm"
+        className="h-9 rounded-xl px-3"
+        disabled={phase !== 'idle'}
+        onClick={handleDownload}
+      >
+        {phase !== 'idle' ? (
+          <Loader2 className="size-3.5 animate-spin" />
+        ) : (
+          <Download className="size-3.5" />
+        )}
+        {phase === 'saving'
+          ? 'Saving…'
+          : phase === 'generating'
+            ? 'Generating…'
+            : 'Export PDF'}
       </Button>
     </div>
   )
@@ -99,12 +142,30 @@ function DownloadButton({ resume }: { resume: Resume }) {
 function SyncStatus() {
   const { state, syncStatus } = useResumeDraftContext()
   const dirty = isDraftDirty(state.data, state.lastSynced)
-  const label = syncStatus === 'error'
-    ? "Couldn't sync ? retrying automatically"
-    : syncStatus === 'syncing' || dirty ? 'Syncing?' : 'All changes saved'
+  const label =
+    syncStatus === 'error'
+      ? "Couldn't sync — retrying automatically"
+      : syncStatus === 'syncing' || dirty
+        ? 'Syncing…'
+        : 'All changes saved'
   return (
-    <span role="status" className={cn('inline-flex items-center gap-1.5 text-xs', syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
-      <span className={cn('size-1.5 rounded-full', syncStatus === 'error' ? 'bg-destructive' : dirty ? 'animate-pulse bg-muted-foreground/50' : 'bg-accent')} />
+    <span
+      role="status"
+      className={cn(
+        'workspace-sync inline-flex items-center gap-1.5 text-[10px]',
+        syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
+      )}
+    >
+      <span
+        className={cn(
+          'size-1.5 rounded-full',
+          syncStatus === 'error'
+            ? 'bg-destructive'
+            : dirty
+              ? 'animate-pulse bg-muted-foreground/50'
+              : 'bg-accent',
+        )}
+      />
       {label}
     </span>
   )
@@ -113,7 +174,10 @@ function SyncStatus() {
 function BackButton() {
   const { state, flushNow } = useResumeDraftContext()
   const dirty = isDraftDirty(state.data, state.lastSynced)
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      dirty && currentLocation.pathname !== nextLocation.pathname,
+  )
   const [saving, setSaving] = useState(false)
   const [syncFailed, setSyncFailed] = useState(false)
 
@@ -139,22 +203,42 @@ function BackButton() {
     <>
       <Button variant="ghost" size="icon" asChild>
         <Link to="/resumes" aria-label="Back to resumes">
-          {saving ? <Loader2 className="size-4 animate-spin" /> : <ArrowLeft className="size-4" />}
+          {saving ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ArrowLeft className="size-4" />
+          )}
         </Link>
       </Button>
-      <AlertDialog open={blocker.state === 'blocked' && syncFailed} onOpenChange={(open) => {
-        if (!open && !saving) blocker.reset?.()
-      }}>
+      <AlertDialog
+        open={blocker.state === 'blocked' && syncFailed}
+        onOpenChange={(open) => {
+          if (!open && !saving) blocker.reset?.()
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Changes haven't synced yet</AlertDialogTitle>
             <AlertDialogDescription>
-              Your changes are kept on this device. You can retry now or leave and resume syncing when you reopen this resume.
+              Your changes are kept on this device. You can retry now or leave
+              and resume syncing when you reopen this resume.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving} onClick={() => blocker.reset?.()}>Stay</AlertDialogCancel>
-            <Button type="button" variant="outline" disabled={saving} onClick={() => blocker.proceed?.()}>Leave for now</Button>
+            <AlertDialogCancel
+              disabled={saving}
+              onClick={() => blocker.reset?.()}
+            >
+              Stay
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={saving}
+              onClick={() => blocker.proceed?.()}
+            >
+              Leave for now
+            </Button>
             <Button type="button" disabled={saving} onClick={syncAndLeave}>
               {saving && <Loader2 className="size-3.5 animate-spin" />} Retry
             </Button>
@@ -167,29 +251,40 @@ function BackButton() {
 
 export type EditorMode = 'content' | 'design' | 'chat'
 
-const NAV_ITEMS: { key: EditorMode; label: string }[] = [
-  { key: 'content', label: 'Content' },
-  { key: 'design', label: 'Design' },
-  { key: 'chat', label: 'Chat' },
-]
+const NAV_ITEMS = [
+  { key: 'chat', label: 'AI workspace', icon: Sparkles },
+  { key: 'content', label: 'Content', icon: FilePenLine },
+  { key: 'design', label: 'Design', icon: Palette },
+] as const
 
-function EditorNavItems({ mode, onModeChange }: { mode: EditorMode; onModeChange: (mode: EditorMode) => void }) {
+function EditorNavItems({
+  mode,
+  onModeChange,
+}: {
+  mode: EditorMode
+  onModeChange: (mode: EditorMode) => void
+}) {
+  const index = NAV_ITEMS.findIndex((item) => item.key === mode)
   return (
-    <div className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1">
-      {NAV_ITEMS.map((item) => (
+    <nav className="workspace-mode-picker" aria-label="Editor mode">
+      <span
+        className="workspace-mode-indicator"
+        style={{ transform: `translateX(${index * 100}%)` }}
+        aria-hidden
+      />
+      {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
         <button
-          key={item.key}
+          key={key}
           type="button"
-          onClick={() => onModeChange(item.key)}
-          className={cn(
-            'rounded-md px-2.5 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
-            mode === item.key && 'bg-background text-foreground shadow-sm',
-          )}
+          className="workspace-mode-button"
+          aria-pressed={mode === key}
+          onClick={() => onModeChange(key)}
         >
-          {item.label}
+          <Icon className="size-3.5" aria-hidden />
+          {label}
         </button>
       ))}
-    </div>
+    </nav>
   )
 }
 
@@ -203,18 +298,27 @@ export default function EditorNavbar({
   onModeChange: (mode: EditorMode) => void
 }) {
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-6 py-3">
-      <BackButton />
-
+    <header className="workspace-navbar">
+      <div className="workspace-back">
+        <BackButton />
+        <Link
+          to="/resumes"
+          className="brand-link"
+          aria-label="Resume Builder home"
+        >
+          <Brand compact />
+        </Link>
+        <div className="min-w-0">
+          <EditableResumeName resume={resume} />
+          <div className="mt-1">
+            <SyncStatus />
+          </div>
+        </div>
+      </div>
       <EditorNavItems mode={mode} onModeChange={onModeChange} />
-
-      <div className="flex-1" />
-
-      <EditableResumeName resume={resume} />
-
-      <DownloadButton resume={resume} />
-
-      <SyncStatus />
-    </div>
+      <div className="workspace-actions">
+        <DownloadButton resume={resume} />
+      </div>
+    </header>
   )
 }

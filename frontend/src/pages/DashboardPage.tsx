@@ -1,108 +1,481 @@
-import { useNavigate } from 'react-router'
+import { useState, type FormEvent } from 'react'
+import { Link, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, MoreVertical } from 'lucide-react'
+import {
+  ArrowRight,
+  Check,
+  Copy,
+  FileText,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Sparkles,
+  Target,
+  Trash2,
+  WandSparkles,
+  X,
+} from 'lucide-react'
 import { apiDelete, apiGet, apiPost } from '@/lib/http'
+import { ASSISTANT_STARTERS, type AssistantTask } from '@/lib/assistantTask'
+import { useAuth } from '@/hooks/useAuth'
 import type { Resume } from '@/types/resume'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+} from '@/components/ui/alert-dialog'
 import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
 
 const resumesKey = ['resumes'] as const
+const starterIcons = [WandSparkles, Check, Target]
 
-export default function DashboardPage() {
+export default function DashboardPage({
+  libraryOnly = false,
+}: {
+  libraryOnly?: boolean
+}) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-
+  const { user } = useAuth()
+  const [prompt, setPrompt] = useState('')
+  const [selection, setSelection] = useState('')
+  const [jobOpen, setJobOpen] = useState(false)
+  const [jobDescription, setJobDescription] = useState('')
+  const [search, setSearch] = useState('')
+  const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
   const resumesQuery = useQuery({
     queryKey: resumesKey,
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
   })
+  const resumes = [...(resumesQuery.data ?? [])].sort((a, b) =>
+    b.updated_at.localeCompare(a.updated_at),
+  )
+  const selectedId =
+    resumes.some((resume) => resume.id === selection) || selection === 'new'
+      ? selection
+      : (resumes[0]?.id ?? 'new')
 
   const createMutation = useMutation({
-    mutationFn: () =>
+    mutationFn: (_task: AssistantTask | undefined) =>
       apiPost<Resume>('/api/resumes', {
         label: 'Untitled resume',
         full_name: '',
       }),
-    onSuccess: (resume) => {
-      queryClient.invalidateQueries({ queryKey: resumesKey })
-      navigate(`/resumes/${resume.id}/edit`)
+    onSuccess: (resume, task) => {
+      void queryClient.invalidateQueries({ queryKey: resumesKey })
+      navigate(`/resumes/${resume.id}/edit`, {
+        state: task ? { assistantTask: task } : { mode: 'content' },
+      })
+    },
+  })
+  const duplicateMutation = useMutation({
+    mutationFn: (id: string) => apiPost<Resume>(`/api/resumes/${id}/duplicate`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: resumesKey })
+    },
+  })
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/resumes/${id}`),
+    onSuccess: () => {
+      setDeleteTarget(null)
+      void queryClient.invalidateQueries({ queryKey: resumesKey })
     },
   })
 
-  const duplicateMutation = useMutation({
-    mutationFn: (id: string) => apiPost<Resume>(`/api/resumes/${id}/duplicate`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: resumesKey }),
-  })
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiDelete(`/api/resumes/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: resumesKey }),
-  })
-
-  const resumes = resumesQuery.data ?? []
+  function startAssistant(event: FormEvent) {
+    event.preventDefault()
+    if (
+      !prompt.trim() ||
+      createMutation.isPending ||
+      resumesQuery.isLoading ||
+      resumesQuery.isError
+    )
+      return
+    const task: AssistantTask = {
+      prompt: prompt.trim(),
+      jobDescription: jobDescription.trim(),
+    }
+    if (selectedId === 'new') createMutation.mutate(task)
+    else
+      navigate(`/resumes/${selectedId}/edit`, {
+        state: { assistantTask: task },
+      })
+  }
+  const shownResumes = libraryOnly
+    ? resumes.filter((resume) =>
+        `${resume.label} ${resume.full_name}`
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      )
+    : resumes.slice(0, 4)
+  const error =
+    createMutation.isError ||
+    duplicateMutation.isError ||
+    deleteMutation.isError
 
   return (
-    <div className="px-10 py-10">
-      <h1 className="text-3xl font-bold tracking-tight text-foreground">My Resumes</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Create, tailor, and export resumes for each application.
-      </p>
-
-      {resumesQuery.isLoading ? (
-        <p className="mt-8 text-sm text-muted-foreground">Loading…</p>
-      ) : (
-        <div className="mt-8 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-          <button
-            type="button"
-            onClick={() => createMutation.mutate()}
-            disabled={createMutation.isPending}
-            className="flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-border text-muted-foreground hover:border-ring hover:text-foreground"
-            style={{ aspectRatio: '0.773' }}
-          >
-            <Plus className="size-6" />
-            <span className="text-sm font-medium">New resume</span>
-          </button>
-
-          {resumes.map((resume) => (
-            <div key={resume.id} className="flex flex-col gap-2">
-              <div
-                className="group relative cursor-pointer"
-                onClick={() => navigate(`/resumes/${resume.id}/edit`)}
-              >
-                <ResumeThumbnail resumeId={resume.id} />
-                <div className="absolute inset-0 rounded-md ring-1 ring-inset ring-transparent transition-colors group-hover:ring-ring" />
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="absolute right-2 top-2 size-7 opacity-0 shadow-sm group-hover:opacity-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <MoreVertical className="size-3.5" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenuItem onSelect={() => duplicateMutation.mutate(resume.id)}>
-                      Duplicate
-                    </DropdownMenuItem>
-                    <DropdownMenuItem variant="destructive" onSelect={() => deleteMutation.mutate(resume.id)}>
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+    <div className="dashboard-page">
+      {!libraryOnly && (
+        <section className="home-intro" aria-labelledby="home-heading">
+          <div className="eyebrow">
+            <Sparkles className="size-3.5" aria-hidden /> A little help. A lot
+            of you.
+          </div>
+          <h1 id="home-heading">
+            Your next chapter
+            <br />
+            <span>starts with your story.</span>
+          </h1>
+          <p>
+            {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} turn
+            your experience into a resume that feels like you.
+          </p>
+          <form className="home-composer" onSubmit={startAssistant}>
+            <label htmlFor="home-prompt" className="sr-only">
+              What would you like help with?
+            </label>
+            <Textarea
+              id="home-prompt"
+              value={prompt}
+              onChange={(event) => setPrompt(event.target.value)}
+              placeholder="What are we working toward? Try making your experience more impactful."
+              maxLength={8000}
+              rows={3}
+              className="home-prompt"
+            />
+            {jobOpen && (
+              <div className="job-context-field">
+                <div className="flex items-center justify-between gap-2">
+                  <label htmlFor="home-job" className="text-xs font-medium">
+                    Job description
+                  </label>
+                  <button
+                    type="button"
+                    aria-label="Remove job description"
+                    onClick={() => {
+                      setJobOpen(false)
+                      setJobDescription('')
+                    }}
+                    className="rounded-full p-1 hover:bg-secondary"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+                <Textarea
+                  id="home-job"
+                  value={jobDescription}
+                  onChange={(event) => setJobDescription(event.target.value)}
+                  maxLength={16000}
+                  rows={4}
+                  placeholder="Paste the role you have in mind. We'll use it as context."
+                />
               </div>
-              <p className="truncate text-sm font-medium text-foreground">{resume.label}</p>
+            )}
+            <div className="composer-toolbar">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <label className="resume-context-picker">
+                  <FileText className="size-3.5 shrink-0" aria-hidden />
+                  <span className="sr-only">Resume to work on</span>
+                  <select
+                    value={selectedId}
+                    onChange={(event) => setSelection(event.target.value)}
+                    disabled={resumesQuery.isLoading}
+                  >
+                    <option value="new">New resume</option>
+                    {resumes.map((resume) => (
+                      <option key={resume.id} value={resume.id}>
+                        {resume.label || 'Untitled resume'}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <button
+                  type="button"
+                  className="context-chip"
+                  onClick={() => setJobOpen(!jobOpen)}
+                  aria-expanded={jobOpen}
+                  aria-controls="home-job"
+                >
+                  {jobDescription.trim() ? (
+                    <Check className="size-3.5" />
+                  ) : (
+                    <Plus className="size-3.5" />
+                  )}{' '}
+                  {jobDescription.trim()
+                    ? 'Job context added'
+                    : 'Job description'}
+                </button>
+              </div>
+              <Button
+                type="submit"
+                className="start-ai-button"
+                disabled={
+                  !prompt.trim() ||
+                  createMutation.isPending ||
+                  resumesQuery.isLoading ||
+                  resumesQuery.isError
+                }
+              >
+                {createMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}{' '}
+                Start with AI <ArrowRight className="size-4" />
+              </Button>
             </div>
-          ))}
-        </div>
+          </form>
+          <div className="starter-grid">
+            {ASSISTANT_STARTERS.map((starter, index) => {
+              const Icon = starterIcons[index]
+              return (
+                <button
+                  type="button"
+                  key={starter.title}
+                  className="starter-button"
+                  onClick={() => {
+                    setPrompt(starter.prompt)
+                    if (index === 2) setJobOpen(true)
+                    document.getElementById('home-prompt')?.focus()
+                  }}
+                >
+                  <span className="starter-icon">
+                    <Icon className="size-[18px]" aria-hidden />
+                  </span>
+                  <span>
+                    <strong>{starter.title}</strong>
+                    <small>{starter.description}</small>
+                  </span>
+                  <ArrowRight
+                    className="ml-auto size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
+                </button>
+              )
+            })}
+          </div>
+          <div className="manual-start">
+            Prefer to start with a blank page?{' '}
+            <button
+              type="button"
+              onClick={() => createMutation.mutate(undefined)}
+              disabled={createMutation.isPending}
+            >
+              Create manually <ArrowRight className="size-3" aria-hidden />
+            </button>
+          </div>
+        </section>
       )}
+
+      <section className="resume-library" aria-labelledby="library-heading">
+        <div className="library-heading">
+          <div>
+            <div className="eyebrow">
+              {libraryOnly ? 'YOUR COLLECTION' : 'PICK UP WHERE YOU LEFT OFF'}
+            </div>
+            <h1 id="library-heading" className="library-title">
+              {libraryOnly
+                ? 'My resumes'
+                : 'Made by you. Ready for what’s next.'}
+            </h1>
+            {libraryOnly && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                A version for every opportunity. Your original is always yours.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {!libraryOnly && resumes.length > 0 && (
+              <Link to="/resumes/library" className="view-all-link">
+                View all <ArrowRight className="size-3.5" />
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              onClick={() => createMutation.mutate(undefined)}
+              disabled={createMutation.isPending}
+            >
+              <Plus className="size-4" /> New resume
+            </Button>
+          </div>
+        </div>
+        {libraryOnly && (
+          <div className="library-search">
+            <Search className="size-4 text-muted-foreground" aria-hidden />
+            <Input
+              aria-label="Search resumes"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Find a resume..."
+            />
+          </div>
+        )}
+        {error && (
+          <p role="alert" className="mb-4 text-sm text-destructive">
+            That change couldn't be completed. Please try again.
+          </p>
+        )}
+        {resumesQuery.isLoading ? (
+          <div className="library-loading" role="status">
+            <Loader2 className="size-5 animate-spin" /> Finding your resumes...
+          </div>
+        ) : resumesQuery.isError ? (
+          <div className="library-empty" role="alert">
+            <p>We couldn't load your resumes.</p>
+            <Button
+              variant="outline"
+              onClick={() => void resumesQuery.refetch()}
+            >
+              Try again
+            </Button>
+          </div>
+        ) : shownResumes.length === 0 ? (
+          <div className="library-empty">
+            <span className="empty-document">
+              <FileText className="size-6" />
+            </span>
+            <h2>
+              {search
+                ? 'No matching resumes'
+                : 'A fresh page, full of possibility.'}
+            </h2>
+            <p>
+              {search
+                ? 'Try another name.'
+                : 'Start with the assistant above or create a blank resume.'}
+            </p>
+          </div>
+        ) : (
+          <div className="resume-grid">
+            {shownResumes.map((resume) => (
+              <article key={resume.id} className="resume-card">
+                <Link
+                  to={`/resumes/${resume.id}/edit`}
+                  className="resume-card-preview"
+                  aria-label={`Open ${resume.label || 'Untitled resume'}`}
+                >
+                  <div className="resume-miniature">
+                    <ResumeThumbnail resumeId={resume.id} />
+                  </div>
+                  <span className="open-resume-hint">
+                    Open workspace <ArrowRight className="size-3.5" />
+                  </span>
+                </Link>
+                <div className="resume-card-details">
+                  <div className="min-w-0">
+                    <Link
+                      to={`/resumes/${resume.id}/edit`}
+                      className="block truncate text-sm font-semibold"
+                    >
+                      {resume.label || 'Untitled resume'}
+                    </Link>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {resume.full_name || 'Your next opportunity'}
+                    </p>
+                    <p className="mt-3 text-[11px] text-muted-foreground">
+                      Updated{' '}
+                      {new Date(resume.updated_at).toLocaleDateString(
+                        undefined,
+                        { month: 'short', day: 'numeric' },
+                      )}
+                    </p>
+                  </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={`Options for ${resume.label || 'Untitled resume'}`}
+                      >
+                        <MoreHorizontal className="size-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent
+                      align="end"
+                      className="rounded-2xl p-1.5"
+                    >
+                      <DropdownMenuItem
+                        disabled={duplicateMutation.isPending}
+                        onSelect={() => duplicateMutation.mutate(resume.id)}
+                      >
+                        <Copy className="size-4" /> Duplicate
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          deleteMutation.reset()
+                          setDeleteTarget(resume)
+                        }}
+                      >
+                        <Trash2 className="size-4" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+      <footer className="dashboard-footer">
+        <span className="inline-flex items-center gap-1.5">
+          <Sparkles className="size-3" aria-hidden /> Your experience. Your
+          words. You're in control.
+        </span>
+      </footer>
+      <AlertDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !deleteMutation.isPending) setDeleteTarget(null)
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete {deleteTarget?.label || 'this resume'}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes the resume and all its sections.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteMutation.isError && (
+            <p role="alert" className="text-sm text-destructive">
+              Couldn't delete this resume. Please try again.
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>
+              Keep resume
+            </AlertDialogCancel>
+            <Button
+              variant="destructive"
+              disabled={deleteMutation.isPending}
+              onClick={() => {
+                if (deleteTarget) deleteMutation.mutate(deleteTarget.id)
+              }}
+            >
+              {deleteMutation.isPending && (
+                <Loader2 className="size-4 animate-spin" />
+              )}{' '}
+              Delete resume
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

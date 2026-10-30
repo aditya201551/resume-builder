@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "./styles/workspace.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -49,72 +50,72 @@
 }
 
 :root {
-    --background: #F4F6F8;
-    --foreground: #1B2B3A;
+    --background: #F5F4FA;
+    --foreground: #2D2A38;
     --card: #FFFFFF;
-    --card-foreground: #1B2B3A;
+    --card-foreground: #2D2A38;
     --popover: #FFFFFF;
-    --popover-foreground: #1B2B3A;
-    --primary: #1B2B3A;
-    --primary-foreground: #F4F6F8;
-    --secondary: #E8ECEF;
-    --secondary-foreground: #1B2B3A;
-    --muted: #E8ECEF;
-    --muted-foreground: #5B6B78;
-    --accent: #C96A3E;
+    --popover-foreground: #2D2A38;
+    --primary: #6752B3;
+    --primary-foreground: #FFFFFF;
+    --secondary: #EEEAF8;
+    --secondary-foreground: #2D2A38;
+    --muted: #EEEAF8;
+    --muted-foreground: #706A7E;
+    --accent: #6752B3;
     --accent-foreground: #FFFFFF;
-    --destructive: #C33F2E;
-    --border: #DCE3E8;
-    --input: #DCE3E8;
-    --ring: #C96A3E;
-    --chart-1: #C96A3E;
-    --chart-2: #1B2B3A;
-    --chart-3: #5B6B78;
-    --chart-4: #DCE3E8;
-    --chart-5: #E8ECEF;
-    --radius: 0.625rem;
-    --sidebar: #F4F6F8;
-    --sidebar-foreground: #1B2B3A;
-    --sidebar-primary: #1B2B3A;
-    --sidebar-primary-foreground: #F4F6F8;
-    --sidebar-accent: #E8ECEF;
-    --sidebar-accent-foreground: #1B2B3A;
-    --sidebar-border: #DCE3E8;
-    --sidebar-ring: #C96A3E;
+    --destructive: #BC3F55;
+    --border: #E5E1EE;
+    --input: #E5E1EE;
+    --ring: #6752B3;
+    --chart-1: #6752B3;
+    --chart-2: #2D2A38;
+    --chart-3: #706A7E;
+    --chart-4: #E5E1EE;
+    --chart-5: #EEEAF8;
+    --radius: 1rem;
+    --sidebar: #F5F4FA;
+    --sidebar-foreground: #2D2A38;
+    --sidebar-primary: #6752B3;
+    --sidebar-primary-foreground: #FFFFFF;
+    --sidebar-accent: #EEEAF8;
+    --sidebar-accent-foreground: #2D2A38;
+    --sidebar-border: #E5E1EE;
+    --sidebar-ring: #6752B3;
 }
 
 .dark {
-    --background: #16232E;
-    --foreground: #F4F6F8;
-    --card: #1E2C38;
-    --card-foreground: #F4F6F8;
-    --popover: #1E2C38;
-    --popover-foreground: #F4F6F8;
-    --primary: #F4F6F8;
-    --primary-foreground: #1B2B3A;
-    --secondary: #223140;
-    --secondary-foreground: #F4F6F8;
-    --muted: #223140;
-    --muted-foreground: #9AA9B4;
-    --accent: #E0855C;
-    --accent-foreground: #1B2B3A;
-    --destructive: #E5726A;
-    --border: #2A3A47;
-    --input: #2A3A47;
-    --ring: #E0855C;
-    --chart-1: #E0855C;
-    --chart-2: #F4F6F8;
-    --chart-3: #9AA9B4;
-    --chart-4: #2A3A47;
-    --chart-5: #223140;
-    --sidebar: #16232E;
-    --sidebar-foreground: #F4F6F8;
-    --sidebar-primary: #F4F6F8;
-    --sidebar-primary-foreground: #1B2B3A;
-    --sidebar-accent: #223140;
-    --sidebar-accent-foreground: #F4F6F8;
-    --sidebar-border: #2A3A47;
-    --sidebar-ring: #E0855C;
+    --background: #191722;
+    --foreground: #F5F4FA;
+    --card: #23202F;
+    --card-foreground: #F5F4FA;
+    --popover: #23202F;
+    --popover-foreground: #F5F4FA;
+    --primary: #B9A5F1;
+    --primary-foreground: #23202F;
+    --secondary: #2E293D;
+    --secondary-foreground: #F5F4FA;
+    --muted: #2E293D;
+    --muted-foreground: #B8B1C9;
+    --accent: #B9A5F1;
+    --accent-foreground: #2D2A38;
+    --destructive: #F093A4;
+    --border: #3C354D;
+    --input: #3C354D;
+    --ring: #B9A5F1;
+    --chart-1: #B9A5F1;
+    --chart-2: #F5F4FA;
+    --chart-3: #B8B1C9;
+    --chart-4: #3C354D;
+    --chart-5: #2E293D;
+    --sidebar: #191722;
+    --sidebar-foreground: #F5F4FA;
+    --sidebar-primary: #F5F4FA;
+    --sidebar-primary-foreground: #2D2A38;
+    --sidebar-accent: #2E293D;
+    --sidebar-accent-foreground: #F5F4FA;
+    --sidebar-border: #3C354D;
+    --sidebar-ring: #B9A5F1;
 }
 
 @layer base {
@@ -150,13 +151,11 @@
   *::-webkit-scrollbar {
     display: none;
     }
-  *:focus {
-    outline: none;
-    }
 }
 
 :focus-visible {
-  box-shadow: none !important;
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
 }
 
 @keyframes chat-dot {

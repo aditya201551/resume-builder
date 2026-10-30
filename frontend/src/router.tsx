@@ -5,6 +5,7 @@ import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import EditorPage from '@/pages/EditorPage'
 import PrintPage from '@/pages/PrintPage'
+import JobMapRoute from '@/components/jobs/JobMapRoute'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -17,6 +18,9 @@ export const router = createBrowserRouter([
         children: [
           { path: '/resumes', element: <DashboardPage /> },
           { path: '/resumes/library', element: <DashboardPage libraryOnly /> },
+          { path: '/jobs', element: <Navigate to="/jobs/external" replace /> },
+          { path: '/jobs/external', element: <JobMapRoute /> },
+          { path: '/jobs/direct', element: <JobMapRoute direct /> },
         ],
       },
       { path: '/resumes/:id/edit', element: <EditorPage /> },

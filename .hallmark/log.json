@@ -6,6 +6,42 @@
   "axes": "light/grotesk-sans/warm",
   "hero": "not applicable",
   "nav": "compact workspace bar",
+  "footer": "map and data attribution",
+  "imagery": "geographic basemap and job listings",
+  "photos": [],
+  "entry": "frontend/src/styles/jobs.css",
+  "fingerprint": "source sections / job index beside map / independent remote preferences / details drawer",
+  "sections": [
+   "search",
+   "workplace filters",
+   "map and results",
+   "source coverage"
+  ],
+  "signature": "a workplace map beside a live job index",
+  "waived": [],
+  "prompt": "Implement a free global tech job map with third-party and future direct listings",
+  "sweep": {
+   "staticFail": 0,
+   "staticReflex": 0,
+   "renderRawFail": 1,
+   "renderFalsePositives": [
+    "73: overflow-clipped rows sampled outside the results scroll pane"
+   ],
+   "finishWarnings": [
+    "F18: existing native account avatar"
+   ]
+  },
+  "mode": "build",
+  "prototype": true,
+  "date": "2026-10-31"
+ },
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "coral",
+  "axes": "light/grotesk-sans/warm",
+  "hero": "not applicable",
+  "nav": "compact workspace bar",
   "footer": "single-line assurance",
   "imagery": "live resume documents",
   "photos": [],

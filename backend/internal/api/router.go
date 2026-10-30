@@ -28,6 +28,7 @@ type Handlers struct {
 	ResumeDesign   *handlers.ResumeDesignHandler
 	DesignSchema   *handlers.DesignSchemaHandler
 	Agent          *handlers.AgentHandler
+	Jobs           *handlers.JobHandler
 }
 
 func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc, staticDir string) http.Handler {
@@ -89,6 +90,16 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("PUT /api/resumes/{resumeID}/design", h.ResumeDesign.Update)
 
 	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
+
+	if h.Jobs != nil {
+		handle("GET /api/jobs", h.Jobs.Search)
+		handle("GET /api/jobs/countries", h.Jobs.Countries)
+		handle("GET /api/jobs/places", h.Jobs.Places)
+		handle("GET /api/jobs/nearest", h.Jobs.Nearest)
+		handle("GET /api/jobs/{jobID}", h.Jobs.Get)
+		handle("PUT /api/jobs/{jobID}/saved", h.Jobs.Save)
+		handle("DELETE /api/jobs/{jobID}/saved", h.Jobs.Unsave)
+	}
 
 	if staticDir != "" {
 		mux.Handle("/", spaFileServer(staticDir))

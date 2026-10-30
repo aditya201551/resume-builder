@@ -4,6 +4,7 @@ import {
   Files,
   House,
   LogOut,
+  MapPin,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -41,11 +42,12 @@ export default function AppShell() {
           {[
             { to: '/resumes', label: 'Home', icon: House },
             { to: '/resumes/library', label: 'My resumes', icon: Files },
+            { to: '/jobs', label: 'Job map', icon: MapPin },
           ].map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
-              end
+              end={to !== '/jobs'}
               className={({ isActive }) =>
                 cn('app-nav-link', isActive && 'is-active')
               }

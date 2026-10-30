@@ -13,6 +13,7 @@ import (
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/config"
 	"resume-builder/backend/internal/db"
+	"resume-builder/backend/internal/jobmap"
 	"resume-builder/backend/internal/repository"
 	"resume-builder/backend/internal/service"
 )
@@ -33,6 +34,14 @@ func main() {
 		log.Fatalf("connect to database: %v", err)
 	}
 	defer pool.Close()
+
+	jobConfig, err := jobmap.LoadConfig()
+	if err != nil {
+		log.Fatalf("load job map config: %v", err)
+	}
+	jobService := service.NewJobService(repository.NewJobRepository(pool), jobConfig)
+	jobContext, stopJobs := context.WithCancel(ctx)
+	defer stopJobs()
 
 	providers := auth.NewProviders(cfg.OAuthRedirectBaseURL, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GithubClientID, cfg.GithubClientSecret)
 	if len(providers) == 0 {
@@ -102,6 +111,7 @@ func main() {
 		ResumeDesign:   handlers.NewResumeDesignHandler(resumeDesignService),
 		DesignSchema:   handlers.NewDesignSchemaHandler(),
 		Agent:          agentHandler,
+		Jobs:           handlers.NewJobHandler(jobService),
 	}
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {
@@ -114,6 +124,7 @@ func main() {
 	}
 
 	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
+	jobService.Start(jobContext)
 
 	log.Printf("api listening on :%s", cfg.Port)
 	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {

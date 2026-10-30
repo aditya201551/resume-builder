@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-31",
+  "scope": "app",
+  "mode": "prototype",
+  "theme": "Coral (locked design.md)",
+  "material": "Live public job feeds; an actual geographic basemap; no marketing images or invented product metrics",
+  "preserved": ["Geist", "warm neutral tokens", "coral selection and focus", "compact workspace navigation", "existing resume editor and PDF flows"],
+  "introduced": ["Job map navigation", "third-party map/list discovery", "independent remote preferences", "saved jobs", "direct jobs coming soon"],
+  "staticSweep": {"fail": 0, "reflex": 0, "warn": 0},
+  "renderSweep": {
+    "viewports": ["1280x800", "1440x900", "1920x1080", "375px full page", "320px navigation"],
+    "fixed": ["49a: three navigation destinations now remain on one line at 320px"],
+    "falsePositives": [{"gate": "73", "reason": "The renderer samples DOM text ranges of rows outside the overflow-clipped results pane against the footer. Those ranges are not painted. The pane explicitly clips overflow and screenshots/interaction checks verify the actual visible boundary. No visible overlap is waived."}],
+    "finishWarnings": [{"gate": "F18", "reason": "The existing 36px account avatar is a UI control, not an image placeholder to stretch."}],
+    "rawRemainingFailCount": 1
+  },
+  "browserChecks": ["actual basemap and bundled worker", "coincident clusters expose their loaded jobs", "details and saved-job persistence", "city selection preserves remote preference", "remote unknown-region opt-in", "direct jobs does not load map or job APIs", "mobile list/map", "320px and 1440px horizontal overflow", "empty and failure states", "dark theme", "no unexpected browser exceptions"],
+  "browserData": "Isolated deterministic API fixtures; live feed parsing validated independently against all nine seed employers and Himalayas",
+  "backendIntegration": "Disposable Postgres schema; up/down migrations, protected routes, cross-user bookmark isolation, closed records and concurrent quota enforcement passed",
+  "finishReview": "Prototype mode; in-thread visual review of desktop, remote, mobile, map and dark screenshots"
+}

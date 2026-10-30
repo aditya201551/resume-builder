@@ -125,5 +125,29 @@
       "findings": 2,
       "resolved": 2
     }
+  },
+  "jobMap": {
+    "scanned": "2026-10-31",
+    "scope": "app",
+    "mode": "prototype",
+    "findings": {
+      "lockedSystem": "design.md:1",
+      "fonts": "frontend/src/styles/tokens.css:22",
+      "palette": "frontend/src/styles/tokens.css:27",
+      "framework": "frontend/package.json",
+      "navigation": "frontend/src/components/layout/AppShell.tsx",
+      "routes": "frontend/src/router.tsx"
+    },
+    "preserve": [
+      "Geist and existing Coral tokens",
+      "workspace navigation and resume routes"
+    ],
+    "introduce": [
+      "source sections",
+      "job index and workplace map",
+      "remote filters",
+      "saved jobs"
+    ],
+    "report": ".hallmark/job-map-report.json"
   }
 }

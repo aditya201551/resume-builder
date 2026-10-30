@@ -9,7 +9,7 @@ The shared system for the application's screens. Resume templates and PDF docume
 - Theme: Coral, adapted to a working document editor
 - Axes: light / grotesk sans / warm, with restrained colour
 - Signature: real resume documents on a writing desk
-- Navigation: compact top bar, with Home and My resumes; the editor keeps its own mode bar
+- Navigation: compact top bar, with Home, My resumes and Job map; the editor keeps its own mode bar
 - Composition: dashboard writing prompt beside its introduction; document collection below; stable controls on the left and PDF preview on the right in every editor mode
 
 ## Tokens
@@ -47,3 +47,4 @@ Still at rest. Short colour and state transitions only; no decorative entrance a
 - `frontend/src/styles/tokens.css`: colour, type, spacing, radius, and motion tokens
 - `frontend/src/styles/base.css`: scoped accessibility and browser defaults
 - `frontend/src/styles/workspace.css`: application layout and interaction surfaces
+- `frontend/src/styles/jobs.css`: job discovery, map/list workspace and job details

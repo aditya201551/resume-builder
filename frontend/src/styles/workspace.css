@@ -454,6 +454,12 @@
   :where(.app-shell, .workspace-shell, .login-page) :is(button, [data-slot='button'], .app-nav-link) { min-height: 44px; }
   .preview-toolbar button { min-width: 44px; }
 }
+
+/* Three workspace destinations remain single-line controls on narrow phones. */
+.app-nav-link { white-space: nowrap; }
+@media (max-width: 639px) {
+  .app-navigation { gap: var(--space-md); }
+}
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }

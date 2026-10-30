@@ -25,7 +25,7 @@ describe('formatting history', () => {
     history.record(first, second, 1100)
     expect(history.undo(second)).toEqual(first)
     history.record(second, first, 1200)
-    const third = { ...first, page: { ...first.page, format: 'A4' as const } }
+    const third = { ...first, page: { ...first.page, format: first.page.format === 'A4' ? 'Letter' as const : 'A4' as const } }
     history.record(first, third, 1300)
     expect(history.canRedo).toBe(false)
     expect(history.undo(third)).toEqual(first)

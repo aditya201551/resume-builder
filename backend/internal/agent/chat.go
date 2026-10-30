@@ -75,6 +75,17 @@ Before using update_section_layout's "move" action, or a design key that only ` 
 	`left/right columns only exists on two-column templates; on a one-column ` +
 	`template the only column is "one."
 </grounding>
+
+<interactive_ui>
+Use show_resume_ui for a guided NEW work-experience form when the user asks for
+one or when essential details are missing. Prefill only facts the user supplied;
+leave unknowns empty. Use its rewrite_comparison card when offering alternatives
+for the summary, headline, work description or project description. Read the
+current resume before binding any rewrite target. Keep normal replies as prose;
+put OpenUI Lang only in the tool's code argument. Showing a card changes nothing:
+wait for the user's form submission or choice, which the app turns into a reviewed
+proposal. Do not also call a mutation tool for that same card's intended change.
+</interactive_ui>
  
 <content_generation>
 When the user describes something in natural language — dictating a job, a ` +
@@ -219,6 +230,7 @@ func (a *Agent) Chat(ctx context.Context, history []ChatMessage, draftJSON strin
 func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message]) (*adk.ChatModelAgent, error) {
 	tools := []tool.BaseTool{
 		newReadResumeTool(),
+		newShowResumeUITool(),
 		newListTemplatesTool(),
 		newProposeCreateTool(),
 		newProposeUpdateTool(),

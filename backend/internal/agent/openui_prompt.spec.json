@@ -1,0 +1,174 @@
+{
+  "root": "AssistantPanel",
+  "components": {
+    "AssistantPanel": {
+      "signature": "AssistantPanel(title: string, children: (TextBlock | ExperienceForm | RewriteComparison)[])",
+      "description": "Root resume assistant card. Include one interactive form OR one rewrite comparison, optionally preceded by a TextBlock."
+    },
+    "TextBlock": {
+      "signature": "TextBlock(text: string)",
+      "description": "A short plain-text explanation. No Markdown or HTML."
+    },
+    "ExperienceForm": {
+      "signature": "ExperienceForm(company: string, role: string, location: string, startDate: string, endDate: string, current: boolean, details: string)",
+      "description": "Collect one NEW work experience for user review. Prefill only facts the user already supplied; use empty strings for unknown facts. Dates are YYYY-MM or empty."
+    },
+    "RewriteComparison": {
+      "signature": "RewriteComparison(options: {label: string, text: string}[])",
+      "description": "Offer 2 or 3 grounded alternatives for the one rewrite target bound by show_resume_ui. The original text comes from the app. No invented metrics, skills or facts."
+    }
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "AssistantPanel": {
+        "$ref": "#/$defs/AssistantPanel"
+      },
+      "TextBlock": {
+        "$ref": "#/$defs/TextBlock"
+      },
+      "ExperienceForm": {
+        "$ref": "#/$defs/ExperienceForm"
+      },
+      "RewriteComparison": {
+        "$ref": "#/$defs/RewriteComparison"
+      }
+    },
+    "required": [
+      "AssistantPanel",
+      "TextBlock",
+      "ExperienceForm",
+      "RewriteComparison"
+    ],
+    "additionalProperties": false,
+    "$defs": {
+      "AssistantPanel": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "children": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/TextBlock"
+                },
+                {
+                  "$ref": "#/$defs/ExperienceForm"
+                },
+                {
+                  "$ref": "#/$defs/RewriteComparison"
+                }
+              ]
+            }
+          }
+        },
+        "required": [
+          "title",
+          "children"
+        ],
+        "additionalProperties": false,
+        "description": "Root resume assistant card. Include one interactive form OR one rewrite comparison, optionally preceded by a TextBlock."
+      },
+      "TextBlock": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false,
+        "description": "A short plain-text explanation. No Markdown or HTML."
+      },
+      "ExperienceForm": {
+        "type": "object",
+        "properties": {
+          "company": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "role": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "location": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "startDate": {
+            "type": "string",
+            "maxLength": 7
+          },
+          "endDate": {
+            "type": "string",
+            "maxLength": 7
+          },
+          "current": {
+            "type": "boolean"
+          },
+          "details": {
+            "type": "string",
+            "maxLength": 12000
+          }
+        },
+        "required": [
+          "company",
+          "role",
+          "location",
+          "startDate",
+          "endDate",
+          "current",
+          "details"
+        ],
+        "additionalProperties": false,
+        "description": "Collect one NEW work experience for user review. Prefill only facts the user already supplied; use empty strings for unknown facts. Dates are YYYY-MM or empty."
+      },
+      "RewriteComparison": {
+        "type": "object",
+        "properties": {
+          "options": {
+            "minItems": 2,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 80
+                },
+                "text": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16000
+                }
+              },
+              "required": [
+                "label",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "options"
+        ],
+        "additionalProperties": false,
+        "description": "Offer 2 or 3 grounded alternatives for the one rewrite target bound by show_resume_ui. The original text comes from the app. No invented metrics, skills or facts."
+      }
+    }
+  }
+}

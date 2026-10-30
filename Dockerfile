@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1
 
 FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend-builder
+ENV OPENUI_TELEMETRY_DISABLED=1
 WORKDIR /src
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package.json

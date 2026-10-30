@@ -1,3 +1,5 @@
+import type { AssistantUI } from './assistantUI'
+import { isAssistantUI } from './assistantUI'
 
 export interface AgentChatMessage {
   role: 'user' | 'assistant'
@@ -18,6 +20,8 @@ export interface AgentProposal {
   designPatch?: Record<string, unknown>
   designUpdates?: Record<string, unknown>
   toolCallId?: string
+  // Local review guard; never used to authorize an API operation.
+  sourceGuard?: import('./assistantUI').RewriteTarget
 }
 
 export interface AgentToolEvent {
@@ -34,6 +38,7 @@ export interface AgentChatHandlers {
   onTool: (event: AgentToolEvent) => void
   onDone: () => void
   onError: (message: string) => void
+  onUI?: (ui: AssistantUI) => void
 }
 
 export async function streamAgentChat(
@@ -120,6 +125,10 @@ function dispatchEvent(raw: string, handlers: AgentChatHandlers) {
   }
 
   switch (event) {
+    case 'ui':
+      if (isAssistantUI(parsed)) handlers.onUI?.(parsed)
+      else handlers.onToken('The interactive card could not be loaded. Please ask me to try again.')
+      break
     case 'token':
       handlers.onToken((parsed as { text: string }).text)
       break

@@ -30,6 +30,7 @@ function handlers() {
     onTool: vi.fn(),
     onDone: vi.fn(),
     onError: vi.fn(),
+    onUI: vi.fn(),
   } satisfies AgentChatHandlers
 }
 
@@ -38,6 +39,15 @@ afterEach(() => {
 })
 
 describe('streamAgentChat', () => {
+  it('separates complete UI events from proposal mutations and rejects unsupported envelopes', async () => {
+    const ui = { id: 'ui1', version: 1, kind: 'experience_form', code: 'root = AssistantPanel("Experience", [form])', fallback: 'Add experience' }
+    mockFetchWithStream([`event: ui\ndata: ${JSON.stringify(ui)}\n\n`, `event: ui\ndata: ${JSON.stringify({ ...ui, version: 99 })}\n\n`, 'event: done\ndata: {}\n\n'])
+    const h = handlers()
+    await streamAgentChat('r1', { messages: [{ role: 'user', content: 'Add experience' }], draft: {} }, h)
+    expect(h.onUI).toHaveBeenCalledExactlyOnceWith(ui)
+    expect(h.onProposal).not.toHaveBeenCalled()
+    expect(h.onToken).toHaveBeenCalledWith(expect.stringContaining('could not be loaded'))
+  })
   it('dispatches token chunks and the done event from the backend SSE shape', async () => {
     mockFetchWithStream([
       'event: token\ndata: {"text":"Here"}\n\n',

@@ -15,6 +15,7 @@
     "test": "turbo run test"
   },
   "devDependencies": {
+    "zod": "4.6.7",
     "shadcn": "^4.13.1",
     "turbo": "^2.9.0"
   }

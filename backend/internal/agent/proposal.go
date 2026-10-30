@@ -32,8 +32,29 @@ var flatEntities = map[string]bool{
 }
 
 type ProposalSink struct {
-	mu    sync.Mutex
-	items []Proposal
+	mu         sync.Mutex
+	items      []Proposal
+	interfaces []AssistantUI
+	uiCount    int
+}
+
+func (s *ProposalSink) addUI(ui AssistantUI) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.uiCount >= 2 {
+		return false
+	}
+	s.uiCount++
+	s.interfaces = append(s.interfaces, ui)
+	return true
+}
+
+func (s *ProposalSink) DrainUI() []AssistantUI {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	items := s.interfaces
+	s.interfaces = nil
+	return items
 }
 
 func (s *ProposalSink) add(p Proposal) {

@@ -131,6 +131,9 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		for _, p := range sink.Drain() {
 			send("proposal", map[string]any{"action": p})
 		}
+		for _, ui := range sink.DrainUI() {
+			send("ui", ui)
+		}
 
 		if event.Output != nil && event.Output.MessageOutput != nil {
 			mv := event.Output.MessageOutput
@@ -164,6 +167,9 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	for _, p := range sink.Drain() {
 		send("proposal", map[string]any{"action": p})
+	}
+	for _, ui := range sink.DrainUI() {
+		send("ui", ui)
 	}
 	send("done", map[string]any{})
 }

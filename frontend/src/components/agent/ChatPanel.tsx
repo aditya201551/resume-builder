@@ -3,6 +3,8 @@ import {
   useEffect,
   useRef,
   useState,
+  lazy,
+  Suspense,
   type KeyboardEvent,
 } from 'react'
 import {
@@ -32,6 +34,9 @@ import {
   type AssistantPart,
   type ChatMessage,
 } from '@/hooks/useAgentChat'
+import type { UIFormState, UIReviewAction } from '@/lib/assistantUI'
+
+const AssistantUIMessage = lazy(() => import('./openui/AssistantUIMessage'))
 
 function isNearBottom(el: HTMLDivElement) {
   return el.scrollHeight - el.scrollTop - el.clientHeight < 96
@@ -58,7 +63,7 @@ const QUICK_ACTIONS = [
     label: 'Write my summary',
     icon: FileText,
     prompt:
-      'Generate a professional summary for my resume based on my current work experience and skills, and propose it as a contact-info update.',
+      'Offer two or three professional summary alternatives grounded in my current experience and skills, so I can compare, edit and choose one.',
   },
   {
     label: 'Find a layout that fits',
@@ -72,6 +77,11 @@ const QUICK_ACTIONS = [
     prompt:
       'Review all my resume content (work experience, project, and summary text) for grammar and style issues, and propose fixes for anything you find.',
   },
+  {
+    label: 'Add work experience',
+    icon: Plus,
+    prompt: "Help me add a new work experience using a guided form. Leave any details I haven't provided blank for me to fill in.",
+  },
 ] as const
 
 const TOOL_LABELS: Record<string, string> = {
@@ -82,6 +92,7 @@ const TOOL_LABELS: Record<string, string> = {
   propose_skill_change: 'Updating skills',
   propose_custom_section_change: 'Updating custom sections',
   propose_meta_update: 'Updating contact info',
+  show_resume_ui: 'Preparing an interactive card',
 }
 
 function ToolActivity({
@@ -123,6 +134,9 @@ function AssistantParts({
   parts,
   streaming = false,
   onResolve,
+  busy = false,
+  onUIState,
+  onReviewUI,
 }: {
   parts: AssistantPart[]
   streaming?: boolean
@@ -131,6 +145,9 @@ function AssistantParts({
     accept: boolean,
     edits?: Record<string, string>,
   ) => void
+  busy?: boolean
+  onUIState?: (key: string, state: UIFormState) => void
+  onReviewUI?: (key: string, action: UIReviewAction) => void
 }) {
   const items = groupAssistantParts(parts)
 
@@ -138,6 +155,7 @@ function AssistantParts({
     <div className="flex flex-col gap-2">
       {items.map((item, i) => {
         const isLast = i === items.length - 1
+        const review = item.kind === 'ui' ? parts.find((p) => p.kind === 'proposal' && p.key === item.part.reviewKey) : undefined
         return item.kind === 'text' ? (
           <div key={item.key} className="text-sm leading-6 text-foreground">
             {streaming && isLast ? (
@@ -148,6 +166,12 @@ function AssistantParts({
           </div>
         ) : item.kind === 'tool' ? (
           <ToolActivity key={item.key} event={item.event} />
+        ) : item.kind === 'ui' ? (
+          <Suspense key={item.key} fallback={<div role="status" className="rounded-2xl bg-secondary p-4 text-xs text-muted-foreground">Opening interactive card...</div>}>
+            <AssistantUIMessage ui={item.part.ui} formState={item.part.formState} disabled={streaming || busy || !onReviewUI}
+              reviewStatus={review?.kind === 'proposal' ? review.status : undefined}
+              error={item.part.error} onStateChange={(state) => onUIState?.(item.key, state)} onReview={(action) => onReviewUI?.(item.key, action)} />
+          </Suspense>
         ) : (
           <ActionItem
             key={item.key}
@@ -173,6 +197,9 @@ function MessageRow({
   message,
   index,
   onResolve,
+  busy,
+  onUIState,
+  onReviewUI,
 }: {
   message: ChatMessage
   index: number
@@ -182,6 +209,9 @@ function MessageRow({
     accept: boolean,
     edits?: Record<string, string>,
   ) => void
+  busy: boolean
+  onUIState: AgentChatController['setUIState']
+  onReviewUI: AgentChatController['reviewUI']
 }) {
   if (message.role === 'user') {
     return (
@@ -209,6 +239,9 @@ function MessageRow({
       <MessageContent className="max-w-full">
         <AssistantParts
           parts={message.parts}
+          busy={busy}
+          onUIState={(key, state) => onUIState(index, key, state)}
+          onReviewUI={(key, action) => onReviewUI(index, key, action)}
           onResolve={(key, accept, edits) =>
             onResolve(index, key, accept, edits)
           }
@@ -255,6 +288,8 @@ export default function ChatPanel({
     sendMessage,
     cancel,
     resolveProposal,
+    setUIState,
+    reviewUI,
   } = chat
   const [input, setInput] = useState('')
   const [jobOpen, setJobOpen] = useState(false)
@@ -426,6 +461,15 @@ export default function ChatPanel({
                 message={m}
                 index={i}
                 onResolve={resolveProposal}
+                busy={isStreaming}
+                onUIState={(index, key, state) => {
+                  shouldStickRef.current = false
+                  setUIState(index, key, state)
+                }}
+                onReviewUI={(index, key, action) => {
+                  shouldStickRef.current = true
+                  reviewUI(index, key, action)
+                }}
               />
             ))}
             {streamingParts && <StreamingMessage parts={streamingParts} />}

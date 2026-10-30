@@ -3,6 +3,7 @@ import type { DraftAction, FlatKind } from '@/hooks/resumeDraftReducer'
 import type { AssistantPart } from '@/hooks/useAgentChat'
 import type { FullResume } from '@/types/resume'
 import type { ResumeDesign } from '@/types/design'
+import { rewriteSource } from './assistantUI'
 
 export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
   switch (p.type) {
@@ -121,6 +122,9 @@ export function canApplyProposal(
   draft: FullResume,
   justCreatedParentIds: ReadonlySet<string> = new Set(),
 ): ProposalApplicability {
+  if (p.sourceGuard && rewriteSource({ ...p.sourceGuard, id: p.id ?? p.sourceGuard.id }, draft) !== p.sourceGuard.original) {
+    return blocked('The source text has changed. Ask for a fresh comparison before applying this rewrite.')
+  }
   const flatEntity = (): ProposalApplicability => {
     const list = draft[p.entity as FlatKind] as { id: string }[] | undefined
     if (!list) return blocked(`Unknown section "${p.entity}"`)
@@ -344,6 +348,7 @@ export function proposalCurrentValues(
 export type DisplayItem =
   | { kind: 'text'; key: string; text: string }
   | { kind: 'tool'; key: string; event: AgentToolEvent }
+  | { kind: 'ui'; key: string; part: Extract<AssistantPart, { kind: 'ui' }> }
   | {
       kind: 'action'
       key: string
@@ -366,6 +371,10 @@ export function groupAssistantParts(parts: AssistantPart[]): DisplayItem[] {
   const items: DisplayItem[] = []
 
   for (const part of parts) {
+    if (part.kind === 'ui') {
+      items.push({ kind: 'ui', key: part.key, part })
+      continue
+    }
     if (part.kind === 'text') {
       items.push({ kind: 'text', key: `text-${items.length}`, text: part.text })
       continue

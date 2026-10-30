@@ -13,10 +13,13 @@ import { loadAutoAccept, saveAutoAccept } from '@/lib/agentChatPrefs'
 import { assistantMessage } from '@/lib/assistantTask'
 import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
+import { tempId } from '@/lib/tempId'
+import { uiReviewProposal, rewriteSource, type AssistantUI, type UIFormState, type UIReviewAction } from '@/lib/assistantUI'
 
 export type AssistantPart =
   | { kind: 'text'; text: string }
   | { kind: 'tool'; key: string; event: AgentToolEvent }
+  | { kind: 'ui'; key: string; ui: AssistantUI; formState: UIFormState; reviewKey?: string; error?: string }
   | {
       kind: 'proposal'
       key: string
@@ -45,8 +48,7 @@ function assistantToPlain(m: Extract<ChatMessage, { role: 'assistant' }>): {
   return {
     role: 'assistant',
     content: m.parts
-      .filter((p) => p.kind === 'text')
-      .map((p) => p.text)
+      .map((p) => p.kind === 'text' ? p.text : p.kind === 'ui' ? `[Interactive card: ${p.ui.fallback}]\n${p.ui.code}` : p.kind === 'proposal' ? `[Proposed resume change; ${p.status}: ${JSON.stringify(p.proposal)}]` : '')
       .join(''),
   }
 }
@@ -91,6 +93,7 @@ export function useAgentChat() {
 
   const applyProposal = useCallback(
     (proposal: AgentProposal): boolean => {
+      if (proposal.sourceGuard && rewriteSource(proposal.sourceGuard, draftRef.current, resolveEntryId) !== proposal.sourceGuard.original) return false
       proposal = resolveEntryReferences(proposal, resolveEntryId)
       const action = proposalToDraftAction(proposal)
       if (!action) return false
@@ -245,6 +248,10 @@ export function useAgentChat() {
           onTool: (event) => {
             if (current()) upsertToolEvent(event)
           },
+          onUI: (ui) => {
+            if (!current() || streamingPartsRef.current.some((p) => p.kind === 'ui' && p.ui.id === ui.id)) return
+            pushPart({ kind: 'ui', key: ui.id, ui, formState: {} })
+          },
           onDone: () => {
             if (current()) finishStreaming()
           },
@@ -319,6 +326,33 @@ export function useAgentChat() {
     [applyProposal],
   )
 
+  const updateUI = useCallback((messageIndex: number, key: string, update: (part: Extract<AssistantPart, { kind: 'ui' }>, parts: AssistantPart[]) => AssistantPart[]) => {
+    const message = messagesRef.current[messageIndex]
+    if (message?.role !== 'assistant') return
+    const part = message.parts.find((p) => p.kind === 'ui' && p.key === key)
+    if (part?.kind !== 'ui') return
+    const next = messagesRef.current.map((m, i) => i === messageIndex ? { ...message, parts: update(part, message.parts) } : m)
+    messagesRef.current = next
+    setMessages(next)
+  }, [])
+
+  const setUIState = useCallback((messageIndex: number, key: string, formState: UIFormState) => {
+    updateUI(messageIndex, key, (part, parts) => parts.map((p) => p === part ? { ...part, formState, error: undefined } : p))
+  }, [updateUI])
+
+  const reviewUI = useCallback((messageIndex: number, key: string, action: UIReviewAction) => {
+    if (activeRef.current) return
+    updateUI(messageIndex, key, (part, parts) => {
+      const previous = parts.find((p) => p.kind === 'proposal' && p.key === part.reviewKey)
+      if (previous?.kind === 'proposal' && previous.status !== 'rejected') return parts
+      const result = uiReviewProposal(part.ui, action, draftRef.current, tempId, resolveEntryId)
+      if ('error' in result) return parts.map((p) => p === part ? { ...part, error: result.error } : p)
+      const reviewKey = nextProposalKey()
+      const proposal = { ...result.proposal, sourceGuard: part.ui.target }
+      return [...parts.map((p) => p === part ? { ...part, reviewKey, error: undefined } : p), { kind: 'proposal', key: reviewKey, proposal, status: 'pending' }]
+    })
+  }, [updateUI, resolveEntryId])
+
   return {
     messages,
     streamingParts,
@@ -329,6 +363,8 @@ export function useAgentChat() {
     sendMessage,
     cancel,
     resolveProposal,
+    setUIState,
+    reviewUI,
   }
 }
 

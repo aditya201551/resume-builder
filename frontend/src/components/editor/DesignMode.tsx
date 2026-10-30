@@ -1,20 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import {
-  DndContext,
-  DragOverlay,
-  closestCorners,
-  PointerSensor,
-  KeyboardSensor,
-  useSensor,
-  useSensors,
-  useDroppable,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent,
-} from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, Undo2, Redo2 } from 'lucide-react'
+import { Undo2, Redo2 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -24,10 +9,11 @@ import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { useTemplates } from '@/hooks/useTemplates'
 import { useDesignSchema } from '@/hooks/useDesignSchema'
 import type { ResumeDesign, SectionRef } from '@/types/design'
-import type { CustomSection, FullResume } from '@/types/resume'
+import type { CustomSection } from '@/types/resume'
 import type { FieldDef, FieldGroup } from '@/types/designSchema'
 import type { Template } from '@/types/template'
-import { resolveSectionRefs, resolveTwoColumnSectionRefs, sectionRefKey, SECTION_LABELS } from '@/lib/sectionOrder'
+import { getTemplate, selectTemplate, supportsTemplateField } from '@/templates/catalog'
+import { resolveSectionRefs, sectionRefKey, SECTION_LABELS } from '@/lib/sectionOrder'
 import { getFieldValue, buildFieldPatch } from '@/lib/designField'
 import { cn } from '@/lib/utils'
 
@@ -165,7 +151,7 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
   if (!templates || templates.length === 0) return null
 
   function applyTemplate(t: Template) {
-    onChange({ ...t.default_design, templateId: t.id, sectionOrder: design.sectionOrder })
+    onChange(selectTemplate(design, t.id))
   }
 
   return (
@@ -180,8 +166,12 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
             design.templateId === t.id ? 'border-accent ring-1 ring-accent' : 'border-border hover:border-foreground/30',
           )}
         >
-          <div className="flex h-16 w-12 items-center justify-center rounded bg-secondary text-[10px] text-muted-foreground">Aa</div>
+          <div aria-hidden className="flex h-24 w-16 flex-col gap-1 rounded-sm border bg-white p-2 shadow-sm">
+            <span className="mb-1 h-1.5 w-8 rounded-sm bg-slate-700" />
+            {[0, 1, 2].map((row) => <div key={row} className="mt-1 flex flex-col gap-1"><span className="h-1 w-7 rounded-sm bg-violet-300" /><span className="h-0.5 w-full bg-slate-200" /><span className="h-0.5 w-4/5 bg-slate-200" /></div>)}
+          </div>
           {t.name}
+          <span className="text-[10px] text-muted-foreground">{t.description}</span>
         </button>
       ))}
     </div>
@@ -243,272 +233,10 @@ function sectionRefListHandlers(refs: SectionRef[], persist: (newRefs: SectionRe
   }
 }
 
-function sectionDefaultLabel(ref: SectionRef, customSections: CustomSection[]): string {
-  if (ref.sectionType !== 'custom') return SECTION_LABELS[ref.sectionType] ?? ref.sectionType
-  return customSections.find((s) => s.id === ref.customSectionId)?.title || 'Untitled section'
-}
-
-function SectionRowContent({
-  dragHandle,
-  ref,
-  defaultLabel,
-  onSetTitleOverride,
-  onToggleVisible,
-  overlay,
-}: {
-  dragHandle: ReactNode
-  ref: SectionRef
-  defaultLabel: string
-  onSetTitleOverride?: (key: string, value: string) => void
-  onToggleVisible?: (key: string) => void
-  overlay?: boolean
-}) {
-  const key = sectionRefKey(ref)
-  return (
-    <div className={cn('flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2', overlay && 'shadow-lg')}>
-      {dragHandle}
-      <Input
-        value={ref.titleOverride ?? ''}
-        placeholder={defaultLabel}
-        onChange={(e) => onSetTitleOverride?.(key, e.target.value)}
-        readOnly={overlay}
-        className="h-8 flex-1"
-      />
-      <Switch checked={ref.isVisible} onCheckedChange={() => onToggleVisible?.(key)} disabled={overlay} />
-    </div>
-  )
-}
-
-function DragHandle(props: React.ComponentProps<'button'>) {
-  return (
-    <button
-      type="button"
-      aria-label="Drag to move"
-      onClick={(e) => e.stopPropagation()}
-      className="-my-1 flex size-6 shrink-0 cursor-grab items-center justify-center rounded text-muted-foreground/50 hover:bg-muted hover:text-muted-foreground active:cursor-grabbing"
-      {...props}
-    >
-      <GripVertical className="size-4" />
-    </button>
-  )
-}
-
-function SortableSectionRow({
-  sectionRef,
-  defaultLabel,
-  onSetTitleOverride,
-  onToggleVisible,
-}: {
-  sectionRef: SectionRef
-  defaultLabel: string
-  onSetTitleOverride: (key: string, value: string) => void
-  onToggleVisible: (key: string) => void
-}) {
-  const id = sectionRefKey(sectionRef)
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id })
-  return (
-    <div ref={setNodeRef} style={{ transform: CSS.Transform.toString(transform), transition }} className={cn(isDragging && 'opacity-30')}>
-      <SectionRowContent
-        dragHandle={<DragHandle {...attributes} {...listeners} />}
-        ref={sectionRef}
-        defaultLabel={defaultLabel}
-        onSetTitleOverride={onSetTitleOverride}
-        onToggleVisible={onToggleVisible}
-      />
-    </div>
-  )
-}
-
-function SectionColumn({
-  id,
-  label,
-  refs,
-  customSections,
-  onSetTitleOverride,
-  onToggleVisible,
-}: {
-  id: 'left' | 'right'
-  label: string
-  refs: SectionRef[]
-  customSections: CustomSection[]
-  onSetTitleOverride: (key: string, value: string) => void
-  onToggleVisible: (key: string) => void
-}) {
-  const { setNodeRef } = useDroppable({ id })
-  return (
-    <div className="flex flex-col gap-2">
-      <h4 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{label}</h4>
-      <SortableContext items={refs.map(sectionRefKey)} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="flex min-h-16 flex-col gap-2 rounded-lg border border-dashed border-transparent p-0.5">
-          {refs.length === 0 ? (
-            <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
-              Drop a section here
-            </p>
-          ) : (
-            refs.map((ref) => (
-              <SortableSectionRow
-                key={sectionRefKey(ref)}
-                sectionRef={ref}
-                defaultLabel={sectionDefaultLabel(ref, customSections)}
-                onSetTitleOverride={onSetTitleOverride}
-                onToggleVisible={onToggleVisible}
-              />
-            ))
-          )}
-        </div>
-      </SortableContext>
-    </div>
-  )
-}
-
-type Columns = { left: SectionRef[]; right: SectionRef[] }
-
-function findColumn(id: string, columns: Columns): 'left' | 'right' | undefined {
-  if (id === 'left' || id === 'right') return id
-  if (columns.left.some((r) => sectionRefKey(r) === id)) return 'left'
-  if (columns.right.some((r) => sectionRefKey(r) === id)) return 'right'
-  return undefined
-}
-
-function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch: (action: { type: 'design_update'; patch: Partial<ResumeDesign> }) => void }) {
-  const [dragColumns, setDragColumns] = useState<Columns | null>(null)
-  const [activeId, setActiveId] = useState<string | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
-
-  const columns = dragColumns ?? resolveTwoColumnSectionRefs(data)
-
-  function persist(final: Columns) {
-    dispatch({
-      type: 'design_update',
-      patch: { sectionOrder: { ...data.design.sectionOrder, two: { left: final.left, right: final.right } } },
-    })
-  }
-
-  function handleDragStart(event: DragStartEvent) {
-    setActiveId(String(event.active.id))
-    setDragColumns(resolveTwoColumnSectionRefs(data))
-  }
-
-  function handleDragOver(event: DragOverEvent) {
-    const { active, over } = event
-    if (!over) return
-    setDragColumns((prev) => {
-      if (!prev) return prev
-      const activeId = String(active.id)
-      const overId = String(over.id)
-      const activeColumn = findColumn(activeId, prev)
-      const overColumn = findColumn(overId, prev)
-      if (!activeColumn || !overColumn || activeColumn === overColumn) return prev
-
-      const activeItems = prev[activeColumn]
-      const overItems = prev[overColumn]
-      const activeIndex = activeItems.findIndex((r) => sectionRefKey(r) === activeId)
-      if (activeIndex === -1) return prev
-      const overIndex = overItems.findIndex((r) => sectionRefKey(r) === overId)
-      const insertAt = overIndex >= 0 ? overIndex : overItems.length
-      const moved = activeItems[activeIndex]
-      return {
-        ...prev,
-        [activeColumn]: activeItems.filter((_, i) => i !== activeIndex),
-        [overColumn]: [...overItems.slice(0, insertAt), moved, ...overItems.slice(insertAt)],
-      }
-    })
-  }
-
-  function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    let final = dragColumns ?? resolveTwoColumnSectionRefs(data)
-
-    if (over) {
-      const activeId = String(active.id)
-      const overId = String(over.id)
-      const column = findColumn(activeId, final)
-      const overColumn = findColumn(overId, final)
-      if (column && overColumn === column) {
-        const items = final[column]
-        const activeIndex = items.findIndex((r) => sectionRefKey(r) === activeId)
-        const overIndex = items.findIndex((r) => sectionRefKey(r) === overId)
-        if (activeIndex !== -1 && overIndex !== -1 && activeIndex !== overIndex) {
-          final = { ...final, [column]: arrayMove(items, activeIndex, overIndex) }
-        }
-      }
-    }
-
-    persist(final)
-    setDragColumns(null)
-    setActiveId(null)
-  }
-
-  function toggleVisible(key: string) {
-    const cur = resolveTwoColumnSectionRefs(data)
-    const column = findColumn(key, cur)
-    if (!column) return
-    persist({ ...cur, [column]: cur[column].map((r) => (sectionRefKey(r) === key ? { ...r, isVisible: !r.isVisible } : r)) })
-  }
-
-  function setTitleOverride(key: string, value: string) {
-    const cur = resolveTwoColumnSectionRefs(data)
-    const column = findColumn(key, cur)
-    if (!column) return
-    persist({ ...cur, [column]: cur[column].map((r) => (sectionRefKey(r) === key ? { ...r, titleOverride: value || null } : r)) })
-  }
-
-  const activeRef = activeId ? [...columns.left, ...columns.right].find((r) => sectionRefKey(r) === activeId) : undefined
-
-  return (
-    <div className="flex flex-col gap-5">
-      <p className="text-xs text-muted-foreground">
-        This template has two columns — drag sections between them, reorder within a column, and show/hide or rename
-        each. A section only shows up here once it actually has content — add or remove sections in Content.
-      </p>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCorners}
-        onDragStart={handleDragStart}
-        onDragOver={handleDragOver}
-        onDragEnd={handleDragEnd}
-        onDragCancel={() => { setDragColumns(null); setActiveId(null) }}
-      >
-        <div className="grid grid-cols-2 gap-4">
-          <SectionColumn
-            id="left"
-            label="Sidebar"
-            refs={columns.left}
-            customSections={data.custom_sections}
-            onSetTitleOverride={setTitleOverride}
-            onToggleVisible={toggleVisible}
-          />
-          <SectionColumn
-            id="right"
-            label="Main"
-            refs={columns.right}
-            customSections={data.custom_sections}
-            onSetTitleOverride={setTitleOverride}
-            onToggleVisible={toggleVisible}
-          />
-        </div>
-        <DragOverlay>
-          {activeRef && (
-            <SectionRowContent
-              dragHandle={<DragHandle />}
-              ref={activeRef}
-              defaultLabel={sectionDefaultLabel(activeRef, data.custom_sections)}
-              overlay
-            />
-          )}
-        </DragOverlay>
-      </DndContext>
-    </div>
-  )
-}
-
 function SectionsPanel() {
   const { state, dispatch } = useResumeDraftContext()
   const data = state.data
 
-  if (data.design.layout.mode === 'two') {
-    return <TwoColumnSectionsPanel data={data} dispatch={dispatch} />
-  }
 
   const refs = resolveSectionRefs(data)
   const persist = (newRefs: SectionRef[]) =>
@@ -633,7 +361,6 @@ export default function DesignMode() {
   const { state, dispatch, undoDesign, redoDesign, canUndoDesign, canRedoDesign } = useResumeDraftContext()
   const design = state.data.design
   const { data: schema, isLoading: schemaLoading } = useDesignSchema()
-  const { data: templates } = useTemplates()
   const [activeCategory, setActiveCategory] = useState<string>('templates')
   const sectionElsRef = useRef<Map<string, HTMLElement>>(new Map())
   const suppressObserverUntilRef = useRef(0)
@@ -642,13 +369,10 @@ export default function DesignMode() {
     dispatch({ type: 'design_update', patch })
   }
 
-  const activeTemplate = templates?.find((t) => t.id === design.templateId)
-  const visibleGroups = (schema ?? []).filter((group) => {
-    if (!activeTemplate) return true
-    if (!activeTemplate.supported_groups.includes(group.key)) return false
-    if (group.key === 'layout' && activeTemplate.supported_modes.length <= 1) return false
-    return true
-  })
+  const activeTemplate = getTemplate(design.templateId)
+  const visibleGroups = (schema ?? []).filter((group) => group.key !== 'paper').map((group) => ({
+    ...group, fields: group.fields.filter((field) => supportsTemplateField(activeTemplate, field.key)),
+  })).filter((group) => group.fields.length > 0)
 
   const navItems = [...PINNED_ITEMS, ...visibleGroups.map((g) => ({ key: g.key, label: g.label }))]
   const navKeys = navItems.map((n) => n.key).join(',')
@@ -725,7 +449,6 @@ export default function DesignMode() {
               { label: 'Spacious', description: 'A little more breathing room', lineHeight: 1.65, sectionGap: 24, entryGap: 14, bulletGap: 6 },
             ].map((preset) => <button key={preset.label} type="button" className="format-preset" onClick={() => update({ typography: { ...design.typography, lineHeight: preset.lineHeight }, spacing: { sectionGap: preset.sectionGap, entryGap: preset.entryGap, bulletGap: preset.bulletGap } })}><strong>{preset.label}</strong><span className="text-[10px] text-muted-foreground">{preset.description}</span></button>)}
           </div>
-          {design.layout.mode === 'two' && <NumberField label="Left column width (%)" value={design.layout.columnWidths.left} min={20} max={80} step={1} onChange={(left) => update({ layout: { ...design.layout, columnWidths: { left, right: 100 - left } } })} />}
           <p className="text-[11px] leading-relaxed text-muted-foreground">Fonts are embedded in your PDF. Georgia uses Gelasio; Times New Roman uses Tinos; Arial and Helvetica use Arimo. Other listed fonts use their own bundled files.</p>
         </section>
 

@@ -1,4 +1,5 @@
 import type { FullResume } from '@/types/resume'
+import { normalizeTemplateDesign } from '@/templates/catalog'
 
 export interface StoredDraft {
   data: FullResume
@@ -22,7 +23,10 @@ export function loadDraft(resumeId: string): StoredDraft | null {
     const parsed = JSON.parse(raw) as Partial<StoredEnvelope>
     if (parsed.version !== DRAFT_SCHEMA_VERSION) return null
     if (!parsed.data || !parsed.lastSynced) return null
-    return { data: parsed.data, lastSynced: parsed.lastSynced }
+    return {
+      data: { ...parsed.data, design: normalizeTemplateDesign(parsed.data.design) },
+      lastSynced: { ...parsed.lastSynced, design: normalizeTemplateDesign(parsed.lastSynced.design) },
+    }
   } catch {
     return null
   }

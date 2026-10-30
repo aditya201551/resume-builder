@@ -71,7 +71,7 @@ func newListTemplatesTool() tool.InvokableTool { return &listTemplatesTool{} }
 func (t *listTemplatesTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name:        "list_templates",
-		Desc:        "List the resume templates available to switch between, including each one's id, name, renderer_key, which layout modes it supports, and which design.Schema() groups it exposes. Fetched fresh from the database when called. Call this only when the user asks about templates or you need a template's id/capabilities — not on every turn.",
+		Desc:        "List the code-defined resume templates, including id, revision, renderer_key, supported layout modes, and supported design fields. Call this when the user asks about templates or you need an id or capability. Templates share the resume's saved formatting; switching templates does not reset fonts, colors or spacing.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
 	}, nil
 }
@@ -633,8 +633,12 @@ func (t *proposeDesignUpdateTool) InvokableRun(ctx context.Context, argumentsInJ
 	}
 
 	touched := map[string]bool{}
+	templateID, _ := working["templateId"].(string)
+	if _, ok := design.FindTemplate(templateID); !ok {
+		templateID = design.DefaultTemplateID()
+	}
 	for key, value := range args.Updates {
-		if err := design.ValidateFieldValue(key, value); err != nil {
+		if err := design.ValidateTemplateField(templateID, key, value); err != nil {
 			return toolProblem("%v", err)
 		}
 		parts := strings.Split(key, ".")
@@ -667,10 +671,7 @@ func newProposeTemplateSwitchTool() tool.InvokableTool { return &proposeTemplate
 func (t *proposeTemplateSwitchTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: "switch_template",
-		Desc: "Switch the resume to a different template. Call list_templates first if you don't already know the target template's id " +
-			"and capabilities from earlier in this conversation — don't guess a template id. Note that some previously set design " +
-			"settings and section placements may not carry over cleanly to a template with a different layout mode; mention this to " +
-			"the user if you know the target template's mode differs from the current one.",
+		Desc: "Switch the resume to a template from list_templates. Preserve the resume's common formatting, content and section preferences. Only the template identity and necessary layout compatibility change. Never invent template IDs.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"template_id": {
 				Type:     schema.String,
@@ -715,18 +716,16 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 		return toolProblem("could not load the template catalog (%v)", err)
 	}
 	var catalog []struct {
-		ID            string          `json:"id"`
-		Name          string          `json:"name"`
-		DefaultDesign json.RawMessage `json:"default_design"`
+		ID   string `json:"id"`
+		Name string `json:"name"`
 	}
 	if err := json.Unmarshal([]byte(catalogJSON), &catalog); err != nil {
 		return "", fmt.Errorf("parse template catalog: %w", err)
 	}
 
 	var target *struct {
-		ID            string          `json:"id"`
-		Name          string          `json:"name"`
-		DefaultDesign json.RawMessage `json:"default_design"`
+		ID   string `json:"id"`
+		Name string `json:"name"`
 	}
 	for i := range catalog {
 		if catalog[i].ID == args.TemplateID {
@@ -738,30 +737,31 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 		return toolProblem("no template with id %q — call list_templates to see valid ids", args.TemplateID)
 	}
 
-	patch := map[string]any{}
-	if err := json.Unmarshal(target.DefaultDesign, &patch); err != nil {
-		return "", fmt.Errorf("parse template %s default_design: %w", target.ID, err)
-	}
-	patch["templateId"] = target.ID
-
 	current, err := currentDesignMap(ctx)
 	if err != nil {
 		return "", err
 	}
-	if sectionOrder, ok := current["sectionOrder"]; ok {
-		patch["sectionOrder"] = sectionOrder
-	}
-
-	patchJSON, err := json.Marshal(patch)
+	currentJSON, err := json.Marshal(current)
 	if err != nil {
-		return "", fmt.Errorf("marshal merged design: %w", err)
+		return "", err
 	}
-	var merged design.ResumeDesign
-	if err := json.Unmarshal(patchJSON, &merged); err != nil {
+	merged := design.Default(design.DefaultTemplateID())
+	if err := json.Unmarshal(currentJSON, &merged); err != nil {
 		return "", fmt.Errorf("unmarshal merged design: %w", err)
 	}
+	if _, ok := design.FindTemplate(target.ID); !ok {
+		return toolProblem("template %q is not registered", target.ID)
+	}
+	merged.TemplateID = target.ID
+	previousMode := merged.Layout.Mode
+	merged = design.NormalizeTemplate(merged)
 	if err := design.Validate(merged); err != nil {
 		return toolProblem("switching to %q would produce an invalid design (%v) — this looks like a problem with the template itself, not something you can fix by retrying", target.Name, err)
+	}
+	patch := map[string]any{"templateId": target.ID}
+	if previousMode != merged.Layout.Mode {
+		patch["layout"] = merged.Layout
+		patch["sectionOrder"] = merged.SectionOrder
 	}
 
 	sink, err := sinkFromContext(ctx)
@@ -928,6 +928,14 @@ func (t *proposeSectionUpdateTool) InvokableRun(ctx context.Context, argumentsIn
 	currentDesign, err := currentDesignMap(ctx)
 	if err != nil {
 		return "", err
+	}
+	templateID, _ := currentDesign["templateId"].(string)
+	template, ok := design.FindTemplate(templateID)
+	if !ok {
+		template, _ = design.FindTemplate(design.DefaultTemplateID())
+	}
+	if template.Capabilities.Columns == 1 && (args.Action == "move" || args.Column == "left" || args.Column == "right") {
+		return toolProblem("%s has one column; use column: one and reorder, set_visible or set_title", template.Name)
 	}
 	sectionOrder, ok := currentDesign["sectionOrder"].(map[string]any)
 	if !ok {

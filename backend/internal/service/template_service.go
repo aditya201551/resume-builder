@@ -3,17 +3,15 @@ package service
 import (
 	"context"
 
-	"resume-builder/backend/internal/repository"
+	"resume-builder/backend/internal/design"
 )
 
-type TemplateService struct {
-	repo *repository.TemplateRepository
+type TemplateService struct{}
+
+func NewTemplateService() *TemplateService {
+	return &TemplateService{}
 }
 
-func NewTemplateService(repo *repository.TemplateRepository) *TemplateService {
-	return &TemplateService{repo: repo}
-}
-
-func (s *TemplateService) List(ctx context.Context) ([]repository.Template, error) {
-	return s.repo.List(ctx)
+func (s *TemplateService) List(_ context.Context) ([]design.Template, error) {
+	return design.Templates(), nil
 }

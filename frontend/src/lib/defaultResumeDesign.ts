@@ -1,7 +1,8 @@
 import type { ResumeDesign } from '@/types/design'
+import catalog from '../../../backend/internal/design/templates.json'
 
 export const defaultResumeDesign: ResumeDesign = {
-  templateId: '',
+  templateId: catalog.defaultTemplateId,
   layout: { mode: 'one', columnWidths: { left: 50, right: 50 } },
   sectionOrder: { one: { sections: [] }, two: { left: [], right: [] }, mix: { bands: [] } },
   page: { format: 'Letter', marginTop: 48, marginBottom: 48, marginLeft: 56, marginRight: 56 },

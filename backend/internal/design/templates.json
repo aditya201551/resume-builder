@@ -1,0 +1,30 @@
+{
+  "defaultTemplateId": "vertical",
+  "templates": [
+    {
+      "id": "vertical",
+      "revision": 1,
+      "renderer_key": "vertical",
+      "name": "Vertical",
+      "description": "A clear, single-column resume with a full-width header and sections flowing from top to bottom.",
+      "thumbnail_url": null,
+      "tags": ["One column", "Professional"],
+      "supported_modes": ["one"],
+      "capabilities": { "columns": 1, "headerPlacement": "full-width", "photo": false },
+      "supported_fields": [
+        "page.format", "page.marginTop", "page.marginBottom", "page.marginLeft", "page.marginRight",
+        "typography.fontFamily", "typography.nameFontFamily", "typography.baseFontSizePt",
+        "typography.lineHeight", "typography.nameFontSizePt", "typography.headlineFontSizePt",
+        "typography.sectionHeadingFontSizePt", "typography.entryHeaderFontSizePt",
+        "colors.text", "colors.accent", "colors.background",
+        "colors.applyAccent.name", "colors.applyAccent.headings", "colors.applyAccent.dates",
+        "heading.style", "heading.capitalization", "header.alignText", "header.jobTitlePosition",
+        "entryLayout.dateDisplayMode", "entryLayout.subtitleStyle",
+        "sectionDisplay.skills", "sectionDisplay.languages", "sectionDisplay.certifications",
+        "spacing.sectionGap", "spacing.entryGap", "spacing.bulletGap",
+        "linkStyle.showIcon", "linkStyle.underline", "linkStyle.useAccentColor",
+        "footer.showPageNumbers", "footer.showEmail", "footer.showName", "dateFormat"
+      ]
+    }
+  ]
+}

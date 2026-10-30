@@ -1,7 +1,6 @@
 import type { ResumeDesign } from '@/types/design'
 import type { ResumeContent } from './contract'
-import ClassicTemplate from './classic/ClassicTemplate'
-import VerticalSplitTemplate from './verticalSplit/VerticalSplitTemplate'
+import VerticalHtmlTemplate from './vertical/VerticalHtmlTemplate'
 
 export interface TemplateComponentProps {
   content: ResumeContent
@@ -12,12 +11,13 @@ export interface TemplateComponentProps {
 export type TemplateComponent = (props: TemplateComponentProps) => React.JSX.Element
 
 export const templateRegistry: Record<string, TemplateComponent> = {
-  classic: ClassicTemplate,
-  'vertical-split': VerticalSplitTemplate,
+  vertical: VerticalHtmlTemplate,
 }
 
-const DEFAULT_RENDERER_KEY = 'classic'
+const DEFAULT_RENDERER_KEY = 'vertical'
 
 export function resolveTemplateComponent(rendererKey?: string): TemplateComponent {
-  return (rendererKey && templateRegistry[rendererKey]) || templateRegistry[DEFAULT_RENDERER_KEY]
+  const component = templateRegistry[rendererKey ?? DEFAULT_RENDERER_KEY]
+  if (!component) throw new Error(`Legacy HTML renderer is not registered: ${rendererKey}`)
+  return component
 }

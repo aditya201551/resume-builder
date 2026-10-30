@@ -94,6 +94,10 @@ func ValidateFieldValue(key string, value any) error {
 func Schema() []FieldGroup {
 	return []FieldGroup{
 		{
+			Key: "paper", Label: "Paper",
+			Fields: []FieldDef{{Key: "page.format", Label: "Paper size", Type: FieldEnum, Options: validPageFormats}},
+		},
+		{
 			Key:   "layout",
 			Label: "Layout",
 			Fields: []FieldDef{
@@ -133,6 +137,7 @@ func Schema() []FieldGroup {
 				{Key: "entryLayout.subtitleStyle", Label: "Subtitle style", Type: FieldEnum, Options: validSubtitleStyles},
 				{Key: "sectionDisplay.skills", Label: "Skills display", Type: FieldEnum, Options: validSectionDisplayModes},
 				{Key: "sectionDisplay.languages", Label: "Languages display", Type: FieldEnum, Options: validSectionDisplayModes},
+				{Key: "sectionDisplay.certifications", Label: "Certificates display", Type: FieldEnum, Options: validSectionDisplayModes},
 				{Key: "dateFormat", Label: "Date format", Type: FieldEnum, Options: validDateFormats},
 			},
 		},

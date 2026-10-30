@@ -52,11 +52,10 @@ func main() {
 	miscEntries := repository.NewMiscEntryRepository(pool)
 	customSections := repository.NewCustomSectionRepository(pool)
 	sectionConfigs := repository.NewSectionConfigRepository(pool)
-	templates := repository.NewTemplateRepository(pool)
 	resumeDesigns := repository.NewResumeDesignRepository(pool)
 
 	authService := service.NewAuthService(users)
-	resumeService := service.NewResumeService(resumes, resumeDesigns, templates, workExperiences, educations, skills, projects, certifications, languages, miscEntries, customSections, sectionConfigs)
+	resumeService := service.NewResumeService(resumes, resumeDesigns, workExperiences, educations, skills, projects, certifications, languages, miscEntries, customSections, sectionConfigs)
 	workExperienceService := service.NewWorkExperienceService(resumes, workExperiences)
 	educationService := service.NewEducationService(resumes, educations)
 	projectService := service.NewProjectService(resumes, projects)
@@ -66,8 +65,8 @@ func main() {
 	skillService := service.NewSkillService(resumes, skills)
 	customSectionService := service.NewCustomSectionService(resumes, sectionConfigs, customSections)
 	sectionConfigService := service.NewSectionConfigService(resumes, sectionConfigs)
-	templateService := service.NewTemplateService(templates)
-	resumeDesignService := service.NewResumeDesignService(resumes, resumeDesigns, templates)
+	templateService := service.NewTemplateService()
+	resumeDesignService := service.NewResumeDesignService(resumes, resumeDesigns)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
 	agentCfg, err := agent.LoadConfig()

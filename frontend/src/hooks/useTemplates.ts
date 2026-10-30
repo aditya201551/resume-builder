@@ -1,10 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { apiGet } from '@/lib/http'
-import type { Template } from '@/types/template'
+import { templates } from '@/templates/catalog'
 
 export function useTemplates() {
-  return useQuery({
-    queryKey: ['templates'],
-    queryFn: () => apiGet<Template[]>('/api/templates'),
-  })
+  return { data: templates, isLoading: false }
 }

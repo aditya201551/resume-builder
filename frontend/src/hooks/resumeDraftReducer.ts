@@ -6,6 +6,7 @@ import type {
   SkillItem,
 } from '@/types/resume'
 import type { ResumeDesign } from '@/types/design'
+import { normalizeTemplateDesign } from '@/templates/catalog'
 
 export type FlatKind =
   | 'work_experiences'
@@ -71,8 +72,14 @@ function replaceIdEverywhere(value: unknown, idMap: Record<string, string>): unk
 }
 
 export function draftReducer(state: DraftState, action: DraftAction): DraftState {
-  if (action.type === 'replace_all') return { data: action.data, lastSynced: action.data }
-  if (action.type === 'hydrate') return { data: action.data, lastSynced: action.lastSynced }
+  if (action.type === 'replace_all') {
+    const data = { ...action.data, design: normalizeTemplateDesign(action.data.design) }
+    return { data, lastSynced: data }
+  }
+  if (action.type === 'hydrate') return {
+    data: { ...action.data, design: normalizeTemplateDesign(action.data.design) },
+    lastSynced: { ...action.lastSynced, design: normalizeTemplateDesign(action.lastSynced.design) },
+  }
 
   const d = state.data
 
@@ -81,7 +88,7 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
       return { ...state, data: { ...d, resume: { ...d.resume, ...action.patch } } }
 
     case 'design_update':
-      return { ...state, data: { ...d, design: { ...d.design, ...action.patch } } }
+      return { ...state, data: { ...d, design: normalizeTemplateDesign({ ...d.design, ...action.patch }) } }
 
     case 'flat_create':
       return {

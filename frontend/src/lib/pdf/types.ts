@@ -5,13 +5,14 @@ import type { FullResume } from '@/types/resume'
 export interface PdfSource {
   data: FullResume
   rendererKey: string
+  templateRevision: number
 }
 
-export function pdfSourceKey({ data, rendererKey }: PdfSource): string {
+export function pdfSourceKey({ data, rendererKey, templateRevision }: PdfSource): string {
   const { full_name, headline, email, phone, location, links, summary } = data.resume
   // Labels and server timestamps cannot change the document. Sync acknowledgements
   // should not cause another render of the same PDF.
-  return JSON.stringify({ data: { ...data, resume: { full_name, headline, email, phone, location, links, summary } }, rendererKey })
+  return JSON.stringify({ data: { ...data, resume: { full_name, headline, email, phone, location, links, summary } }, rendererKey, templateRevision })
 }
 
 export interface PdfInput {

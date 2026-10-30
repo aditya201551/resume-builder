@@ -3,6 +3,7 @@ WORKDIR /src
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package.json
 COPY backend/package.json backend/package.json
+COPY backend/internal/design/templates.json backend/internal/design/templates.json
 RUN npm ci --workspace=frontend --include-workspace-root
 COPY frontend frontend
 RUN npm run build --workspace=frontend

@@ -8,7 +8,7 @@ import { pdfHitRegions } from './regions'
 
 function input(): PdfInput {
   return {
-    rendererKey: 'classic', design: structuredClone(defaultResumeDesign),
+    rendererKey: 'vertical', design: structuredClone(defaultResumeDesign),
     content: { header: { fullName: 'Alex Morgan', headline: 'Software Engineer', email: 'alex@example.com', phone: null, location: 'London', links: [{ label: 'Portfolio', url: 'example.com' }] }, sections: [
       { key: 'summary', type: 'summary', title: 'Summary', entries: [{ key: 'summary', description: 'Builds thoughtful, reliable software.' }] },
       { key: 'work_experience', type: 'work_experience', title: 'Experience', entries: [{ key: 'work-1', title: 'Engineer · Acme', subtitle: 'Remote', dateLabel: '2020 – Present', bodyHtml: '<p>Built <strong>reliable</strong> tools with <em>care</em>.</p><ul><li><p>Improved performance by 30%.</p></li></ul>' }] },
@@ -34,14 +34,10 @@ describe('client resume PDF', () => {
     expect(text).toContain('reliable')
     expect(pdfHitRegions(result.layout, input().content).map((r) => r.section)).toEqual(['contact', 'summary', 'work_experience'])
   })
-  it('flows long two-column content across A4 pages without losing the last entry', async () => {
+  it('flows long vertical content across A4 pages without losing the last entry', async () => {
     const value = input()
-    value.design.layout.mode = 'two'
     value.design.page.format = 'A4'
     value.design.footer.showPageNumbers = true
-    value.rendererKey = 'vertical-split'
-    value.content.sections[0].column = 'left'
-    value.content.sections[1].column = 'right'
     const entry = value.content.sections[1].entries[0]
     value.content.sections[1].entries = Array.from({ length: 26 }, (_, i) => ({ ...entry, key: `entry-${i}`, title: `Engineer ${i}`, bodyHtml: '<p>' + 'Built resilient systems with clear documentation. '.repeat(7) + `Final marker ${i}.</p>` }))
     const result = await renderDocumentWithLayout(<ResumeDocument input={value} fonts={fonts} />)

@@ -24,7 +24,6 @@ type FullResume struct {
 type ResumeService struct {
 	resumes         *repository.ResumeRepository
 	resumeDesigns   *repository.ResumeDesignRepository
-	templates       *repository.TemplateRepository
 	workExperiences *repository.WorkExperienceRepository
 	educations      *repository.EducationRepository
 	skills          *repository.SkillRepository
@@ -39,7 +38,6 @@ type ResumeService struct {
 func NewResumeService(
 	resumes *repository.ResumeRepository,
 	resumeDesigns *repository.ResumeDesignRepository,
-	templates *repository.TemplateRepository,
 	workExperiences *repository.WorkExperienceRepository,
 	educations *repository.EducationRepository,
 	skills *repository.SkillRepository,
@@ -53,7 +51,6 @@ func NewResumeService(
 	return &ResumeService{
 		resumes:         resumes,
 		resumeDesigns:   resumeDesigns,
-		templates:       templates,
 		workExperiences: workExperiences,
 		educations:      educations,
 		skills:          skills,
@@ -141,7 +138,7 @@ func (s *ResumeService) GetFullResume(ctx context.Context, callerUserID, resumeI
 	if err != nil {
 		return nil, err
 	}
-	resumeDesign, err := resolveResumeDesign(ctx, s.resumeDesigns, s.templates, resumeID)
+	resumeDesign, err := resolveResumeDesign(ctx, s.resumeDesigns, resumeID)
 	if err != nil {
 		return nil, err
 	}

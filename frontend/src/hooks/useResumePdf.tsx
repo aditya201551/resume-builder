@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRenderQueue, SupersededRenderError } from '@/lib/pdf/renderQueue'
 import { pdfSourceKey, type PdfSource, type PdfResult, type PdfWorkerRequest, type PdfWorkerResponse } from '@/lib/pdf/types'
-import { useTemplates } from './useTemplates'
+import { getTemplate, normalizeTemplateDesign } from '@/templates/catalog'
 import type { FullResume } from '@/types/resume'
 
 export interface PdfSnapshot {
@@ -59,11 +59,11 @@ function createSession() {
 }
 
 export function ResumePdfProvider({ data, children }: { data: FullResume; children: ReactNode }) {
-  const { data: templates, error: templateError, refetch } = useTemplates()
-  const input = useMemo<PdfSource>(() => ({
-    data,
-    rendererKey: templates?.find((t) => t.id === data.design.templateId)?.renderer_key ?? 'classic',
-  }), [data, templates])
+  const input = useMemo<PdfSource>(() => {
+    const design = normalizeTemplateDesign(data.design)
+    const template = getTemplate(design.templateId)
+    return { data: { ...data, design }, rendererKey: template.renderer_key, templateRevision: template.revision }
+  }, [data])
   const key = pdfSourceKey(input)
   const latest = useRef({ input, key })
   latest.current = { input, key }
@@ -91,7 +91,6 @@ export function ResumePdfProvider({ data, children }: { data: FullResume; childr
   }, [])
 
   useEffect(() => {
-    if (!templates) return
     let cancelled = false
     const instance = session.current!
     void instance.request(key, latest.current.input).then((result) => {
@@ -100,10 +99,9 @@ export function ResumePdfProvider({ data, children }: { data: FullResume; childr
       if (!cancelled && !(error instanceof SupersededRenderError)) setFailure({ key, message: error instanceof Error ? error.message : 'Could not generate PDF.' })
     })
     return () => { cancelled = true }
-  }, [key, templates, attempt, publish])
+  }, [key, attempt, publish])
 
   const getLatest = useCallback(async () => {
-    if (!templates) throw new Error('Templates are still loading. Please try again.')
     const instance = session.current
     if (!instance) throw new Error('PDF workspace is not ready.')
     // Include edits made while Download is waiting, without waiting for server sync.
@@ -117,10 +115,10 @@ export function ResumePdfProvider({ data, children }: { data: FullResume; childr
         if (session.current !== instance) throw new Error('PDF workspace closed.')
       }
     }
-  }, [templates, publish])
+  }, [publish])
 
-  const error = templateError && !templates ? 'Could not load resume templates. Check your connection.' : failure?.key === key ? failure.message : null
-  const retry = () => { setFailure(undefined); setAttempt((n) => n + 1); if (!templates) void refetch() }
+  const error = failure?.key === key ? failure.message : null
+  const retry = () => { setFailure(undefined); setAttempt((n) => n + 1) }
   return <ResumePdfContext.Provider value={{ snapshot, updating: snapshot?.key !== key, error, retry, getLatest }}>{children}</ResumePdfContext.Provider>
 }
 

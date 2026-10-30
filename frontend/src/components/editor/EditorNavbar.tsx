@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useBlocker } from 'react-router'
-import { ArrowLeft, Check, Download, Loader2, Pencil, X } from 'lucide-react'
+import { ArrowLeft, Check, Download, Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -14,7 +14,6 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
-import { clearDraft } from '@/lib/resumeDraftStorage'
 import { apiDownload } from '@/lib/http'
 import { cn } from '@/lib/utils'
 import type { Resume } from '@/types/resume'
@@ -22,7 +21,6 @@ import type { Resume } from '@/types/resume'
 function EditableResumeName({ resume }: { resume: Resume }) {
   const { dispatch } = useResumeDraftContext()
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(resume.label)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -30,21 +28,7 @@ function EditableResumeName({ resume }: { resume: Resume }) {
   }, [editing])
 
   function startEditing() {
-    setValue(resume.label)
     setEditing(true)
-  }
-
-  function commit() {
-    const trimmed = value.trim()
-    if (trimmed && trimmed !== resume.label) {
-      dispatch({ type: 'update_meta', patch: { label: trimmed } })
-    }
-    setEditing(false)
-  }
-
-  function discard() {
-    setValue(resume.label)
-    setEditing(false)
   }
 
   if (editing) {
@@ -52,19 +36,15 @@ function EditableResumeName({ resume }: { resume: Resume }) {
       <div className="flex min-w-0 items-center gap-1.5">
         <Input
           ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
+          value={resume.label}
+          onChange={(e) => dispatch({ type: 'update_meta', patch: { label: e.target.value } })}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') commit()
-            if (e.key === 'Escape') discard()
+            if (e.key === 'Enter' || e.key === 'Escape') setEditing(false)
           }}
           className="h-8 max-w-72 text-sm font-semibold"
         />
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-accent" onClick={commit}>
+        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-accent" onClick={() => setEditing(false)}>
           <Check className="size-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="size-8 shrink-0 text-muted-foreground" onClick={discard}>
-          <X className="size-4" />
         </Button>
       </div>
     )
@@ -83,7 +63,7 @@ function EditableResumeName({ resume }: { resume: Resume }) {
 }
 
 function DownloadButton({ resume }: { resume: Resume }) {
-  const { flushNow, commitDirtyPanels } = useResumeDraftContext()
+  const { flushNow } = useResumeDraftContext()
   const [phase, setPhase] = useState<'idle' | 'saving' | 'generating'>('idle')
   const [error, setError] = useState<string | null>(null)
 
@@ -91,8 +71,6 @@ function DownloadButton({ resume }: { resume: Resume }) {
     setError(null)
     try {
       setPhase('saving')
-      commitDirtyPanels()
-      await new Promise((resolve) => setTimeout(resolve, 0))
       const saved = await flushNow()
       if (!saved) {
         setError("Couldn't save your latest changes — try again before downloading.")
@@ -119,105 +97,66 @@ function DownloadButton({ resume }: { resume: Resume }) {
 }
 
 function SyncStatus() {
-  const { state, syncStatus, hasDirtyPanel } = useResumeDraftContext()
-  const dirty = isDraftDirty(state.data, state.lastSynced) || hasDirtyPanel
-  const label =
-    syncStatus === 'syncing'
-      ? 'Saving…'
-      : syncStatus === 'error'
-        ? "Couldn't save — press Ctrl+S to retry"
-        : dirty
-          ? 'Unsaved changes — press Ctrl+S to save'
-          : 'All changes saved'
+  const { state, syncStatus } = useResumeDraftContext()
+  const dirty = isDraftDirty(state.data, state.lastSynced)
+  const label = syncStatus === 'error'
+    ? "Couldn't sync ? retrying automatically"
+    : syncStatus === 'syncing' || dirty ? 'Syncing?' : 'All changes saved'
   return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 text-xs',
-        syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
-      )}
-    >
-      <span
-        className={cn(
-          'size-1.5 rounded-full',
-          syncStatus === 'syncing' && 'animate-pulse bg-accent',
-          syncStatus === 'error' && 'bg-destructive',
-          syncStatus === 'idle' && (dirty ? 'bg-muted-foreground/50' : 'bg-accent'),
-        )}
-      />
+    <span role="status" className={cn('inline-flex items-center gap-1.5 text-xs', syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground')}>
+      <span className={cn('size-1.5 rounded-full', syncStatus === 'error' ? 'bg-destructive' : dirty ? 'animate-pulse bg-muted-foreground/50' : 'bg-accent')} />
       {label}
     </span>
   )
 }
 
 function BackButton() {
-  const { state, resumeId, flushNow, hasDirtyPanel, commitDirtyPanels } = useResumeDraftContext()
-  const dirty = isDraftDirty(state.data, state.lastSynced) || hasDirtyPanel
+  const { state, flushNow } = useResumeDraftContext()
+  const dirty = isDraftDirty(state.data, state.lastSynced)
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && currentLocation.pathname !== nextLocation.pathname)
   const [saving, setSaving] = useState(false)
-  const [saveError, setSaveError] = useState(false)
+  const [syncFailed, setSyncFailed] = useState(false)
 
-  function discardAndLeave() {
-    clearDraft(resumeId)
-    blocker.proceed?.()
-  }
-
-  async function saveAndLeave() {
+  async function syncAndLeave() {
     setSaving(true)
-    setSaveError(false)
-    commitDirtyPanels()
-    await new Promise((resolve) => setTimeout(resolve, 0))
     const ok = await flushNow()
     setSaving(false)
-    if (ok) {
-      blocker.proceed?.()
-    } else {
-      setSaveError(true)
-    }
+    if (ok) blocker.proceed?.()
+    else setSyncFailed(true)
   }
+
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      setSyncFailed(false)
+      return
+    }
+    void syncAndLeave()
+    // Flush automatically when navigating; a dialog is needed only if syncing fails.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocker.state])
 
   return (
     <>
       <Button variant="ghost" size="icon" asChild>
-        <Link to="/resumes">
-          <ArrowLeft className="size-4" />
+        <Link to="/resumes" aria-label="Back to resumes">
+          {saving ? <Loader2 className="size-4 animate-spin" /> : <ArrowLeft className="size-4" />}
         </Link>
       </Button>
-
-      <AlertDialog
-        open={blocker.state === 'blocked'}
-        onOpenChange={(open) => {
-          if (!open && !saving) {
-            blocker.reset?.()
-            setSaveError(false)
-          }
-        }}
-      >
+      <AlertDialog open={blocker.state === 'blocked' && syncFailed} onOpenChange={(open) => {
+        if (!open && !saving) blocker.reset?.()
+      }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Save changes before leaving?</AlertDialogTitle>
+            <AlertDialogTitle>Changes haven't synced yet</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved changes that haven&apos;t been saved to the server yet.
-              {saveError && (
-                <span className="mt-1.5 block text-destructive">Couldn&apos;t save — check your connection and try again.</span>
-              )}
+              Your changes are kept on this device. You can retry now or leave and resume syncing when you reopen this resume.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={saving} onClick={() => blocker.reset?.()}>
-              Cancel
-            </AlertDialogCancel>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={saving}
-              className="text-destructive hover:text-destructive"
-              onClick={discardAndLeave}
-            >
-              Discard &amp; leave
-            </Button>
-            <Button type="button" disabled={saving} onClick={saveAndLeave}>
-              {saving && <Loader2 className="size-3.5 animate-spin" />}
-              {saving ? 'Saving…' : 'Save & leave'}
+            <AlertDialogCancel disabled={saving} onClick={() => blocker.reset?.()}>Stay</AlertDialogCancel>
+            <Button type="button" variant="outline" disabled={saving} onClick={() => blocker.proceed?.()}>Leave for now</Button>
+            <Button type="button" disabled={saving} onClick={syncAndLeave}>
+              {saving && <Loader2 className="size-3.5 animate-spin" />} Retry
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

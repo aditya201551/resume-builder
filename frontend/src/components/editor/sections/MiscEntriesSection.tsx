@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
@@ -10,7 +10,7 @@ import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useEntryPanel } from '@/hooks/useEntryPanel'
-import { usePreviewOverride } from '@/hooks/usePreviewOverride'
+import { useDraftForm } from '@/hooks/useDraftForm'
 import type { MiscEntry } from '@/types/resume'
 
 function toDateInput(v: string | null) {
@@ -43,7 +43,6 @@ function MiscEntryRow({
   onDelete,
   dragHandle,
   open,
-  isNew,
   onOpenChange,
 }: {
   entry: MiscEntry
@@ -51,40 +50,18 @@ function MiscEntryRow({
   onDelete: () => void
   dragHandle?: ReactNode
   open: boolean
-  isNew: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [form, setForm] = useState(() => formFromEntry(entry))
-  const isDirty = JSON.stringify(form) !== JSON.stringify(formFromEntry(entry))
-
-  const { setOverride, clearOverride } = usePreviewOverride()
-  useEffect(() => {
-    if (!open) return
-    return () => clearOverride(entry.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, entry.id])
-  useEffect(() => {
-    if (!open) return
-    setOverride(entry.id, toPatch(form))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, form, entry.id])
-
-  function handleDone() {
-    onSave({ ...toPatch(form), sort_order: entry.sort_order })
-  }
+  const [form, setForm] = useDraftForm(formFromEntry(entry), toPatch, onSave)
 
   return (
     <RowCard
-      onDone={handleDone}
-      onDiscard={() => setForm(formFromEntry(entry))}
-      isDirty={isDirty}
       onDelete={onDelete}
       title={form.title}
       subtitle={form.issuer_or_org}
       dragHandle={dragHandle}
       editorTitle="Edit entry"
       open={open}
-      isNew={isNew}
       onOpenChange={onOpenChange}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -143,7 +120,7 @@ export default function MiscEntriesSection({
 }: MiscEntriesSectionProps) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/misc-entries`)
   const entries = items.filter((e) => e.kind === kind)
-  const { openNew, getPanelProps } = useEntryPanel(entries.map((e) => e.id))
+  const { openNew, getPanelProps } = useEntryPanel()
 
   if (entries.length === 0) {
     return (

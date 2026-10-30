@@ -2,29 +2,17 @@ import { apiDelete, apiPatch, apiPost, apiPut, HttpError } from '@/lib/http'
 import { draftReducer, type DraftAction, type DraftState, type FlatKind } from '@/hooks/resumeDraftReducer'
 import type { FullResume } from '@/types/resume'
 
-const FLAT_ENTITIES: { entity: FlatKind; path: (resumeId: string) => string }[] = [
-  { entity: 'work_experiences', path: (id) => `/api/resumes/${id}/work-experiences` },
-  { entity: 'educations', path: (id) => `/api/resumes/${id}/educations` },
-  { entity: 'projects', path: (id) => `/api/resumes/${id}/projects` },
-  { entity: 'certifications', path: (id) => `/api/resumes/${id}/certifications` },
-  { entity: 'languages', path: (id) => `/api/resumes/${id}/languages` },
-  { entity: 'misc_entries', path: (id) => `/api/resumes/${id}/misc-entries` },
+const FLAT_ENTITIES: { entity: FlatKind; path: string }[] = [
+  { entity: 'work_experiences', path: 'work-experiences' },
+  { entity: 'educations', path: 'educations' },
+  { entity: 'projects', path: 'projects' },
+  { entity: 'certifications', path: 'certifications' },
+  { entity: 'languages', path: 'languages' },
+  { entity: 'misc_entries', path: 'misc-entries' },
 ]
 
 function omit(obj: object, keys: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {}
-  for (const [k, v] of Object.entries(obj)) {
-    if (!keys.includes(k)) out[k] = v
-  }
-  return out
-}
-
-function isTempId(id: string) {
-  return id.startsWith('temp-')
-}
-
-function createBody(item: { id: string }, omitKeys: string[]): Record<string, unknown> {
-  return { ...omit(item, omitKeys), client_id: item.id }
+  return Object.fromEntries(Object.entries(obj).filter(([key]) => !keys.includes(key)))
 }
 
 async function deleteIfExists(url: string) {
@@ -36,13 +24,65 @@ async function deleteIfExists(url: string) {
   }
 }
 
+// Acknowledge every successful request, including progress before a later request fails.
+// Parent collections exclude children here; children sync after parent IDs resolve.
+async function syncCollection<T extends { id: string }>(
+  current: T[],
+  previous: T[],
+  path: string,
+  parentKey: string,
+  apply: (action: DraftAction) => void,
+  acknowledge: (items: T[]) => void,
+  childrenKey?: keyof T,
+) {
+  let saved = [...previous]
+  const resolvedIds = new Map<string, string>()
+  const currentIds = new Set(current.map((item) => item.id))
+  const omitted = ['id', parentKey, ...(childrenKey ? [String(childrenKey)] : [])]
+  const body = (item: T) => omit(item, omitted)
+  const savedItem = (item: T, previousItem?: T): T => childrenKey
+    ? { ...item, [childrenKey]: previousItem?.[childrenKey] ?? [] }
+    : item
+
+  for (const item of previous) {
+    if (currentIds.has(item.id)) continue
+    await deleteIfExists(`${path}/${item.id}`)
+    saved = saved.filter((entry) => entry.id !== item.id)
+    acknowledge(saved)
+  }
+
+  for (const item of current) {
+    const previousItem = saved.find((entry) => entry.id === item.id)
+    if (!previousItem) {
+      const created = await apiPost<T>(path, { ...body(item), client_id: item.id })
+      resolvedIds.set(item.id, created.id)
+      apply({ type: 'resolve_ids', idMap: { [item.id]: created.id } })
+      // An idempotent retry can return an earlier create. Use its actual fields
+      // so edits since that create remain dirty and are PATCHed on the next pass.
+      const acknowledged = Object.fromEntries(Object.entries(item).map(([key, value]) => [
+        key, Object.hasOwn(created, key) ? (created as Record<string, unknown>)[key] : value,
+      ])) as T
+      saved = [...saved, savedItem({ ...acknowledged, id: created.id })]
+      acknowledge(saved)
+    } else if (JSON.stringify(body(item)) !== JSON.stringify(body(previousItem))) {
+      await apiPatch(`${path}/${item.id}`, body(item))
+      saved = saved.map((entry) => entry.id === item.id ? savedItem(item, entry) : entry)
+      acknowledge(saved)
+    }
+  }
+  const ordered = current.map((item) => saved.find((entry) => entry.id === (resolvedIds.get(item.id) ?? item.id))!)
+  if (JSON.stringify(ordered) !== JSON.stringify(saved)) acknowledge(ordered)
+}
+
 export async function flushDraft(resumeId: string, snapshot: DraftState, dispatch: (action: DraftAction) => void) {
   let state = snapshot
   const apply = (action: DraftAction) => {
     state = draftReducer(state, action)
     dispatch(action)
   }
-
+  const acknowledge = <K extends keyof FullResume>(slice: K, value: FullResume[K]) => {
+    apply({ type: 'mark_synced_entity', slice, snapshot: { ...state.lastSynced, [slice]: value } })
+  }
   let hadError = false
   async function step(fn: () => Promise<void>) {
     try {
@@ -52,198 +92,63 @@ export async function flushDraft(resumeId: string, snapshot: DraftState, dispatc
       console.error('draft sync step failed:', err)
     }
   }
+  const base = `/api/resumes/${resumeId}`
 
   for (const { entity, path } of FLAT_ENTITIES) {
-    await step(() => syncFlatCollection(entity, path(resumeId), apply, () => state))
+    await step(() => syncCollection<{ id: string }>(
+      state.data[entity], state.lastSynced[entity], `${base}/${path}`, 'resume_id', apply,
+      (items) => acknowledge(entity, items as FullResume[typeof entity]),
+    ))
   }
 
-  await step(() => syncSkillGroups(resumeId, apply, () => state))
-  await step(() => syncCustomSections(resumeId, apply, () => state))
-  await step(() => syncResumeMeta(resumeId, apply, () => state))
-  await step(() => syncResumeDesign(resumeId, apply, () => state))
+  await step(async () => {
+    await syncCollection(
+      state.data.skill_groups, state.lastSynced.skill_groups, `${base}/skill-groups`, 'resume_id', apply,
+      (groups) => acknowledge('skill_groups', groups), 'items',
+    )
+    for (const group of state.data.skill_groups) {
+      await step(() => syncCollection(
+        group.items, state.lastSynced.skill_groups.find((saved) => saved.id === group.id)?.items ?? [],
+        `${base}/skill-groups/${group.id}/items`, 'skill_group_id', apply,
+        (items) => acknowledge('skill_groups', state.lastSynced.skill_groups.map((saved) =>
+          saved.id === group.id ? { ...saved, items } : saved)),
+      ))
+    }
+  })
+
+  await step(async () => {
+    await syncCollection(
+      state.data.custom_sections, state.lastSynced.custom_sections, `${base}/custom-sections`, 'resume_id', apply,
+      (sections) => acknowledge('custom_sections', sections), 'entries',
+    )
+    for (const section of state.data.custom_sections) {
+      await step(() => syncCollection(
+        section.entries, state.lastSynced.custom_sections.find((saved) => saved.id === section.id)?.entries ?? [],
+        `${base}/custom-sections/${section.id}/entries`, 'custom_section_id', apply,
+        (entries) => acknowledge('custom_sections', state.lastSynced.custom_sections.map((saved) =>
+          saved.id === section.id ? { ...saved, entries } : saved)),
+      ))
+    }
+  })
+
+  await step(async () => {
+    const current = state.data.resume
+    const previous = state.lastSynced.resume
+    const omitted = ['id', 'user_id', 'created_at', 'updated_at', 'last_exported_at']
+    if (JSON.stringify(omit(current, omitted)) !== JSON.stringify(omit(previous, omitted))) {
+      await apiPatch(base, omit(current, omitted))
+      acknowledge('resume', current)
+    }
+  })
+  await step(async () => {
+    const current = state.data.design
+    if (JSON.stringify(current) !== JSON.stringify(state.lastSynced.design)) {
+      await apiPut(`${base}/design`, current)
+      acknowledge('design', current)
+    }
+  })
 
   if (hadError) throw new Error('one or more draft sync steps failed')
-}
-
-async function syncFlatCollection(
-  entity: FlatKind,
-  path: string,
-  apply: (a: DraftAction) => void,
-  getState: () => DraftState,
-) {
-  const cur = getState().data[entity] as { id: string }[]
-  const prev = getState().lastSynced[entity] as { id: string }[]
-  const curIds = new Set(cur.map((i) => i.id))
-  const prevById = new Map(prev.map((i) => [i.id, i]))
-
-  for (const item of prev) {
-    if (!curIds.has(item.id)) await deleteIfExists(`${path}/${item.id}`)
-  }
-
-  const idMap: Record<string, string> = {}
-  for (const item of cur) {
-    if (!prevById.has(item.id)) {
-      const created = await apiPost<{ id: string }>(path, createBody(item, ['id', 'resume_id']))
-      idMap[item.id] = created.id
-    }
-  }
-  if (Object.keys(idMap).length > 0) apply({ type: 'resolve_ids', idMap })
-
-  for (const item of cur) {
-    const prevItem = prevById.get(item.id)
-    if (prevItem && !isTempId(item.id) && JSON.stringify(item) !== JSON.stringify(prevItem)) {
-      await apiPatch(`${path}/${item.id}`, omit(item, ['id', 'resume_id']))
-    }
-  }
-
-  apply({ type: 'mark_synced_entity', slice: entity })
-}
-
-async function syncSkillGroups(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
-  const basePath = `/api/resumes/${resumeId}/skill-groups`
-  const cur = getState().data.skill_groups
-  const prev = getState().lastSynced.skill_groups
-  const curIds = new Set(cur.map((g) => g.id))
-  const prevById = new Map(prev.map((g) => [g.id, g]))
-
-  for (const g of prev) {
-    if (!curIds.has(g.id)) await deleteIfExists(`${basePath}/${g.id}`)
-  }
-
-  const idMap: Record<string, string> = {}
-  for (const g of cur) {
-    if (!prevById.has(g.id)) {
-      const created = await apiPost<{ id: string }>(basePath, createBody(g, ['id', 'resume_id', 'items']))
-      idMap[g.id] = created.id
-    }
-  }
-  if (Object.keys(idMap).length > 0) apply({ type: 'resolve_ids', idMap })
-
-  for (const g of cur) {
-    const prevGroup = prevById.get(g.id)
-    if (prevGroup && !isTempId(g.id)) {
-      const { items: curItems, ...curFields } = g
-      const { items: _prevItems, ...prevFields } = prevGroup
-      if (JSON.stringify(curFields) !== JSON.stringify(prevFields)) {
-        await apiPatch(`${basePath}/${g.id}`, omit(curFields, ['id', 'resume_id']))
-      }
-      void curItems
-    }
-  }
-
-  for (const g of getState().data.skill_groups) {
-    const itemsPath = `${basePath}/${g.id}/items`
-    const curItems = g.items
-    const prevGroup = getState().lastSynced.skill_groups.find((p) => p.id === g.id)
-    const prevItems = prevGroup?.items ?? []
-    const curItemIds = new Set(curItems.map((i) => i.id))
-    const prevItemById = new Map(prevItems.map((i) => [i.id, i]))
-
-    for (const item of prevItems) {
-      if (!curItemIds.has(item.id)) await deleteIfExists(`${itemsPath}/${item.id}`)
-    }
-
-    const itemIdMap: Record<string, string> = {}
-    for (const item of curItems) {
-      if (!prevItemById.has(item.id)) {
-        const created = await apiPost<{ id: string }>(itemsPath, createBody(item, ['id', 'skill_group_id']))
-        itemIdMap[item.id] = created.id
-      }
-    }
-    if (Object.keys(itemIdMap).length > 0) apply({ type: 'resolve_ids', idMap: itemIdMap })
-
-    for (const item of curItems) {
-      const prevItem = prevItemById.get(item.id)
-      if (prevItem && !isTempId(item.id) && JSON.stringify(item) !== JSON.stringify(prevItem)) {
-        await apiPatch(`${itemsPath}/${item.id}`, omit(item, ['id', 'skill_group_id']))
-      }
-    }
-  }
-  apply({ type: 'mark_synced_entity', slice: 'skill_groups' })
-}
-
-async function syncCustomSections(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
-  const basePath = `/api/resumes/${resumeId}/custom-sections`
-  const cur = getState().data.custom_sections
-  const prev = getState().lastSynced.custom_sections
-  const curIds = new Set(cur.map((s) => s.id))
-  const prevById = new Map(prev.map((s) => [s.id, s]))
-
-  for (const s of prev) {
-    if (!curIds.has(s.id)) await deleteIfExists(`${basePath}/${s.id}`)
-  }
-
-  const idMap: Record<string, string> = {}
-  for (const s of cur) {
-    if (!prevById.has(s.id)) {
-      const created = await apiPost<{ id: string }>(basePath, createBody(s, ['id', 'resume_id', 'entries']))
-      idMap[s.id] = created.id
-    }
-  }
-  if (Object.keys(idMap).length > 0) apply({ type: 'resolve_ids', idMap })
-
-  for (const s of cur) {
-    const prevSection = prevById.get(s.id)
-    if (prevSection && !isTempId(s.id)) {
-      const { entries: curEntries, ...curFields } = s
-      const { entries: _prevEntries, ...prevFields } = prevSection
-      if (JSON.stringify(curFields) !== JSON.stringify(prevFields)) {
-        await apiPatch(`${basePath}/${s.id}`, omit(curFields, ['id', 'resume_id']))
-      }
-      void curEntries
-    }
-  }
-
-  for (const s of getState().data.custom_sections) {
-    const entriesPath = `${basePath}/${s.id}/entries`
-    const curEntries = s.entries
-    const prevSection = getState().lastSynced.custom_sections.find((p) => p.id === s.id)
-    const prevEntries = prevSection?.entries ?? []
-    const curEntryIds = new Set(curEntries.map((e) => e.id))
-    const prevEntryById = new Map(prevEntries.map((e) => [e.id, e]))
-
-    for (const entry of prevEntries) {
-      if (!curEntryIds.has(entry.id)) await deleteIfExists(`${entriesPath}/${entry.id}`)
-    }
-
-    const entryIdMap: Record<string, string> = {}
-    for (const entry of curEntries) {
-      if (!prevEntryById.has(entry.id)) {
-        const created = await apiPost<{ id: string }>(entriesPath, createBody(entry, ['id', 'custom_section_id']))
-        entryIdMap[entry.id] = created.id
-      }
-    }
-    if (Object.keys(entryIdMap).length > 0) apply({ type: 'resolve_ids', idMap: entryIdMap })
-
-    for (const entry of curEntries) {
-      const prevEntry = prevEntryById.get(entry.id)
-      if (prevEntry && !isTempId(entry.id) && JSON.stringify(entry) !== JSON.stringify(prevEntry)) {
-        await apiPatch(`${entriesPath}/${entry.id}`, omit(entry, ['id', 'custom_section_id']))
-      }
-    }
-  }
-  apply({ type: 'mark_synced_entity', slice: 'custom_sections' })
-}
-
-async function syncResumeMeta(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
-  const cur = getState().data.resume
-  const prev = getState().lastSynced.resume
-  const metaKeys = ['label', 'full_name', 'headline', 'email', 'phone', 'location', 'photo_url', 'summary', 'links']
-  const curMeta = Object.fromEntries(metaKeys.map((k) => [k, (cur as unknown as Record<string, unknown>)[k]]))
-  const prevMeta = Object.fromEntries(metaKeys.map((k) => [k, (prev as unknown as Record<string, unknown>)[k]]))
-  if (JSON.stringify(curMeta) !== JSON.stringify(prevMeta)) {
-    await apiPatch(`/api/resumes/${resumeId}`, curMeta)
-  }
-  apply({ type: 'mark_synced_entity', slice: 'resume' })
-}
-
-async function syncResumeDesign(resumeId: string, apply: (a: DraftAction) => void, getState: () => DraftState) {
-  const cur = getState().data.design
-  const prev = getState().lastSynced.design
-  if (JSON.stringify(cur) !== JSON.stringify(prev)) {
-    await apiPut(`/api/resumes/${resumeId}/design`, cur)
-  }
-  apply({ type: 'mark_synced_entity', slice: 'design' })
 }
 
 export function isDraftDirty(state: FullResume, lastSynced: FullResume): boolean {

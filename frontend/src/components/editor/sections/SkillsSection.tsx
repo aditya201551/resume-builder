@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Layers, Plus, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -6,10 +6,9 @@ import { Button } from '@/components/ui/button'
 import RowCard from '@/components/editor/RowCard'
 import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
-import { useAutosave } from '@/hooks/useAutosave'
+import { useDraftForm } from '@/hooks/useDraftForm'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useEntryPanel } from '@/hooks/useEntryPanel'
-import { usePreviewOverride } from '@/hooks/usePreviewOverride'
 import type { SkillGroup, SkillItem } from '@/types/resume'
 
 function SkillItemRow({
@@ -21,9 +20,10 @@ function SkillItemRow({
   onSave: (input: Partial<SkillItem>) => Promise<unknown>
   onDelete: () => void
 }) {
-  const [form, setForm] = useState({ name: item.name, proficiency: item.proficiency ?? '' })
-  useAutosave(form, (value) =>
-    onSave({ name: value.name, proficiency: value.proficiency || null, sort_order: item.sort_order }),
+  const [form, setForm] = useDraftForm(
+    { name: item.name, proficiency: item.proficiency ?? '' },
+    (value) => ({ name: value.name, proficiency: value.proficiency || null }),
+    onSave,
   )
 
   return (
@@ -60,7 +60,6 @@ function SkillGroupCard({
   onDeleteGroup,
   dragHandle,
   open,
-  isNew,
   onOpenChange,
 }: {
   resumeId: string
@@ -69,40 +68,22 @@ function SkillGroupCard({
   onDeleteGroup: () => void
   dragHandle?: ReactNode
   open: boolean
-  isNew: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [groupName, setGroupName] = useState(group.group_name)
-  const isDirty = groupName !== group.group_name
+  const [groupName, setGroupName] = useDraftForm(group.group_name, (group_name) => ({ group_name }), onSaveGroup)
   const items = useEntityMutations(
     resumeId,
     `/api/resumes/${resumeId}/skill-groups/${group.id}/items`,
   )
 
-  const { setOverride, clearOverride } = usePreviewOverride()
-  useEffect(() => {
-    if (!open) return
-    return () => clearOverride(group.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, group.id])
-  useEffect(() => {
-    if (!open) return
-    setOverride(group.id, { group_name: groupName })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, groupName, group.id])
-
   return (
     <RowCard
-      onDone={() => onSaveGroup({ group_name: groupName, sort_order: group.sort_order })}
-      onDiscard={() => setGroupName(group.group_name)}
-      isDirty={isDirty}
       onDelete={onDeleteGroup}
       title={groupName}
       subtitle={group.items.length > 0 ? `${group.items.length} skill${group.items.length === 1 ? '' : 's'}` : undefined}
       dragHandle={dragHandle}
       editorTitle="Edit skill group"
       open={open}
-      isNew={isNew}
       onOpenChange={onOpenChange}
     >
       <div className="flex flex-col gap-1.5">
@@ -143,7 +124,7 @@ function SkillGroupCard({
 
 export default function SkillsSection({ resumeId, items }: { resumeId: string; items: SkillGroup[] }) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/skill-groups`)
-  const { openNew, getPanelProps } = useEntryPanel(items.map((i) => i.id))
+  const { openNew, getPanelProps } = useEntryPanel()
 
   if (items.length === 0) {
     return (

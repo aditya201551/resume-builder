@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { streamAgentChat, type AgentProposal, type AgentToolEvent } from '@/lib/agentChat'
 import { canApplyProposal, proposalToDraftAction } from '@/lib/agentProposal'
 import { loadAutoAccept, saveAutoAccept } from '@/lib/agentChatPrefs'
+import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 
 export type AssistantPart =
@@ -26,7 +27,7 @@ function assistantToPlain(m: Extract<ChatMessage, { role: 'assistant' }>): { rol
 }
 
 export function useAgentChat() {
-  const { resumeId, state, dispatch } = useResumeDraftContext()
+  const { resumeId, state, dispatch, resolveEntryId } = useResumeDraftContext()
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [streamingParts, setStreamingParts] = useState<AssistantPart[] | null>(null)
@@ -48,10 +49,11 @@ export function useAgentChat() {
 
   const applyProposal = useCallback(
     (proposal: AgentProposal): boolean => {
+      proposal = resolveEntryReferences(proposal, resolveEntryId)
       const action = proposalToDraftAction(proposal)
       if (!action) return false
 
-      const applicability = canApplyProposal(proposal, draftRef.current, createdParentIdsRef.current)
+      const applicability = canApplyProposal(proposal, draftRef.current, new Set([...createdParentIdsRef.current].map(resolveEntryId)))
       if (!applicability.ok) return false
 
       dispatch(action)
@@ -60,7 +62,7 @@ export function useAgentChat() {
       }
       return true
     },
-    [dispatch],
+    [dispatch, resolveEntryId],
   )
 
   const pushPart = useCallback((part: AssistantPart) => {

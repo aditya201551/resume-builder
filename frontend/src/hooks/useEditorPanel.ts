@@ -2,7 +2,6 @@ import { createContext, useContext } from 'react'
 
 export interface OpenPanelHandle {
   close: () => void
-  commit?: () => void
 }
 
 export interface EditorPanelContextValue {

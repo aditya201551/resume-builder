@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -16,15 +16,11 @@ import { useEditorPanel } from '@/hooks/useEditorPanel'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 
 interface RowCardProps {
-  onDone?: () => void
-  onDiscard?: () => void
-  isDirty?: boolean
   onDelete: () => void
   title: ReactNode
   subtitle?: ReactNode
   dragHandle?: ReactNode
   editorTitle?: string
-  isNew?: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
   children: ReactNode
@@ -32,92 +28,30 @@ interface RowCardProps {
 
 
 export default function RowCard({
-  onDone,
-  onDiscard,
-  isDirty = false,
   onDelete,
   title,
   subtitle,
   dragHandle,
   editorTitle = 'Edit entry',
-  isNew = false,
   open,
   onOpenChange,
   children,
 }: RowCardProps) {
   const { slot, pushOpen } = useEditorPanel()
-  const { registerPanel } = useResumeDraftContext()
-  const panelKey = useId()
+  const { syncStatus } = useResumeDraftContext()
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
-
-  const committedRef = useRef(false)
-
-  const commitRef = useRef(() => {})
-  commitRef.current = () => {
-    committedRef.current = true
-    onDone?.()
-  }
-
-  const attemptCloseRef = useRef(() => {})
-  attemptCloseRef.current = () => {
-    if (isDirty) setConfirmCloseOpen(true)
-    else onOpenChange(false)
-  }
+  const closeRef = useRef(onOpenChange)
+  closeRef.current = onOpenChange
 
   useEffect(() => {
     if (!open) return
-    return pushOpen({ close: () => attemptCloseRef.current(), commit: () => commitRef.current() })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return pushOpen({ close: () => closeRef.current(false) })
   }, [open, pushOpen])
-
-  useEffect(() => {
-    if (open && isDirty) registerPanel(panelKey, () => commitRef.current())
-    else registerPanel(panelKey, null)
-    return () => registerPanel(panelKey, null)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isDirty, panelKey, registerPanel])
-
-  const wasOpenRef = useRef(open)
-  useEffect(() => {
-    const wasOpen = wasOpenRef.current
-    wasOpenRef.current = open
-    if (!wasOpen || open) return
-    const wasCommitted = committedRef.current
-    committedRef.current = false
-    if (wasCommitted) return
-    if (isNew) {
-      onDelete()
-    } else {
-      onDiscard?.()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
-  function handleDone() {
-    commitRef.current()
-    onOpenChange(false)
-  }
-
-  function handleDelete() {
-    committedRef.current = true
-    onDelete()
-    onOpenChange(false)
-  }
 
   function confirmDelete() {
     setConfirmOpen(false)
-    handleDelete()
-  }
-
-  function discardAndClose() {
-    setConfirmCloseOpen(false)
+    onDelete()
     onOpenChange(false)
-  }
-
-  function saveAndClose() {
-    setConfirmCloseOpen(false)
-    handleDone()
   }
 
   return (
@@ -168,7 +102,7 @@ export default function RowCard({
                   variant="ghost"
                   size="icon"
                   aria-label="Close editor"
-                  onClick={() => attemptCloseRef.current()}
+                  onClick={() => onOpenChange(false)}
                 >
                   <X className="size-4" />
                 </Button>
@@ -176,8 +110,10 @@ export default function RowCard({
             </div>
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</div>
             <div className="flex items-center justify-between gap-2 border-t border-border p-4">
-              <span className="text-xs text-muted-foreground">{isDirty ? 'Unsaved changes' : ''}</span>
-              <Button type="button" onClick={handleDone}>
+              <span className="text-xs text-muted-foreground">
+                {syncStatus === 'error' ? 'Changes kept on this device. Retrying sync...' : 'Changes save automatically'}
+              </span>
+              <Button type="button" onClick={() => onOpenChange(false)}>
                 Done
               </Button>
             </div>
@@ -198,23 +134,6 @@ export default function RowCard({
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={confirmCloseOpen} onOpenChange={setConfirmCloseOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Save changes to {typeof title === 'string' && title ? `"${title}"` : 'this entry'}?</AlertDialogTitle>
-            <AlertDialogDescription>You have unsaved edits in this entry.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <Button type="button" variant="outline" className="text-destructive hover:text-destructive" onClick={discardAndClose}>
-              Discard
-            </Button>
-            <AlertDialogAction variant="default" onClick={saveAndClose}>
-              Save changes
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   )
 }

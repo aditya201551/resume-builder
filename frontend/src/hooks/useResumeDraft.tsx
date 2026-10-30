@@ -1,11 +1,12 @@
 import { createContext, useCallback, useContext, useEffect, useReducer, useRef, useState, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { apiGet } from '@/lib/http'
 import { loadDraft, saveDraft } from '@/lib/resumeDraftStorage'
 import { flushDraft, isDraftDirty } from '@/lib/resumeDraftSync'
+import { createDraftAutosync, type SyncStatus } from '@/lib/resumeDraftAutosync'
+import { createEntryIdentity, resolveEntryReferences } from '@/lib/resumeDraftIds'
 import { draftReducer, type DraftAction, type DraftState } from '@/hooks/resumeDraftReducer'
 import type { FullResume } from '@/types/resume'
-
-export type SyncStatus = 'idle' | 'dirty' | 'syncing' | 'error'
 
 interface ResumeDraftContextValue {
   state: DraftState
@@ -13,91 +14,82 @@ interface ResumeDraftContextValue {
   resumeId: string
   syncStatus: SyncStatus
   flushNow: () => Promise<boolean>
-  hasDirtyPanel: boolean
-  registerPanel: (key: string, commit: (() => void) | null) => void
-  commitDirtyPanels: () => void
+  getEntryKey: (id: string) => string
+  resolveEntryId: (id: string) => string
 }
 
 const ResumeDraftContext = createContext<ResumeDraftContextValue | null>(null)
 
 export function ResumeDraftProvider({ resumeId, children }: { resumeId: string; children: ReactNode }) {
-  const [state, dispatch] = useReducer(draftReducer, null as unknown as DraftState)
-  const [ready, setReady] = useState(false)
-  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
-  const stateRef = useRef(state)
-  stateRef.current = state
-  const flushingRef = useRef(false)
+  return <ResumeDraftSession key={resumeId} resumeId={resumeId}>{children}</ResumeDraftSession>
+}
 
-  const [dirtyPanels, setDirtyPanels] = useState<Map<string, () => void>>(new Map())
-  const dirtyPanelsRef = useRef(dirtyPanels)
-  dirtyPanelsRef.current = dirtyPanels
-  const registerPanel = useCallback((key: string, commit: (() => void) | null) => {
-    setDirtyPanels((prev) => {
-      if (commit === null) {
-        if (!prev.has(key)) return prev
-        const next = new Map(prev)
-        next.delete(key)
-        return next
-      }
-      const next = new Map(prev)
-      next.set(key, commit)
-      return next
+function ResumeDraftSession({ resumeId, children }: { resumeId: string; children: ReactNode }) {
+  const [state, reactDispatch] = useReducer(draftReducer, null as unknown as DraftState)
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>('idle')
+  const stateRef = useRef<DraftState | null>(null)
+  const syncRef = useRef<ReturnType<typeof createDraftAutosync> | null>(null)
+  const [identity] = useState(createEntryIdentity)
+  const queryClient = useQueryClient()
+
+  const dispatch = useCallback((action: DraftAction) => {
+    if (action.type === 'resolve_ids') {
+      identity.register(action.idMap)
+    } else {
+      action = resolveEntryReferences(action, identity.resolveId)
+    }
+    // Update this ref synchronously so an in-flight sync sees edits from this event,
+    // even before React commits the render. Persist before scheduling any network work.
+    stateRef.current = draftReducer(stateRef.current as DraftState, action)
+    saveDraft(resumeId, stateRef.current)
+    reactDispatch(action)
+    syncRef.current?.schedule()
+  }, [resumeId, identity])
+
+  useEffect(() => {
+    const sync = createDraftAutosync({
+      getState: () => stateRef.current,
+      sync: (snapshot) => flushDraft(resumeId, snapshot, dispatch),
+      onStatus: setSyncStatus,
+      onSynced: () => {
+        void queryClient.invalidateQueries({ queryKey: ['resumes'] })
+      },
     })
-  }, [])
-  function commitDirtyPanels() {
-    for (const commit of dirtyPanelsRef.current.values()) commit()
-  }
+    syncRef.current = sync
+    sync.schedule()
+    const flush = () => { void sync.flush() }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush()
+    }
+    window.addEventListener('online', flush)
+    window.addEventListener('blur', flush)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      sync.dispose()
+      syncRef.current = null
+      window.removeEventListener('online', flush)
+      window.removeEventListener('blur', flush)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [resumeId, dispatch, queryClient])
 
   useEffect(() => {
     let cancelled = false
-    setReady(false)
     const cached = loadDraft(resumeId)
     if (cached) {
       dispatch({ type: 'hydrate', data: cached.data, lastSynced: cached.lastSynced })
-      setReady(true)
       return
     }
     apiGet<FullResume>(`/api/resumes/${resumeId}/full`).then((data) => {
-      if (cancelled) return
-      dispatch({ type: 'replace_all', data })
-      setReady(true)
+      if (!cancelled) dispatch({ type: 'replace_all', data })
     })
-    return () => {
-      cancelled = true
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [resumeId])
-
-  useEffect(() => {
-    if (!ready || !state) return
-    saveDraft(resumeId, { data: state.data, lastSynced: state.lastSynced })
-  }, [resumeId, ready, state])
-
-  async function runFlush(): Promise<boolean> {
-    if (flushingRef.current || !stateRef.current) return true
-    if (!isDraftDirty(stateRef.current.data, stateRef.current.lastSynced)) {
-      setSyncStatus('idle')
-      return true
-    }
-    flushingRef.current = true
-    setSyncStatus('syncing')
-    try {
-      await flushDraft(resumeId, stateRef.current, dispatch)
-      setSyncStatus('idle')
-      return true
-    } catch {
-      setSyncStatus('error')
-      return false
-    } finally {
-      flushingRef.current = false
-    }
-  }
+    return () => { cancelled = true }
+  }, [resumeId, dispatch])
 
   useEffect(() => {
     function handleBeforeUnload(e: BeforeUnloadEvent) {
-      if (!stateRef.current) return
-      const dirty = isDraftDirty(stateRef.current.data, stateRef.current.lastSynced) || dirtyPanelsRef.current.size > 0
-      if (dirty) {
+      const current = stateRef.current
+      if (current && isDraftDirty(current.data, current.lastSynced)) {
         e.preventDefault()
         e.returnValue = ''
       }
@@ -106,21 +98,15 @@ export function ResumeDraftProvider({ resumeId, children }: { resumeId: string; 
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [])
 
-  if (!ready || !state) return null
+  const flushNow = useCallback(() => syncRef.current?.flush() ?? Promise.resolve(false), [])
+
+  if (!state) return null
 
   return (
-    <ResumeDraftContext.Provider
-      value={{
-        state,
-        dispatch,
-        resumeId,
-        syncStatus,
-        flushNow: runFlush,
-        hasDirtyPanel: dirtyPanels.size > 0,
-        registerPanel,
-        commitDirtyPanels,
-      }}
-    >
+    <ResumeDraftContext.Provider value={{
+      state, dispatch, resumeId, syncStatus, getEntryKey: identity.getKey, resolveEntryId: identity.resolveId,
+      flushNow,
+    }}>
       {children}
     </ResumeDraftContext.Provider>
   )

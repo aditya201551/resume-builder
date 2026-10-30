@@ -3,6 +3,7 @@ import { Check, ChevronDown, Loader2, Lock, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { canApplyProposal, describeProposal, proposalDetailEntries, type DisplayItem } from '@/lib/agentProposal'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
+import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 
 function formatValue(v: unknown): string {
   if (v === null || v === undefined) return '—'
@@ -27,8 +28,8 @@ export default function ActionItem({
   const isRunning = event.status === 'running'
   const isToolError = event.status === 'error'
 
-  const { state } = useResumeDraftContext()
-  const applicability = canApplyProposal(proposal, state.data)
+  const { state, resolveEntryId } = useResumeDraftContext()
+  const applicability = canApplyProposal(resolveEntryReferences(proposal, resolveEntryId), state.data)
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 overflow-hidden rounded-lg border border-border bg-card text-sm duration-200">

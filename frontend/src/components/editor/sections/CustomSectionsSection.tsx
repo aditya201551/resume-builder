@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { LayoutList, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -9,7 +9,7 @@ import SortableList from '@/components/editor/SortableList'
 import EmptyState from '@/components/editor/EmptyState'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useEntryPanel } from '@/hooks/useEntryPanel'
-import { usePreviewOverride } from '@/hooks/usePreviewOverride'
+import { useDraftForm } from '@/hooks/useDraftForm'
 import type { CustomSection, CustomSectionEntry } from '@/types/resume'
 
 function toDateInput(v: string | null) {
@@ -38,7 +38,6 @@ function CustomEntryRow({
   onDelete,
   dragHandle,
   open,
-  isNew,
   onOpenChange,
 }: {
   entry: CustomSectionEntry
@@ -46,40 +45,18 @@ function CustomEntryRow({
   onDelete: () => void
   dragHandle?: ReactNode
   open: boolean
-  isNew: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [form, setForm] = useState(() => formFromEntry(entry))
-  const isDirty = JSON.stringify(form) !== JSON.stringify(formFromEntry(entry))
-
-  const { setOverride, clearOverride } = usePreviewOverride()
-  useEffect(() => {
-    if (!open) return
-    return () => clearOverride(entry.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, entry.id])
-  useEffect(() => {
-    if (!open) return
-    setOverride(entry.id, toPatch(form))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, form, entry.id])
-
-  function handleDone() {
-    onSave({ ...toPatch(form), sort_order: entry.sort_order })
-  }
+  const [form, setForm] = useDraftForm(formFromEntry(entry), toPatch, onSave)
 
   return (
     <RowCard
-      onDone={handleDone}
-      onDiscard={() => setForm(formFromEntry(entry))}
-      isDirty={isDirty}
       onDelete={onDelete}
       title={form.title}
       subtitle={form.entry_date}
       dragHandle={dragHandle}
       editorTitle="Edit entry"
       open={open}
-      isNew={isNew}
       onOpenChange={onOpenChange}
     >
       <div className="flex gap-2">
@@ -116,7 +93,6 @@ function CustomSectionCard({
   onDeleteSection,
   dragHandle,
   open,
-  isNew,
   onOpenChange,
 }: {
   resumeId: string
@@ -125,41 +101,23 @@ function CustomSectionCard({
   onDeleteSection: () => void
   dragHandle?: ReactNode
   open: boolean
-  isNew: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [title, setTitle] = useState(section.title)
-  const isDirty = title !== section.title
+  const [title, setTitle] = useDraftForm(section.title, (title) => ({ title }), onSaveSection)
   const entries = useEntityMutations(
     resumeId,
     `/api/resumes/${resumeId}/custom-sections/${section.id}/entries`,
   )
-  const { openNew: openNewEntry, getPanelProps: getEntryPanelProps } = useEntryPanel(section.entries.map((e) => e.id))
-
-  const { setOverride, clearOverride } = usePreviewOverride()
-  useEffect(() => {
-    if (!open) return
-    return () => clearOverride(section.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, section.id])
-  useEffect(() => {
-    if (!open) return
-    setOverride(section.id, { title })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, title, section.id])
+  const { openNew: openNewEntry, getPanelProps: getEntryPanelProps } = useEntryPanel()
 
   return (
     <RowCard
-      onDone={() => onSaveSection({ title, sort_order: section.sort_order })}
-      onDiscard={() => setTitle(section.title)}
-      isDirty={isDirty}
       onDelete={onDeleteSection}
       title={title}
       subtitle={section.entries.length > 0 ? `${section.entries.length} entr${section.entries.length === 1 ? 'y' : 'ies'}` : undefined}
       dragHandle={dragHandle}
       editorTitle="Edit custom section"
       open={open}
-      isNew={isNew}
       onOpenChange={onOpenChange}
     >
       <div className="flex flex-col gap-1.5">
@@ -206,7 +164,7 @@ function CustomSectionCard({
 
 export default function CustomSectionsSection({ resumeId, items }: { resumeId: string; items: CustomSection[] }) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/custom-sections`)
-  const { openNew, getPanelProps } = useEntryPanel(items.map((i) => i.id))
+  const { openNew, getPanelProps } = useEntryPanel()
 
   if (items.length === 0) {
     return (

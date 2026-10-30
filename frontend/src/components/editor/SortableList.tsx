@@ -16,6 +16,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { GripVertical } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 
 interface SortableListProps<T extends { id: string }> {
   items: T[]
@@ -32,6 +33,7 @@ export default function SortableList<T extends { id: string }>({
   className,
   dragHandlePlacement = 'gutter',
 }: SortableListProps<T>) {
+  const { getEntryKey } = useResumeDraftContext()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
 
   function handleDragEnd(event: DragEndEvent) {
@@ -48,7 +50,7 @@ export default function SortableList<T extends { id: string }>({
       <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
         <div className={cn('flex flex-col gap-3', className)}>
           {items.map((item, index) => (
-            <SortableRow key={item.id} id={item.id} placement={dragHandlePlacement}>
+            <SortableRow key={getEntryKey(item.id)} id={item.id} placement={dragHandlePlacement}>
               {(dragHandle) => renderItem(item, index, dragHandle)}
             </SortableRow>
           ))}

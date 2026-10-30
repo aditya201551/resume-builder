@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useParams } from 'react-router'
 import { EditorPanelContext, type OpenPanelHandle } from '@/hooks/useEditorPanel'
-import { PreviewOverrideContext } from '@/hooks/usePreviewOverride'
-import { applyPreviewOverrides } from '@/lib/applyPreviewOverrides'
 import {
   Award,
   Briefcase,
@@ -289,40 +287,25 @@ function EditPane({ resumeId, data }: { resumeId: string; data: FullResume }) {
 
 function EditorPageContent() {
   const { data, isLoading } = useResumeDraftData()
-  const { commitDirtyPanels, flushNow } = useResumeDraftContext()
+  const { flushNow } = useResumeDraftContext()
   const [mode, setMode] = useState<EditorMode>('content')
-  const [overrides, setOverrides] = useState<Record<string, Record<string, unknown>>>({})
-  const setOverride = useCallback((id: string, patch: Record<string, unknown>) => {
-    setOverrides((prev) => ({ ...prev, [id]: patch }))
-  }, [])
-  const clearOverride = useCallback((id: string) => {
-    setOverrides((prev) => {
-      if (!(id in prev)) return prev
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-  }, [])
-  const panelContextValue = useMemo(() => ({ overrides, setOverride, clearOverride }), [overrides, setOverride, clearOverride])
-
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 's') {
         e.preventDefault()
-        commitDirtyPanels()
-        setTimeout(() => void flushNow(), 0)
+        void flushNow()
       }
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [commitDirtyPanels, flushNow])
+  }, [flushNow])
 
   if (isLoading || !data) {
     return <div className="p-10 text-sm text-muted-foreground">Loading resume…</div>
   }
 
   const resumeId = data.resume.id
-  const previewData = applyPreviewOverrides(data, overrides)
+  const previewData = data
 
   const editPane = <EditPane resumeId={resumeId} data={data} />
   const designPane = (
@@ -344,39 +327,37 @@ function EditorPageContent() {
   const secondaryPane = mode === 'chat' ? <ChatPanel /> : previewPane
 
   return (
-    <PreviewOverrideContext.Provider value={panelContextValue}>
-      <div className="flex h-svh flex-col">
-        <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
+    <div className="flex h-svh flex-col">
+      <EditorNavbar resume={data.resume} mode={mode} onModeChange={setMode} />
 
-        <div className="min-h-0 flex-1">
-          {/* Desktop split pane */}
-          <div className="hidden min-[900px]:grid min-[900px]:h-full min-[900px]:grid-cols-2">
-            {primaryPane}
-            {secondaryPane}
-          </div>
+      <div className="min-h-0 flex-1">
+        {/* Desktop split pane */}
+        <div className="hidden min-[900px]:grid min-[900px]:h-full min-[900px]:grid-cols-2">
+          {primaryPane}
+          {secondaryPane}
+        </div>
 
-          {/* Mobile: Edit/Chat + Preview tab switcher */}
-          <div className="h-full overflow-y-auto min-[900px]:hidden">
-            <Tabs defaultValue="edit">
-              <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
-                <TabsList>
-                  <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : mode === 'design' ? 'Design' : 'Edit'}</TabsTrigger>
-                  <TabsTrigger value="preview">Preview</TabsTrigger>
-                </TabsList>
-              </div>
-              <TabsContent value="edit" className={mode === 'chat' ? 'h-[calc(100svh-8.5rem)]' : 'px-4 py-4'}>
-                {mode === 'chat' ? <ChatPanel /> : mode === 'design' ? <DesignMode /> : editPane}
-              </TabsContent>
-              <TabsContent value="preview" className="bg-secondary/40 p-4">
-                <PreviewErrorBoundary resetKey={previewData}>
-                  <LivePreview data={previewData} />
-                </PreviewErrorBoundary>
-              </TabsContent>
-            </Tabs>
-          </div>
+        {/* Mobile: Edit/Chat + Preview tab switcher */}
+        <div className="h-full overflow-y-auto min-[900px]:hidden">
+          <Tabs defaultValue="edit">
+            <div className="sticky top-0 z-10 flex justify-center border-b border-border bg-background py-2">
+              <TabsList>
+                <TabsTrigger value="edit">{mode === 'chat' ? 'Chat' : mode === 'design' ? 'Design' : 'Edit'}</TabsTrigger>
+                <TabsTrigger value="preview">Preview</TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="edit" className={mode === 'chat' ? 'h-[calc(100svh-8.5rem)]' : 'px-4 py-4'}>
+              {mode === 'chat' ? <ChatPanel /> : mode === 'design' ? <DesignMode /> : editPane}
+            </TabsContent>
+            <TabsContent value="preview" className="bg-secondary/40 p-4">
+              <PreviewErrorBoundary resetKey={previewData}>
+                <LivePreview data={previewData} />
+              </PreviewErrorBoundary>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
-    </PreviewOverrideContext.Provider>
+    </div>
   )
 }
 

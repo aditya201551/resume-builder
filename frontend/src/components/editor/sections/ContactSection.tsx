@@ -1,16 +1,15 @@
-import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import { useAutosave } from '@/hooks/useAutosave'
+import { useDraftForm } from '@/hooks/useDraftForm'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import type { Resume, ResumeLink } from '@/types/resume'
 
 export default function ContactSection({ resume }: { resume: Resume }) {
   const { dispatch } = useResumeDraftContext()
-  const [form, setForm] = useState({
+  const [form, setForm] = useDraftForm({
     full_name: resume.full_name,
     headline: resume.headline ?? '',
     email: resume.email ?? '',
@@ -18,22 +17,15 @@ export default function ContactSection({ resume }: { resume: Resume }) {
     location: resume.location ?? '',
     summary: resume.summary ?? '',
     links: resume.links,
-  })
-
-  useAutosave(form, async (value) => {
-    dispatch({
-      type: 'update_meta',
-      patch: {
-        full_name: value.full_name,
-        headline: value.headline || null,
-        email: value.email || null,
-        phone: value.phone || null,
-        location: value.location || null,
-        summary: value.summary || null,
-        links: value.links,
-      },
-    })
-  })
+  }, (value) => ({
+    full_name: value.full_name,
+    headline: value.headline || null,
+    email: value.email || null,
+    phone: value.phone || null,
+    location: value.location || null,
+    summary: value.summary || null,
+    links: value.links,
+  }), (patch) => dispatch({ type: 'update_meta', patch }))
 
   function setLink(index: number, patch: Partial<ResumeLink>) {
     setForm((f) => ({

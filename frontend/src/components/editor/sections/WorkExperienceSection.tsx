@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { Briefcase, Plus } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -10,7 +10,7 @@ import EmptyState from '@/components/editor/EmptyState'
 import RichTextEditor from '@/components/editor/RichTextEditor'
 import { useEntityMutations } from '@/hooks/useResumeEditor'
 import { useEntryPanel } from '@/hooks/useEntryPanel'
-import { usePreviewOverride } from '@/hooks/usePreviewOverride'
+import { useDraftForm } from '@/hooks/useDraftForm'
 import type { WorkExperience } from '@/types/resume'
 
 function toDateInput(v: string | null) {
@@ -56,7 +56,6 @@ function WorkExperienceRow({
   onDelete,
   dragHandle,
   open,
-  isNew,
   onOpenChange,
 }: {
   entry: WorkExperience
@@ -64,40 +63,18 @@ function WorkExperienceRow({
   onDelete: () => void
   dragHandle?: ReactNode
   open: boolean
-  isNew: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const [form, setForm] = useState(() => formFromEntry(entry))
-  const isDirty = JSON.stringify(form) !== JSON.stringify(formFromEntry(entry))
-
-  const { setOverride, clearOverride } = usePreviewOverride()
-  useEffect(() => {
-    if (!open) return
-    return () => clearOverride(entry.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, entry.id])
-  useEffect(() => {
-    if (!open) return
-    setOverride(entry.id, toPatch(form))
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, form, entry.id])
-
-  function handleDone() {
-    onSave({ ...toPatch(form), sort_order: entry.sort_order })
-  }
+  const [form, setForm] = useDraftForm(formFromEntry(entry), toPatch, onSave)
 
   return (
     <RowCard
-      onDone={handleDone}
-      onDiscard={() => setForm(formFromEntry(entry))}
-      isDirty={isDirty}
       onDelete={onDelete}
       title={form.title}
       subtitle={form.company}
       dragHandle={dragHandle}
       editorTitle="Edit work experience"
       open={open}
-      isNew={isNew}
       onOpenChange={onOpenChange}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -176,7 +153,7 @@ function WorkExperienceRow({
 
 export default function WorkExperienceSection({ resumeId, items }: { resumeId: string; items: WorkExperience[] }) {
   const { create, update, remove, reorder } = useEntityMutations(resumeId, `/api/resumes/${resumeId}/work-experiences`)
-  const { openNew, getPanelProps } = useEntryPanel(items.map((i) => i.id))
+  const { openNew, getPanelProps } = useEntryPanel()
 
   if (items.length === 0) {
     return (

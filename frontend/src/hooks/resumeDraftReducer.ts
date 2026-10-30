@@ -41,8 +41,7 @@ export type DraftAction =
   | { type: 'custom_entry_delete'; sectionId: string; id: string }
   | { type: 'custom_entry_reorder'; sectionId: string; orderedIds: string[] }
   | { type: 'resolve_ids'; idMap: Record<string, string> }
-  | { type: 'mark_synced_entity'; slice: keyof FullResume }
-  | { type: 'mark_synced_all' }
+  | { type: 'mark_synced_entity'; slice: keyof FullResume; snapshot: FullResume }
 
 export interface DraftState {
   data: FullResume
@@ -226,10 +225,8 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
     }
 
     case 'mark_synced_entity':
-      return { ...state, lastSynced: { ...state.lastSynced, [action.slice]: d[action.slice] } }
-
-    case 'mark_synced_all':
-      return { ...state, lastSynced: d }
+      // A response acknowledges the submitted snapshot, never edits made while it was in flight.
+      return { ...state, lastSynced: { ...state.lastSynced, [action.slice]: action.snapshot[action.slice] } }
 
     default:
       return state

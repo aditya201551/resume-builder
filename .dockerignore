@@ -1,0 +1,25 @@
+# Only send application build inputs to Docker.
+**
+!Dockerfile
+!.dockerignore
+!package.json
+!package-lock.json
+!frontend/
+!frontend/**
+!backend/
+!backend/**
+
+# Keep local dependencies, outputs and credentials out of every build stage.
+**/node_modules
+**/dist
+**/bin
+**/coverage
+**/.turbo
+**/.cache
+**/.env
+**/.env.*
+**/.npmrc
+**/*.log
+**/*.tsbuildinfo
+**/*.exe
+**/.DS_Store

@@ -1,24 +1,38 @@
-FROM node:22-bookworm AS frontend-builder
+# syntax=docker/dockerfile:1
+
+FROM --platform=$BUILDPLATFORM node:22-bookworm-slim AS frontend-builder
 WORKDIR /src
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package.json
 COPY backend/package.json backend/package.json
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --workspace=frontend --include-workspace-root=false --no-audit --no-fund
+# Catalog changes should rebuild the frontend without reinstalling dependencies.
 COPY backend/internal/design/templates.json backend/internal/design/templates.json
-RUN npm ci --workspace=frontend --include-workspace-root
 COPY frontend frontend
 RUN npm run build --workspace=frontend
 
-FROM golang:1.26-bookworm AS backend-builder
+FROM --platform=$BUILDPLATFORM golang:1.26-bookworm AS backend-builder
 WORKDIR /src/backend
+ENV CGO_ENABLED=0 GOWORK=off
 COPY backend/go.mod backend/go.sum ./
-RUN go mod download
-COPY backend .
-RUN CGO_ENABLED=0 go build -o /server ./cmd/api
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+COPY backend/cmd ./cmd
+COPY backend/internal ./internal
+ARG TARGETOS
+ARG TARGETARCH
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false -ldflags="-s -w" -o /server ./cmd/api
 
-FROM chromedp/headless-shell:stable
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+# PDF preview/download run in the client. The legacy Chrome export endpoint is
+# not supported by this image. Distroless includes TLS roots and timezone data.
+FROM gcr.io/distroless/static-debian13:nonroot AS runtime
+WORKDIR /app
 COPY --from=backend-builder /server /usr/local/bin/server
 COPY --from=frontend-builder /src/frontend/dist /app/dist
-ENV CHROME_EXEC_PATH=/headless-shell/headless-shell
 ENV STATIC_DIR=/app/dist
+USER 65532:65532
+EXPOSE 8080
 ENTRYPOINT ["/usr/local/bin/server"]

@@ -4,6 +4,7 @@ import {
   DragOverlay,
   closestCorners,
   PointerSensor,
+  KeyboardSensor,
   useSensor,
   useSensors,
   useDroppable,
@@ -11,9 +12,9 @@ import {
   type DragOverEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
-import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable'
+import { SortableContext, useSortable, verticalListSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Undo2, Redo2 } from 'lucide-react'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -60,20 +61,34 @@ function NumberField({
   max?: number
   step?: number
 }) {
+  const [inputValue, setInputValue] = useState(String(value))
+  const focused = useRef(false)
+  useEffect(() => { if (!focused.current) setInputValue(String(value)) }, [value])
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
         <Label>{label}</Label>
-        {/* Slider is bounded to [min, max], but typing an exact value here
-            isn't clamped to that range — the range is a sensible default,
-            not a hard backend limit. */}
+        {/* Let users finish typing a number before clamping; incomplete input
+            never enters the synced document or PDF pipeline. */}
         <input
           type="number"
-          value={value}
+          aria-label={label}
+          value={inputValue}
+          min={min}
+          max={max}
           step={step}
+          onFocus={() => { focused.current = true }}
           onChange={(e) => {
+            setInputValue(e.target.value)
             const n = Number(e.target.value)
-            if (!Number.isNaN(n)) onChange(n)
+            if (e.target.value !== '' && Number.isFinite(n) && n >= min && n <= max) onChange(n)
+          }}
+          onBlur={() => {
+            focused.current = false
+            const parsed = inputValue.trim() === '' ? value : Number(inputValue)
+            const next = Number.isFinite(parsed) ? Math.min(max, Math.max(min, parsed)) : value
+            setInputValue(String(next))
+            if (next !== value) onChange(next)
           }}
           className="h-7 w-16 rounded border border-input bg-transparent px-1.5 text-right text-sm tabular-nums"
         />
@@ -81,6 +96,7 @@ function NumberField({
       <div className="flex items-center gap-2">
         <input
           type="range"
+          aria-label={`Adjust ${label}`}
           min={min}
           max={max}
           step={step}
@@ -112,16 +128,23 @@ function NumberField({
 }
 
 function ColorField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const [inputValue, setInputValue] = useState(value)
+  const focused = useRef(false)
+  useEffect(() => { if (!focused.current) setInputValue(value) }, [value])
   return (
     <Field label={label}>
       <div className="flex items-center gap-2">
         <input
           type="color"
+          aria-label={`Pick ${label}`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
           className="h-9 w-9 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0.5"
         />
-        <Input value={value} onChange={(e) => onChange(e.target.value)} className="font-mono text-xs" />
+        <Input aria-label={`${label} hex color`} value={inputValue} onFocus={() => { focused.current = true }} onChange={(e) => {
+          setInputValue(e.target.value)
+          if (/^#[0-9a-f]{6}$/i.test(e.target.value)) onChange(e.target.value)
+        }} onBlur={() => { focused.current = false; if (!/^#[0-9a-f]{6}$/i.test(inputValue)) setInputValue(value) }} className="font-mono text-xs" />
       </div>
     </Field>
   )
@@ -350,7 +373,7 @@ function findColumn(id: string, columns: Columns): 'left' | 'right' | undefined 
 function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch: (action: { type: 'design_update'; patch: Partial<ResumeDesign> }) => void }) {
   const [dragColumns, setDragColumns] = useState<Columns | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }), useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }))
 
   const columns = dragColumns ?? resolveTwoColumnSectionRefs(data)
 
@@ -444,6 +467,7 @@ function TwoColumnSectionsPanel({ data, dispatch }: { data: FullResume; dispatch
         onDragStart={handleDragStart}
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
+        onDragCancel={() => { setDragColumns(null); setActiveId(null) }}
       >
         <div className="grid grid-cols-2 gap-4">
           <SectionColumn
@@ -525,7 +549,7 @@ function SchemaField({
     return (
       <Field label={field.label}>
         <Select value={value as string} onValueChange={(v) => onChange(buildFieldPatch(design, field.key, v))}>
-          <SelectTrigger>
+          <SelectTrigger aria-label={field.label}>
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -598,6 +622,7 @@ function SchemaGroupPanel({
 
 const PINNED_ITEMS = [
   { key: 'templates', label: 'Templates' },
+  { key: 'page', label: 'Page & presets' },
   { key: 'sections', label: 'Sections' },
 ] as const
 
@@ -605,7 +630,7 @@ const SCROLLSPY_ROOT_MARGIN = '0px 0px -75% 0px'
 const CLICK_SCROLL_SUPPRESS_MS = 700
 
 export default function DesignMode() {
-  const { state, dispatch } = useResumeDraftContext()
+  const { state, dispatch, undoDesign, redoDesign, canUndoDesign, canRedoDesign } = useResumeDraftContext()
   const design = state.data.design
   const { data: schema, isLoading: schemaLoading } = useDesignSchema()
   const { data: templates } = useTemplates()
@@ -673,9 +698,35 @@ export default function DesignMode() {
       </nav>
 
       <div className="flex min-w-0 flex-1 flex-col gap-8">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-muted-foreground">Changes update your PDF automatically.</span>
+          <div className="flex gap-1" role="group" aria-label="Formatting history">
+            <button type="button" onClick={undoDesign} disabled={!canUndoDesign} aria-label="Undo formatting" title="Undo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Undo2 className="size-3.5" /></button>
+            <button type="button" onClick={redoDesign} disabled={!canRedoDesign} aria-label="Redo formatting" title="Redo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Redo2 className="size-3.5" /></button>
+          </div>
+        </div>
         <section ref={(el) => registerSection('templates', el)} data-nav-key="templates" className="flex flex-col gap-3">
           <h3 className="text-sm font-semibold text-foreground">Templates</h3>
           <TemplatePicker design={design} onChange={update} />
+        </section>
+
+        <section ref={(el) => registerSection('page', el)} data-nav-key="page" className="flex flex-col gap-4">
+          <h3 className="text-sm font-semibold">Page & formatting presets</h3>
+          <Field label="Paper size">
+            <Select value={design.page.format} onValueChange={(format) => update({ page: { ...design.page, format: format as 'Letter' | 'A4' } })}>
+              <SelectTrigger aria-label="Paper size"><SelectValue /></SelectTrigger>
+              <SelectContent><SelectItem value="Letter">US Letter · 8.5 × 11 in</SelectItem><SelectItem value="A4">A4 · 210 × 297 mm</SelectItem></SelectContent>
+            </Select>
+          </Field>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {[
+              { label: 'Compact', description: 'More room for experience', lineHeight: 1.3, sectionGap: 12, entryGap: 7, bulletGap: 2 },
+              { label: 'Balanced', description: 'Comfortable and clear', lineHeight: 1.5, sectionGap: 18, entryGap: 10, bulletGap: 4 },
+              { label: 'Spacious', description: 'A little more breathing room', lineHeight: 1.65, sectionGap: 24, entryGap: 14, bulletGap: 6 },
+            ].map((preset) => <button key={preset.label} type="button" className="format-preset" onClick={() => update({ typography: { ...design.typography, lineHeight: preset.lineHeight }, spacing: { sectionGap: preset.sectionGap, entryGap: preset.entryGap, bulletGap: preset.bulletGap } })}><strong>{preset.label}</strong><span className="text-[10px] text-muted-foreground">{preset.description}</span></button>)}
+          </div>
+          {design.layout.mode === 'two' && <NumberField label="Left column width (%)" value={design.layout.columnWidths.left} min={20} max={80} step={1} onChange={(left) => update({ layout: { ...design.layout, columnWidths: { left, right: 100 - left } } })} />}
+          <p className="text-[11px] leading-relaxed text-muted-foreground">Fonts are embedded in your PDF. Georgia uses Gelasio; Times New Roman uses Tinos; Arial and Helvetica use Arimo. Other listed fonts use their own bundled files.</p>
         </section>
 
         <section ref={(el) => registerSection('sections', el)} data-nav-key="sections" className="flex flex-col gap-3">

@@ -47,6 +47,7 @@ import MiscEntriesSection from '@/components/editor/sections/MiscEntriesSection'
 import CustomSectionsSection from '@/components/editor/sections/CustomSectionsSection'
 import DesignMode from '@/components/editor/DesignMode'
 import ResumePreview from '@/components/editor/ResumePreview'
+import { ResumePdfProvider } from '@/hooks/useResumePdf'
 import { useAgentChat } from '@/hooks/useAgentChat'
 import { type AssistantTask } from '@/lib/assistantTask'
 import EditorNavbar, { type EditorMode } from '@/components/editor/EditorNavbar'
@@ -269,9 +270,13 @@ function slotContent(
 function ContentMode({
   resumeId,
   data,
+  selected,
+  selectionVersion,
 }: {
   resumeId: string
   data: FullResume
+  selected?: string
+  selectionVersion?: number
 }) {
   const customSections = useEntityMutations(
     resumeId,
@@ -279,6 +284,11 @@ function ContentMode({
   )
   const [revealed, setRevealed] = useState<Set<SlotKey>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
+  const [openSection, setOpenSection] = useState('')
+  useEffect(() => {
+    if (!selected) return
+    setOpenSection(selected === 'summary' ? 'contact' : selected.startsWith('custom-') ? 'custom' : selected)
+  }, [selected, selectionVersion])
 
   const isActive = (key: SlotKey) =>
     slotCount(data, key) > 0 || revealed.has(key)
@@ -317,7 +327,7 @@ function ContentMode({
 
   return (
     <div className="flex flex-col gap-3">
-      <Accordion type="single" collapsible className="flex flex-col gap-3">
+      <Accordion type="single" collapsible value={openSection === 'contact' ? 'contact' : ''} onValueChange={setOpenSection} className="flex flex-col gap-3">
         <SectionAccordionItem
           value="contact"
           title="Contact & Summary"
@@ -327,7 +337,7 @@ function ContentMode({
         </SectionAccordionItem>
       </Accordion>
 
-      <Accordion type="single" collapsible className="flex flex-col gap-3">
+      <Accordion type="single" collapsible value={openSection === 'contact' ? '' : openSection} onValueChange={setOpenSection} className="flex flex-col gap-3">
         {sections.map((section) => (
           <SectionAccordionItem
             key={section.key}
@@ -364,10 +374,14 @@ function EditPane({
   resumeId,
   data,
   active,
+  selected,
+  selectionVersion,
 }: {
   resumeId: string
   data: FullResume
   active: boolean
+  selected?: string
+  selectionVersion?: number
 }) {
   const [panelSlot, setPanelSlot] = useState<HTMLDivElement | null>(null)
   const openStack = useRef<OpenPanelHandle[]>([])
@@ -400,7 +414,7 @@ function EditPane({
   return (
     <EditorPanelContext.Provider value={panelContext}>
       <div className="relative h-full flex-1 overflow-y-auto pb-10">
-        <ContentMode resumeId={resumeId} data={data} />
+        <ContentMode resumeId={resumeId} data={data} selected={selected} selectionVersion={selectionVersion} />
         {/* Entry editors portal in here, replacing the list in place while it's open. */}
         <div
           ref={setPanelSlot}
@@ -427,6 +441,8 @@ function EditorPageContent() {
     launch.current?.mode === 'content' ? 'content' : 'chat',
   )
   const [mobilePreview, setMobilePreview] = useState(false)
+  const [selectedSection, setSelectedSection] = useState<string>()
+  const [selectionVersion, setSelectionVersion] = useState(0)
   const [jobDescription, setJobDescription] = useState(
     launch.current?.assistantTask?.jobDescription ?? '',
   )
@@ -480,6 +496,7 @@ function EditorPageContent() {
   }
 
   return (
+    <ResumePdfProvider data={data}>
     <div className="workspace-shell">
       <EditorNavbar
         resume={data.resume}
@@ -545,6 +562,8 @@ function EditorPageContent() {
                 resumeId={resumeId}
                 data={data}
                 active={mode === 'content' && !mobilePreview}
+                selected={selectedSection}
+                selectionVersion={selectionVersion}
               />
             </div>
           </div>
@@ -560,9 +579,10 @@ function EditorPageContent() {
             </div>
           </div>
         </div>
-        <ResumePreview data={data} />
+        <ResumePreview selected={selectedSection} onSelect={(section) => { setSelectedSection(section); setSelectionVersion((n) => n + 1); changeMode('content') }} />
       </div>
     </div>
+    </ResumePdfProvider>
   )
 }
 

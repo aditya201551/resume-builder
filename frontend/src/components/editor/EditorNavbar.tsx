@@ -23,7 +23,8 @@ import {
 } from '@/components/ui/alert-dialog'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { isDraftDirty } from '@/lib/resumeDraftSync'
-import { apiDownload } from '@/lib/http'
+import { useResumePdf } from '@/hooks/useResumePdf'
+import { downloadPdfBlob } from '@/lib/pdf/download'
 import { cn } from '@/lib/utils'
 import Brand from '@/components/layout/Brand'
 import type { Resume } from '@/types/resume'
@@ -83,28 +84,18 @@ function EditableResumeName({ resume }: { resume: Resume }) {
 }
 
 function DownloadButton({ resume }: { resume: Resume }) {
-  const { flushNow } = useResumeDraftContext()
-  const [phase, setPhase] = useState<'idle' | 'saving' | 'generating'>('idle')
+  const { getLatest } = useResumePdf()
+  const [phase, setPhase] = useState<'idle' | 'generating'>('idle')
   const [error, setError] = useState<string | null>(null)
 
   async function handleDownload() {
     setError(null)
     try {
-      setPhase('saving')
-      const saved = await flushNow()
-      if (!saved) {
-        setError(
-          "Couldn't save your latest changes — try again before downloading.",
-        )
-        return
-      }
       setPhase('generating')
-      await apiDownload(
-        `/api/resumes/${resume.id}/export/pdf`,
-        `${resume.label || 'resume'}.pdf`,
-      )
-    } catch {
-      setError("Couldn't generate PDF")
+      const pdf = await getLatest()
+      downloadPdfBlob(pdf.blob, resume.label)
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Couldn't generate PDF")
     } finally {
       setPhase('idle')
     }
@@ -129,9 +120,7 @@ function DownloadButton({ resume }: { resume: Resume }) {
         ) : (
           <Download className="size-3.5" />
         )}
-        {phase === 'saving'
-          ? 'Saving…'
-          : phase === 'generating'
+        {phase === 'generating'
             ? 'Generating…'
             : 'Export PDF'}
       </Button>

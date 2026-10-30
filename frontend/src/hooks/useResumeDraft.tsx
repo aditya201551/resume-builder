@@ -5,6 +5,7 @@ import { loadDraft, saveDraft } from '@/lib/resumeDraftStorage'
 import { flushDraft, isDraftDirty } from '@/lib/resumeDraftSync'
 import { createDraftAutosync, type SyncStatus } from '@/lib/resumeDraftAutosync'
 import { createEntryIdentity, resolveEntryReferences } from '@/lib/resumeDraftIds'
+import { createDesignHistory } from '@/lib/designHistory'
 import { draftReducer, type DraftAction, type DraftState } from '@/hooks/resumeDraftReducer'
 import type { FullResume } from '@/types/resume'
 
@@ -16,6 +17,10 @@ interface ResumeDraftContextValue {
   flushNow: () => Promise<boolean>
   getEntryKey: (id: string) => string
   resolveEntryId: (id: string) => string
+  undoDesign: () => void
+  redoDesign: () => void
+  canUndoDesign: boolean
+  canRedoDesign: boolean
 }
 
 const ResumeDraftContext = createContext<ResumeDraftContextValue | null>(null)
@@ -30,6 +35,7 @@ function ResumeDraftSession({ resumeId, children }: { resumeId: string; children
   const stateRef = useRef<DraftState | null>(null)
   const syncRef = useRef<ReturnType<typeof createDraftAutosync> | null>(null)
   const [identity] = useState(createEntryIdentity)
+  const [designHistory] = useState(createDesignHistory)
   const queryClient = useQueryClient()
 
   const dispatch = useCallback((action: DraftAction) => {
@@ -40,11 +46,13 @@ function ResumeDraftSession({ resumeId, children }: { resumeId: string; children
     }
     // Update this ref synchronously so an in-flight sync sees edits from this event,
     // even before React commits the render. Persist before scheduling any network work.
-    stateRef.current = draftReducer(stateRef.current as DraftState, action)
+    const next = draftReducer(stateRef.current as DraftState, action)
+    if (action.type === 'design_update' && stateRef.current) designHistory.record(stateRef.current.data.design, next.data.design)
+    stateRef.current = next
     saveDraft(resumeId, stateRef.current)
     reactDispatch(action)
     syncRef.current?.schedule()
-  }, [resumeId, identity])
+  }, [resumeId, identity, designHistory])
 
   useEffect(() => {
     const sync = createDraftAutosync({
@@ -99,6 +107,16 @@ function ResumeDraftSession({ resumeId, children }: { resumeId: string; children
   }, [])
 
   const flushNow = useCallback(() => syncRef.current?.flush() ?? Promise.resolve(false), [])
+  const undoDesign = useCallback(() => {
+    if (!stateRef.current) return
+    const previous = designHistory.undo(stateRef.current.data.design)
+    if (previous) dispatch({ type: 'design_update', patch: previous })
+  }, [designHistory, dispatch])
+  const redoDesign = useCallback(() => {
+    if (!stateRef.current) return
+    const next = designHistory.redo(stateRef.current.data.design)
+    if (next) dispatch({ type: 'design_update', patch: next })
+  }, [designHistory, dispatch])
 
   if (!state) return null
 
@@ -106,6 +124,7 @@ function ResumeDraftSession({ resumeId, children }: { resumeId: string; children
     <ResumeDraftContext.Provider value={{
       state, dispatch, resumeId, syncStatus, getEntryKey: identity.getKey, resolveEntryId: identity.resolveId,
       flushNow,
+      undoDesign, redoDesign, canUndoDesign: designHistory.canUndo, canRedoDesign: designHistory.canRedo,
     }}>
       {children}
     </ResumeDraftContext.Provider>

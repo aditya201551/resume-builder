@@ -8,14 +8,14 @@ export function createDesignHistory() {
   let lastTime = 0
   let restoring = false
   return {
-    record(before: ResumeDesign, after: ResumeDesign, now = Date.now()) {
+    record(before: ResumeDesign, after: ResumeDesign, now = Date.now(), { separate = false } = {}) {
       if (restoring) { restoring = false; return }
       if (JSON.stringify(before) === JSON.stringify(after)) return
       const changed = changedPaths(before, after).join(',')
-      if (changed !== lastGroup || now - lastTime > 600 || past.length === 0) past.push(structuredClone(before))
+      if (separate || changed !== lastGroup || now - lastTime > 600 || past.length === 0) past.push(structuredClone(before))
       if (past.length > 80) past.shift()
       future.length = 0
-      lastGroup = changed
+      lastGroup = separate ? '' : changed
       lastTime = now
     },
     undo(current: ResumeDesign) {

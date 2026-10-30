@@ -49,6 +49,21 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
+it('restores formatting defaults locally without changing resume content or the synced snapshot', () => {
+  const h = harness()
+  h.dispatch({ type: 'update_meta', patch: { full_name: 'My name', summary: 'Unsynced summary' } })
+  h.dispatch({ type: 'design_update', patch: { typography: { ...defaultResumeDesign.typography, fontFamily: 'Roboto' } } })
+  const before = h.getState()
+  h.dispatch({ type: 'restore_design_defaults' })
+  const after = h.getState()
+  expect(after.data.design.typography).toEqual(defaultResumeDesign.typography)
+  expect(after.data.resume).toBe(before.data.resume)
+  expect(after.data.work_experiences).toBe(before.data.work_experiences)
+  expect(after.data.custom_sections).toBe(before.data.custom_sections)
+  expect(after.lastSynced).toBe(before.lastSynced)
+  expect(isDraftDirty(after.data, after.lastSynced)).toBe(true)
+})
+
 describe('automatic draft syncing', () => {
   it('debounces edits, with a bounded wait during continuous typing', async () => {
     vi.useFakeTimers()

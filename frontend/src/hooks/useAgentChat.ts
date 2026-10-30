@@ -8,6 +8,7 @@ import {
   canApplyProposal,
   editProposalText,
   proposalToDraftAction,
+  shouldApplyProposalAutomatically,
 } from '@/lib/agentProposal'
 import { loadAutoAccept, saveAutoAccept } from '@/lib/agentChatPrefs'
 import { assistantMessage } from '@/lib/assistantTask'
@@ -167,6 +168,7 @@ export function useAgentChat() {
       progressed = false
       const next = streamingPartsRef.current.map((part) => {
         if (part.kind !== 'proposal' || part.status !== 'pending') return part
+        if (!shouldApplyProposalAutomatically(part.proposal, autoAcceptRef.current)) return part
         if (!applyProposal(part.proposal)) return part
         progressed = true
         return { ...part, status: 'accepted' as const }
@@ -236,7 +238,7 @@ export function useAgentChat() {
           onProposal: (proposal) => {
             if (!current()) return
             const key = nextProposalKey()
-            const applied = autoAcceptRef.current && applyProposal(proposal)
+            const applied = shouldApplyProposalAutomatically(proposal, autoAcceptRef.current) && applyProposal(proposal)
             pushPart({
               kind: 'proposal',
               key,

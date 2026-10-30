@@ -15,7 +15,7 @@ const TextBlock = defineComponent({
 })
 
 const ExperienceForm = defineComponent({
-  name: 'ExperienceForm', description: 'Guided input for one NEW work experience only when explicitly requested or unresolved questions benefit from a form. If required facts are known, use create_resume_entry directly; for one missing field, ask a short chat question. Prefill facts already supplied in the conversation; use empty strings for unknown facts. Dates are YYYY-MM or empty.',
+  name: 'ExperienceForm', description: 'Guided input for one NEW work experience only when required facts are missing, an unresolved ambiguity benefits from structured input, or the user explicitly requests a form. If company and role are known, use create_resume_entry directly; missing optional responsibilities, metrics or dates never require a form. Prefill all supplied and unambiguously implied facts, including normalized dates and current status; leave only unknowns empty. Never invent facts. Dates are YYYY-MM or empty.',
   props: z.object({
     company: z.string().max(200), role: z.string().max(200), location: z.string().max(200),
     startDate: z.string().max(7), endDate: z.string().max(7), current: z.boolean(), details: z.string().max(12000),
@@ -83,7 +83,7 @@ export const assistantLibrary = createLibrary({ root: 'AssistantPanel', componen
 export const assistantPromptOptions: PromptOptions = {
   toolCalls: false, bindings: false, builtinFunctions: false,
   additionalRules: [
-    'Default to normal mutation tools when the request is clear and required facts are known. Use a card only for explicitly requested guided input or alternatives, or an unresolved question that benefits from structured input or comparison. Ask a short chat question for one missing required field; never collect optional details as a prerequisite to editing.',
+    'Default to normal mutation tools when the request is clear and required facts are known. Complete new entries are added directly. Use a card only for explicitly requested guided input or alternatives, or blocking missing facts or ambiguities that benefit from structured input. Prefill every supplied or unambiguously implied fact and leave only unknowns empty. Never collect optional details as a prerequisite to editing.',
     'Return the program only as the code argument of show_resume_ui, never in normal chat text.',
     'Use one AssistantPanel root and exactly one ExperienceForm or one RewriteComparison. No Query, Mutation, actions, functions or external URLs.',
     'The experience_form kind requires ExperienceForm; rewrite_comparison requires RewriteComparison. Do not mix the kinds.',

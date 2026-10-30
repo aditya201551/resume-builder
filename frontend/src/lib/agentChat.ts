@@ -20,6 +20,7 @@ export interface AgentProposal {
   designPatch?: Record<string, unknown>
   designUpdates?: Record<string, unknown>
   toolCallId?: string
+  applyDirectly?: boolean
   // Local review guard; never used to authorize an API operation.
   sourceGuard?: import('./assistantUI').RewriteTarget
 }

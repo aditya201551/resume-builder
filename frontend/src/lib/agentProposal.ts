@@ -5,6 +5,13 @@ import type { FullResume } from '@/types/resume'
 import type { ResumeDesign } from '@/types/design'
 import { rewriteSource } from './assistantUI'
 
+// The backend sets applyDirectly only after validating a complete new entry.
+// Interactive cards keep their explicit submission/review flow.
+export function shouldApplyProposalAutomatically(p: AgentProposal, autoAccept: boolean): boolean {
+  return autoAccept || (p.applyDirectly === true && p.type === 'flat_create' && Boolean(p.tempId) &&
+    ['work_experiences', 'educations', 'projects', 'certifications', 'languages', 'misc_entries'].includes(p.entity ?? ''))
+}
+
 export function proposalToDraftAction(p: AgentProposal): DraftAction | null {
   switch (p.type) {
     case 'flat_create':

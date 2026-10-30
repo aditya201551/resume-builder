@@ -4,7 +4,18 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react({
+      // PDF components also run in a Web Worker, where the window-based
+      // Fast Refresh runtime cannot execute. Vite still transforms their JSX.
+      exclude: [
+        /\/node_modules\//,
+        /\/src\/lib\/pdf\//,
+        /\/src\/templates\/.*pdf.*\.[jt]sx?$/i,
+      ],
+    }),
+    tailwindcss(),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

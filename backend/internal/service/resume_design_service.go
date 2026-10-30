@@ -17,11 +17,11 @@ func resolveResumeDesign(
 ) (design.ResumeDesign, error) {
 	row, err := designs.Find(ctx, resumeID)
 	if err == nil {
-		d := design.Default(design.DefaultTemplateID())
-		if uerr := json.Unmarshal(row.Design, &d); uerr != nil {
+		d, uerr := design.Decode(row.Design)
+		if uerr != nil {
 			return design.ResumeDesign{}, fmt.Errorf("unmarshal resume design: %w", uerr)
 		}
-		return design.NormalizeTemplate(d), nil
+		return d, nil
 	}
 	if !errors.Is(err, repository.ErrNotFound) {
 		return design.ResumeDesign{}, err

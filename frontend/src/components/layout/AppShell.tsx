@@ -4,7 +4,6 @@ import {
   Files,
   House,
   LogOut,
-  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -55,14 +54,6 @@ export default function AppShell() {
             </NavLink>
           ))}
         </nav>
-        <div className="sidebar-note">
-          <Sparkles className="size-5 text-primary" aria-hidden />
-          <p>
-            Your experience.
-            <br />A little more possibility.
-          </p>
-          <span>Build your next chapter.</span>
-        </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -86,8 +77,8 @@ export default function AppShell() {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            side="top"
-            className="max-w-72 rounded-2xl p-2"
+            side="bottom"
+            className="max-w-72 rounded-lg p-2"
           >
             {user && (
               <div className="truncate px-2 py-2 text-xs text-muted-foreground">

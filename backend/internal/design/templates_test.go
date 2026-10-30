@@ -1,6 +1,7 @@
 package design
 
 import (
+	"encoding/json"
 	"reflect"
 	"testing"
 )
@@ -16,6 +17,22 @@ func TestTemplateCatalog(t *testing.T) {
 		}
 		if template.Capabilities.Columns != 1 {
 			t.Fatal("vertical must have one column")
+		}
+		if err := Validate(Default(template.ID)); err != nil {
+			t.Fatalf("invalid template defaults: %v", err)
+		}
+		raw, err := json.Marshal(template)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var payload struct {
+			Defaults ResumeDesign `json:"defaults"`
+		}
+		if err := json.Unmarshal(raw, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Defaults.Typography.FontFamily != "Georgia" || payload.Defaults.Typography.BaseFontSizePt != 13 || payload.Defaults.Page.MarginLeft != 56 {
+			t.Fatal("published catalog must include Vertical's existing formatting defaults")
 		}
 		seen := map[string]bool{}
 		for _, key := range template.SupportedFields {

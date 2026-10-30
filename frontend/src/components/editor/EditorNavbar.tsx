@@ -73,7 +73,7 @@ function EditableResumeName({ resume }: { resume: Resume }) {
       type="button"
       onClick={startEditing}
       aria-label="Rename resume"
-      className="flex w-fit min-w-0 max-w-48 items-center gap-1.5 rounded-md text-left"
+      className="workspace-rename flex w-fit min-w-0 max-w-48 items-center gap-1.5 rounded-md text-left"
     >
       <span className="truncate text-sm font-semibold text-foreground">
         {resume.label || 'Untitled resume'}
@@ -145,16 +145,11 @@ function SyncStatus() {
         syncStatus === 'error' ? 'text-destructive' : 'text-muted-foreground',
       )}
     >
-      <span
-        className={cn(
-          'size-1.5 rounded-full',
-          syncStatus === 'error'
-            ? 'bg-destructive'
-            : dirty
-              ? 'animate-pulse bg-muted-foreground/50'
-              : 'bg-accent',
-        )}
-      />
+        {syncStatus === 'syncing' || dirty ? (
+          <Loader2 className="size-3 animate-spin" aria-hidden />
+        ) : syncStatus !== 'error' ? (
+          <Check className="size-3" aria-hidden />
+        ) : null}
       {label}
     </span>
   )
@@ -207,7 +202,7 @@ function BackButton() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Changes haven't synced yet</AlertDialogTitle>
+            <AlertDialogTitle>Changes haven’t synced yet</AlertDialogTitle>
             <AlertDialogDescription>
               Your changes are kept on this device. You can retry now or leave
               and resume syncing when you reopen this resume.

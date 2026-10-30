@@ -20,6 +20,7 @@ type Proposal struct {
 	DesignPatch     map[string]any `json:"designPatch,omitempty"`
 	DesignUpdates   map[string]any `json:"designUpdates,omitempty"`
 	ToolCallID      string         `json:"toolCallId,omitempty"`
+	ApplyDirectly   bool           `json:"applyDirectly,omitempty"`
 }
 
 var flatEntities = map[string]bool{

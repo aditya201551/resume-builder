@@ -32,11 +32,12 @@ export default function ActionItem({
   onReject: () => void
   canResolve?: boolean
 }) {
-  const [open, setOpen] = useState(true)
-  const [editing, setEditing] = useState(false)
-  const [edits, setEdits] = useState<Record<string, string>>({})
   const { event, part } = item
   const { proposal, status } = part
+  const directAddition = proposal.applyDirectly === true && proposal.type === 'flat_create' && status === 'accepted'
+  const [open, setOpen] = useState(!directAddition)
+  const [editing, setEditing] = useState(false)
+  const [edits, setEdits] = useState<Record<string, string>>({})
   const { state, resolveEntryId } = useResumeDraftContext()
   const resolved = resolveEntryReferences(proposal, resolveEntryId)
   const entries = proposalDetailEntries(resolved)
@@ -71,11 +72,11 @@ export default function ActionItem({
           </span>
         )}
         <span className="min-w-0 flex-1 text-left font-medium">
-          {describeProposal(proposal)}
+          {directAddition ? describeProposal(proposal).replace(/^Add\b/, 'Added') : describeProposal(proposal)}
         </span>
         {status !== 'pending' && (
           <span className="text-[10px] text-muted-foreground">
-            {status === 'accepted' ? 'Accepted' : 'Rejected'}
+            {status === 'accepted' ? directAddition ? 'Added' : 'Accepted' : 'Rejected'}
           </span>
         )}
         <ChevronDown

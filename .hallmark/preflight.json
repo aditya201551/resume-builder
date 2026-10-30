@@ -1,0 +1,129 @@
+{
+  "version": "2.0.0",
+  "date": "2026-10-30",
+  "mode": "redesign",
+  "depth": "full",
+  "genre": "modern-minimal",
+  "scope": "app",
+  "git": {
+    "initialWorkingTree": "clean"
+  },
+  "system": {
+    "lockedDesign": null,
+    "brandSpec": null,
+    "framework": "React 19, TypeScript, Vite, Tailwind v4, shadcn/ui",
+    "font": {
+      "value": "Geist Variable",
+      "source": "frontend/src/index.css:11"
+    },
+    "accent": {
+      "value": "#6752B3",
+      "source": "frontend/src/index.css:59"
+    },
+    "darkTheme": "frontend/src/index.css:87",
+    "workspaceStyles": "frontend/src/styles/workspace.css:1"
+  },
+  "routes": [
+    {
+      "route": "/login",
+      "file": "frontend/src/pages/LoginPage.tsx",
+      "kind": "sign-in screen"
+    },
+    {
+      "route": "/resumes",
+      "file": "frontend/src/pages/DashboardPage.tsx",
+      "kind": "app screen"
+    },
+    {
+      "route": "/resumes/library",
+      "file": "frontend/src/pages/DashboardPage.tsx",
+      "kind": "app screen"
+    },
+    {
+      "route": "/resumes/:id/edit",
+      "file": "frontend/src/pages/EditorPage.tsx",
+      "kind": "app screen"
+    }
+  ],
+  "routingSource": "frontend/src/router.tsx:9",
+  "preserve": [
+    "Routes, links, handlers, form fields, and component logic",
+    "OAuth sign-in, local drafts, synchronization, assistant, and export behavior",
+    "Resume preview and PDF template geometry"
+  ],
+  "introduce": [
+    "Shared Coral app tokens with locally bundled Geist",
+    "Compact top navigation",
+    "Split dashboard writing workspace",
+    "Document-led resume library",
+    "Stable editor pane positions",
+    "Visible field edges and readable control states",
+    "Mobile empty-chat scroll correction"
+  ],
+  "material": {
+    "real": [
+      "Existing app components",
+      "Resume Builder name",
+      "Live resume preview",
+      "Existing app copy"
+    ],
+    "absent": [
+      "New user-supplied imagery",
+      "Customer testimonials",
+      "Verified marketing metrics"
+    ]
+  },
+  "baseline": {
+    "staticAudit": ".hallmark/before.txt",
+    "wiringRecord": ".hallmark/before.json",
+    "rendered": false,
+    "reason": "No running development server; repository instructions prohibit starting one unless explicitly requested."
+  },
+  "status": "complete",
+  "validation": {
+    "build": "pass",
+    "frontendTests": 62,
+    "lint": "pass with 6 existing Fast Refresh warnings",
+    "render": {
+      "routes": 4,
+      "widths": [
+        320,
+        375,
+        414,
+        768,
+        1024,
+        1280,
+        1920
+      ],
+      "floorFailures": 0,
+      "openReflex": 0,
+      "waived": [
+        "39b: PDF section selection geometry",
+        "75: PDF text at user-selected zoom"
+      ],
+      "warnings": 0
+    },
+    "smoke": [
+      "dashboard starters",
+      "job context disclosure",
+      "library search",
+      "import dialog",
+      "editor modes",
+      "stable PDF preview placement",
+      "mobile preview toggle",
+      "empty chat starts at top",
+      "no runtime errors"
+    ],
+    "darkContrast": {
+      "body": 14.85,
+      "muted": 7.1,
+      "inputBoundary": 3.34,
+      "focus": 8.13
+    },
+    "review": {
+      "type": "fresh-context subagent",
+      "findings": 2,
+      "resolved": 2
+    }
+  }
+}

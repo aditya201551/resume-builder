@@ -14,7 +14,16 @@ entry can be added; missing responsibilities or metrics do not require a form.
 Cards are reserved for explicitly requested guided input or alternatives, or
 unresolved questions that benefit from structured input or comparison. Ordinary
 summary rewrites and the default starter buttons use the normal proposal flow.
-Existing review and automatic acceptance settings still govern tool proposals.
+Complete new entries from `create_resume_entry` are validated by the backend and
+marked `applyDirectly`. The client adds them immediately and shows a collapsed
+“Added” result, including when automatic acceptance of other edits is off. Missing
+required facts block creation; missing optional descriptions or metrics stay empty.
+Updates and removals retain the existing review and automatic acceptance settings.
+Retrying pending dependencies never bypasses those settings.
+
+When a form is needed, prefill all supplied or unambiguously implied facts, including
+normalized month dates and current-employment status. Leave only unknown fields
+empty. Never infer a new role from an earlier job or invent responsibilities or metrics.
 
 ## Request and action flow
 

@@ -120,8 +120,8 @@ type Footer struct {
 	ShowName        bool `json:"showName"`
 }
 
-type ResumeDesign struct {
-	TemplateID     string         `json:"templateId"`
+// DesignDefaults are the complete starting settings owned by a template.
+type DesignDefaults struct {
 	Layout         Layout         `json:"layout"`
 	SectionOrder   SectionOrder   `json:"sectionOrder"`
 	Page           Page           `json:"page"`
@@ -135,4 +135,9 @@ type ResumeDesign struct {
 	LinkStyle      LinkStyle      `json:"linkStyle"`
 	Footer         Footer         `json:"footer"`
 	DateFormat     string         `json:"dateFormat"`
+}
+
+type ResumeDesign struct {
+	TemplateID string `json:"templateId"`
+	DesignDefaults
 }

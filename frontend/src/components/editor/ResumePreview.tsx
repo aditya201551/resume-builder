@@ -44,7 +44,7 @@ export default function ResumePreview({ selected, onSelect }: { selected?: strin
       <span className="inline-flex items-center gap-2"><FileText className="size-3.5" aria-hidden /> PDF preview</span>
       <span role="status" className="inline-flex items-center gap-1.5">
         {preparing && !error && <RefreshCw className="size-3 animate-spin" aria-hidden />}
-        {error ? 'Preview needs attention' : preparing ? snapshot ? 'Updating…' : 'Preparing PDF…' : `${snapshot?.result.pages.length ?? 0} ${(snapshot?.result.pages.length ?? 0) === 1 ? 'page' : 'pages'} · Matches download`}
+        {error ? 'Preview needs attention' : preparing ? snapshot ? 'Updating…' : 'Preparing PDF…' : `${snapshot?.result.pages.length ?? 0} ${(snapshot?.result.pages.length ?? 0) === 1 ? 'page' : 'pages'}, matches download`}
       </span>
     </div>
     {(error || viewerError) && <div className="pdf-error" role="alert"><span>{error || viewerError}</span><button type="button" onClick={() => { setViewerError(null); setViewerAttempt((n) => n + 1); retry() }}>Retry</button></div>}

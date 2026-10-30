@@ -1,0 +1,168 @@
+{
+  "summary": "Full frontend redesign preserving core features and PDF templates.",
+  "system": "design.md",
+  "before": {
+    "rendered": false,
+    "staticFailures": 43,
+    "staticReflex": 86
+  },
+  "after": {
+    "build": "pass",
+    "frontendTests": 62,
+    "lint": "pass with 6 existing Fast Refresh warnings",
+    "render": {
+      "routes": 4,
+      "widths": [
+        320,
+        375,
+        414,
+        768,
+        1024,
+        1280,
+        1920
+      ],
+      "floorFailures": 0,
+      "openReflex": 0,
+      "waived": [
+        "39b: PDF section selection geometry",
+        "75: PDF text at user-selected zoom"
+      ],
+      "warnings": 0
+    },
+    "smoke": [
+      "dashboard starters",
+      "job context disclosure",
+      "library search",
+      "import dialog",
+      "editor modes",
+      "stable PDF preview placement",
+      "mobile preview toggle",
+      "empty chat starts at top",
+      "no runtime errors"
+    ],
+    "darkContrast": {
+      "body": 14.85,
+      "muted": 7.1,
+      "inputBoundary": 3.34,
+      "focus": 8.13
+    },
+    "review": {
+      "type": "fresh-context subagent",
+      "findings": 2,
+      "resolved": 2
+    }
+  },
+  "review": [
+    {
+      "finding": "Mobile dashboard headline lost whitespace around a responsive break",
+      "resolution": "Explicit JSX space and preserved line break",
+      "status": "resolved"
+    },
+    {
+      "finding": "Empty mobile assistant scrolled past its opening heading",
+      "resolution": "Auto-scroll only when conversation content exists; simplified empty-state layout",
+      "status": "resolved"
+    }
+  ],
+  "copyChanges": [
+    {
+      "file": "LoginPage.tsx",
+      "before": "A thoughtful space to build your resume. Write with AI, fine-tune every detail, and make it entirely yours.",
+      "after": "Write your resume with AI, fine-tune every detail, and make it yours.",
+      "reason": "Tighten repeated positioning copy, gates 19 and 69"
+    },
+    {
+      "file": "LoginPage.tsx / DashboardPage.tsx",
+      "before": "A little help. A lot of you.",
+      "after": null,
+      "reason": "Remove eyebrow, gate 54"
+    },
+    {
+      "file": "AppShell.tsx",
+      "before": "Your experience. A little more possibility. Build your next chapter.",
+      "after": null,
+      "reason": "Remove repeated promotional sidebar copy as navigation becomes a compact bar, gates 19 and 69"
+    },
+    {
+      "file": "DashboardPage.tsx",
+      "before": "Your next chapter starts with your story.",
+      "after": "Your experience, on the page.",
+      "reason": "Replace generic promotional heading with the resume task, gate 19"
+    },
+    {
+      "file": "DashboardPage.tsx",
+      "before": "YOUR COLLECTION / PICK UP WHERE YOU LEFT OFF",
+      "after": null,
+      "reason": "Remove tracked-capital eyebrows, gates 54 and 67"
+    },
+    {
+      "file": "DashboardPage.tsx",
+      "before": "Made by you. Ready for what’s next.",
+      "after": "Recent resumes",
+      "reason": "Use the descriptive library heading in place of its eyebrow, gate 54"
+    },
+    {
+      "file": "DashboardPage.tsx",
+      "before": "A fresh page, full of possibility.",
+      "after": "Your first resume starts here.",
+      "reason": "Name the empty-state object, gate 19"
+    },
+    {
+      "file": "EditorPage.tsx",
+      "before": "Make it yours.",
+      "after": "Resume content",
+      "reason": "Use a task-specific pane heading, gate 19"
+    },
+    {
+      "file": "EditorPage.tsx",
+      "before": "A look that feels like you.",
+      "after": "Resume design",
+      "reason": "Use a task-specific pane heading, gate 19"
+    },
+    {
+      "file": "ChatPanel.tsx",
+      "before": "A fresh perspective. Still entirely you.",
+      "after": "Work on your resume.",
+      "reason": "Use a task-specific empty-state heading, gate 19"
+    },
+    {
+      "file": "ChatPanel.tsx",
+      "before": "Let's bring your experience into focus. Ask for a rewrite, build a new section, or find a layout that fits. You'll review the changes.",
+      "after": "Rewrite an entry, add a section, or find a layout that fits. You’ll review the changes.",
+      "reason": "Tighten repeated positioning copy, gate 69"
+    },
+    {
+      "file": "ResumePreview.tsx",
+      "before": "pages · Matches download",
+      "after": "pages, matches download",
+      "reason": "Remove template meta punctuation, gate 63"
+    },
+    {
+      "file": "LoginPage.tsx / DashboardPage.tsx / EditorPage.tsx / EditorNavbar.tsx",
+      "before": "Straight apostrophes and three-period ellipses in displayed prose",
+      "after": "Typographic apostrophes and ellipses",
+      "reason": "Finish F1 and F2"
+    }
+  ],
+  "material": {
+    "slots": [],
+    "newImageryRequired": false,
+    "usefulFutureReference": "A real filled resume with dense experience and long section titles"
+  },
+  "limitations": [
+    "Rendered checks used temporary read-only QA fixtures, not a live user account.",
+    "Live OAuth, AI calls, and backend mutations were not end-to-end tested.",
+    "PDF selection overlays and zoomed document text intentionally keep document geometry, with two documented Reflex waivers.",
+    "No before screenshots were available."
+  ],
+  "preserved": {
+    "sourceLinks": "7/7",
+    "sourceHandlers": "40/40",
+    "backendChanges": false,
+    "pdfTemplateChanges": false
+  },
+  "warnings": [
+    "Six existing React Fast Refresh lint warnings",
+    "Existing Vite large chunk warning"
+  ]
+}

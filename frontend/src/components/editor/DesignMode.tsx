@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Undo2, Redo2 } from 'lucide-react'
+import { Undo2, Redo2, RotateCcw } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -424,9 +425,21 @@ export default function DesignMode() {
       <div className="flex min-w-0 flex-1 flex-col gap-8">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">Changes update your PDF automatically.</span>
-          <div className="flex gap-1" role="group" aria-label="Formatting history">
-            <button type="button" onClick={undoDesign} disabled={!canUndoDesign} aria-label="Undo formatting" title="Undo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Undo2 className="size-3.5" /></button>
-            <button type="button" onClick={redoDesign} disabled={!canRedoDesign} aria-label="Redo formatting" title="Redo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Redo2 className="size-3.5" /></button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => dispatch({ type: 'restore_design_defaults' })}
+              title={`Restore ${activeTemplate.name}'s default formatting and layout. Keeps resume content, section visibility, and custom titles.`}
+            >
+              <RotateCcw className="size-3.5" aria-hidden />
+              Restore defaults
+            </Button>
+            <div className="flex gap-1" role="group" aria-label="Formatting history">
+              <button type="button" onClick={undoDesign} disabled={!canUndoDesign} aria-label="Undo formatting" title="Undo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Undo2 className="size-3.5" /></button>
+              <button type="button" onClick={redoDesign} disabled={!canRedoDesign} aria-label="Redo formatting" title="Redo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Redo2 className="size-3.5" /></button>
+            </div>
           </div>
         </div>
         <section ref={(el) => registerSection('templates', el)} data-nav-key="templates" className="flex flex-col gap-3">

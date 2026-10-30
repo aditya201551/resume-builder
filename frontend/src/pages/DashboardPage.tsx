@@ -134,21 +134,17 @@ export default function DashboardPage({
     <div className={`dashboard-page${libraryOnly ? '' : ' dashboard-home'}`}>
       {!libraryOnly && (
         <section className="home-intro" aria-labelledby="home-heading">
-          <div className="eyebrow">
-            <Sparkles className="size-3.5" aria-hidden /> A little help. A lot
-            of you.
-          </div>
           <h1 id="home-heading">
-            Your next chapter
+            Your experience,{' '}
             <br />
-            <span>starts with your story.</span>
+            on the page.
           </h1>
           <p>
             {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} turn
             your experience into a resume that feels like you.
           </p>
           <form className="home-composer" onSubmit={startAssistant}>
-            <label htmlFor="home-prompt" className="sr-only">
+            <label htmlFor="home-prompt" className="composer-label">
               What would you like help with?
             </label>
             <Textarea
@@ -287,13 +283,10 @@ export default function DashboardPage({
       <section className="resume-library" aria-labelledby="library-heading">
         <div className="library-heading">
           <div>
-            <div className="eyebrow">
-              {libraryOnly ? 'YOUR COLLECTION' : 'PICK UP WHERE YOU LEFT OFF'}
-            </div>
             <h1 id="library-heading" className="library-title">
               {libraryOnly
                 ? 'My resumes'
-                : 'Made by you. Ready for what’s next.'}
+                : 'Recent resumes'}
             </h1>
             {libraryOnly && (
               <p className="mt-2 text-sm text-muted-foreground">
@@ -326,22 +319,22 @@ export default function DashboardPage({
               aria-label="Search resumes"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Find a resume..."
+              placeholder="Find a resume…"
             />
           </div>
         )}
         {error && (
           <p role="alert" className="mb-4 text-sm text-destructive">
-            That change couldn't be completed. Please try again.
+            That change couldn’t be completed. Please try again.
           </p>
         )}
         {resumesQuery.isLoading ? (
           <div className="library-loading" role="status">
-            <Loader2 className="size-5 animate-spin" /> Finding your resumes...
+            <Loader2 className="size-5 animate-spin" /> Finding your resumes…
           </div>
         ) : resumesQuery.isError ? (
           <div className="library-empty" role="alert">
-            <p>We couldn't load your resumes.</p>
+            <p>We couldn’t load your resumes.</p>
             <Button
               variant="outline"
               onClick={() => void resumesQuery.refetch()}
@@ -357,7 +350,7 @@ export default function DashboardPage({
             <h2>
               {search
                 ? 'No matching resumes'
-                : 'A fresh page, full of possibility.'}
+                : 'Your first resume starts here.'}
             </h2>
             <p>
               {search
@@ -440,7 +433,7 @@ export default function DashboardPage({
       <footer className="dashboard-footer">
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="size-3" aria-hidden /> Your experience. Your
-          words. You're in control.
+          words. You’re in control.
         </span>
       </footer>
       <ImportResumeDialog open={importOpen} onOpenChange={setImportOpen} />
@@ -461,7 +454,7 @@ export default function DashboardPage({
           </AlertDialogHeader>
           {deleteMutation.isError && (
             <p role="alert" className="text-sm text-destructive">
-              Couldn't delete this resume. Please try again.
+              Couldn’t delete this resume. Please try again.
             </p>
           )}
           <AlertDialogFooter>

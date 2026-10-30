@@ -489,7 +489,7 @@ function EditorPageContent() {
   if (isLoading || !data)
     return (
       <div role="status" className="p-10 text-sm text-muted-foreground">
-        Opening your workspace...
+        Opening your workspace…
       </div>
     )
   const resumeId = data.resume.id
@@ -561,7 +561,7 @@ function EditorPageContent() {
           <div className="workspace-pane" hidden={mode !== 'content'}>
             <div className="workspace-pane-heading">
               <div>
-                <h1>Make it yours.</h1>
+                <h1>Resume content</h1>
                 <p>
                   Your experience, one section at a time. Changes save
                   automatically.
@@ -588,7 +588,7 @@ function EditorPageContent() {
           <div className="workspace-pane" hidden={mode !== 'design'}>
             <div className="workspace-pane-heading">
               <div>
-                <h1>A look that feels like you.</h1>
+                <h1>Resume design</h1>
                 <p>Fine-tune your template, layout, and finishing touches.</p>
               </div>
             </div>

@@ -71,7 +71,7 @@ func newListTemplatesTool() tool.InvokableTool { return &listTemplatesTool{} }
 func (t *listTemplatesTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name:        "list_templates",
-		Desc:        "List the code-defined resume templates, including id, revision, renderer_key, supported layout modes, and supported design fields. Call this when the user asks about templates or you need an id or capability. Templates share the resume's saved formatting; switching templates does not reset fonts, colors or spacing.",
+		Desc:        "List the code-defined resume templates, including id, revision, renderer_key, supported layout modes, supported design fields, and formatting defaults. Call this when the user asks about templates or you need an id or capability. Selecting a different template applies its defaults; saved resume overrides are preserved when reopening.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{}),
 	}, nil
 }
@@ -116,7 +116,8 @@ func (t *proposeCreateTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 			"Use this when the user describes new experience in natural language; turn their description into well-structured, " +
 			"achievement-focused fields rather than asking them to fill out a form, but only include numbers or outcomes the user " +
 			"actually stated — do not invent metrics. Work experience requires company and title; ask only for missing required facts, " +
-			"then use this tool directly. Optional descriptions, metrics, location and dates may be omitted. Never include sort_order; the app places new entries.",
+			"then use this tool directly. Complete new entries are added directly without another review form. " +
+			"Optional descriptions, metrics, location and dates may be omitted. Never include sort_order; the app places new entries.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"entity": flatEntityInfo,
 			"fields": {
@@ -136,15 +137,25 @@ type proposeCreateArgs struct {
 	Fields map[string]any `json:"fields"`
 }
 
+// Only validated, complete additions bypass the separate proposal review step.
+// Missing optional details stay empty; missing required facts still fail validation.
+func prepareCreateProposal(args proposeCreateArgs) (Proposal, error) {
+	if err := validateFlatEntity(args.Entity); err != nil {
+		return Proposal{}, err
+	}
+	fields, err := normalizeFields(args.Entity, flatEntitySpecs[args.Entity], args.Fields, true)
+	if err != nil {
+		return Proposal{}, err
+	}
+	return Proposal{Type: "flat_create", Entity: args.Entity, TempID: tempID(), Fields: fields, ApplyDirectly: true}, nil
+}
+
 func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var args proposeCreateArgs
 	if err := json.Unmarshal([]byte(argumentsInJSON), &args); err != nil {
 		return toolProblem("could not parse the arguments (%v) — they may have been cut short, so keep this call small", err)
 	}
-	if err := validateFlatEntity(args.Entity); err != nil {
-		return toolProblem("%v", err)
-	}
-	fields, err := normalizeFields(args.Entity, flatEntitySpecs[args.Entity], args.Fields, true)
+	proposal, err := prepareCreateProposal(args)
 	if err != nil {
 		return toolProblem("%v", err)
 	}
@@ -153,9 +164,9 @@ func (t *proposeCreateTool) InvokableRun(ctx context.Context, argumentsInJSON st
 		return "", err
 	}
 
-	id := tempID()
-	sink.add(Proposal{Type: "flat_create", Entity: args.Entity, TempID: id, Fields: fields, ToolCallID: compose.GetToolCallID(ctx)})
-	return fmt.Sprintf("created %s (tempId %s)", args.Entity, id), nil
+	proposal.ToolCallID = compose.GetToolCallID(ctx)
+	sink.add(proposal)
+	return fmt.Sprintf("created %s (tempId %s)", args.Entity, proposal.TempID), nil
 }
 
 type proposeUpdateTool struct{}
@@ -672,7 +683,7 @@ func newProposeTemplateSwitchTool() tool.InvokableTool { return &proposeTemplate
 func (t *proposeTemplateSwitchTool) Info(_ context.Context) (*schema.ToolInfo, error) {
 	return &schema.ToolInfo{
 		Name: "switch_template",
-		Desc: "Switch the resume to a template from list_templates. Preserve the resume's common formatting, content and section preferences. Only the template identity and necessary layout compatibility change. Never invent template IDs.",
+		Desc: "Switch the resume to a template from list_templates, applying that template's default formatting and layout. Preserve content, section visibility, custom titles and custom sections. Reselecting the current template keeps its formatting. Never invent template IDs.",
 		ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
 			"template_id": {
 				Type:     schema.String,
@@ -746,23 +757,24 @@ func (t *proposeTemplateSwitchTool) InvokableRun(ctx context.Context, argumentsI
 	if err != nil {
 		return "", err
 	}
-	merged := design.Default(design.DefaultTemplateID())
-	if err := json.Unmarshal(currentJSON, &merged); err != nil {
+	merged, err := design.Decode(currentJSON)
+	if err != nil {
 		return "", fmt.Errorf("unmarshal merged design: %w", err)
 	}
-	if _, ok := design.FindTemplate(target.ID); !ok {
-		return toolProblem("template %q is not registered", target.ID)
+	selected, err := design.SelectTemplate(merged, target.ID)
+	if err != nil {
+		return toolProblem("could not select template (%v)", err)
 	}
-	merged.TemplateID = target.ID
-	previousMode := merged.Layout.Mode
-	merged = design.NormalizeTemplate(merged)
-	if err := design.Validate(merged); err != nil {
+	if err := design.Validate(selected); err != nil {
 		return toolProblem("switching to %q would produce an invalid design (%v) — this looks like a problem with the template itself, not something you can fix by retrying", target.Name, err)
 	}
-	patch := map[string]any{"templateId": target.ID}
-	if previousMode != merged.Layout.Mode {
-		patch["layout"] = merged.Layout
-		patch["sectionOrder"] = merged.SectionOrder
+	selectedJSON, err := json.Marshal(selected)
+	if err != nil {
+		return "", fmt.Errorf("marshal selected design: %w", err)
+	}
+	var patch map[string]any
+	if err := json.Unmarshal(selectedJSON, &patch); err != nil {
+		return "", fmt.Errorf("decode selected design patch: %w", err)
 	}
 
 	sink, err := sinkFromContext(ctx)

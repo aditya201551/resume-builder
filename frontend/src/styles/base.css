@@ -1,0 +1,35 @@
+﻿/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral (dealt 1/3) · redesign: full */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: S; base rules protect the working surfaces. */
+html, body {
+  overflow-x: clip;
+}
+body {
+  margin: 0;
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  caret-color: var(--foreground);
+}
+::selection {
+  background: color-mix(in oklab, var(--color-signal) 22%, transparent);
+  color: var(--foreground);
+}
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+:where(.app-shell, .workspace-shell, .login-page) :is(h1, h2, h3) {
+  min-width: 0;
+  overflow-wrap: break-word;
+  text-wrap: balance;
+}
+:where(.app-shell, .workspace-shell, .login-page) :is(button, a, input, textarea, select) {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

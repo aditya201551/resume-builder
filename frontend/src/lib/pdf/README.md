@@ -5,6 +5,11 @@ persistent PDF.js worker parses those bytes, and visible pages are painted on ca
 with selectable text and clickable links. Download saves the very same PDF blob.
 Neither preview nor download waits for backend sync or calls the Chrome export route.
 
+Vite excludes `src/lib/pdf` and the PDF template modules from React Fast Refresh.
+These modules run inside a Web Worker, where the refresh runtime's `window` access
+would fail during local development. JSX compilation remains enabled; the rest of
+the application retains Fast Refresh.
+
 - `useResumePdf.tsx`: per-editor worker lifecycle, revision tracking, error/retry, and
   download requests that wait for the latest local revision.
 - `renderQueue.ts`: 200 ms debounce, 800 ms maximum wait during continuous typing,

@@ -1,0 +1,35 @@
+[
+ {
+  "scope": "app",
+  "shape": "app screen",
+  "theme": "coral",
+  "axes": "light/grotesk-sans/warm",
+  "hero": "not applicable",
+  "nav": "compact workspace bar",
+  "footer": "single-line assurance",
+  "imagery": "live resume documents",
+  "photos": [],
+  "entry": "frontend/src/index.css",
+  "fingerprint": "top bar / split writing workspace / document collection / stable two-pane editor",
+  "sections": [
+   "sign-in",
+   "writing workspace",
+   "resume collection",
+   "resume editor"
+  ],
+  "signature": "real resume on a writing desk",
+  "waived": [
+   "39b",
+   "75"
+  ],
+  "prompt": "Redesign the frontend with a fresh perspective, preserving core features and functionality",
+  "sweep": {
+   "fail": 0,
+   "openReflex": 0,
+   "waived": 2,
+   "reviewFindingsResolved": 2
+  },
+  "date": "2026-10-30",
+  "mode": "build"
+ }
+]

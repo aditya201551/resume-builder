@@ -27,6 +27,7 @@ type Template struct {
 	SupportedModes  []string             `json:"supported_modes"`
 	SupportedFields []string             `json:"supported_fields"`
 	Capabilities    TemplateCapabilities `json:"capabilities"`
+	Defaults        DesignDefaults       `json:"defaults"`
 }
 
 type templateCatalog struct {
@@ -35,35 +36,89 @@ type templateCatalog struct {
 }
 
 // This exact catalog is also imported by the frontend. Templates are application code,
-// while a resume's selected ID and shared formatting remain persisted resume data.
+// including their defaults; each resume persists its selected ID and overrides.
 var catalog = func() templateCatalog {
-	var c templateCatalog
-	if err := json.Unmarshal(templateCatalogJSON, &c); err != nil {
-		panic(fmt.Errorf("invalid embedded template catalog: %w", err))
-	}
-	if len(c.Templates) == 0 {
-		panic("template catalog is empty")
+	c, err := decodeTemplateCatalog(templateCatalogJSON)
+	if err != nil {
+		panic(err)
 	}
 	return c
 }()
+
+func decodeTemplateCatalog(raw []byte) (templateCatalog, error) {
+	var c templateCatalog
+	if err := json.Unmarshal(raw, &c); err != nil {
+		return c, fmt.Errorf("invalid embedded template catalog: %w", err)
+	}
+	if len(c.Templates) == 0 {
+		return c, fmt.Errorf("template catalog is empty")
+	}
+	seen := map[string]bool{}
+	for _, template := range c.Templates {
+		if template.ID == "" || seen[template.ID] {
+			return c, fmt.Errorf("template catalog has an empty or duplicate id: %q", template.ID)
+		}
+		seen[template.ID] = true
+		if err := Validate(ResumeDesign{TemplateID: template.ID, DesignDefaults: template.Defaults}); err != nil {
+			return c, fmt.Errorf("template %s defaults: %w", template.ID, err)
+		}
+		if !slices.Contains(template.SupportedModes, string(template.Defaults.Layout.Mode)) {
+			return c, fmt.Errorf("template %s defaults use an unsupported layout mode", template.ID)
+		}
+	}
+	if !seen[c.DefaultTemplateID] {
+		return c, fmt.Errorf("default template %q is not registered", c.DefaultTemplateID)
+	}
+	return c, nil
+}
+
+func cloneSectionRefs(refs []SectionRef) []SectionRef {
+	out := slices.Clone(refs)
+	for i := range out {
+		if out[i].CustomSectionID != nil {
+			value := *out[i].CustomSectionID
+			out[i].CustomSectionID = &value
+		}
+		if out[i].TitleOverride != nil {
+			value := *out[i].TitleOverride
+			out[i].TitleOverride = &value
+		}
+	}
+	return out
+}
+
+func cloneTemplate(template Template) Template {
+	template.Tags = slices.Clone(template.Tags)
+	template.SupportedModes = slices.Clone(template.SupportedModes)
+	template.SupportedFields = slices.Clone(template.SupportedFields)
+	order := &template.Defaults.SectionOrder
+	order.One.Sections = cloneSectionRefs(order.One.Sections)
+	order.Two.Left = cloneSectionRefs(order.Two.Left)
+	order.Two.Right = cloneSectionRefs(order.Two.Right)
+	order.Mix.Bands = slices.Clone(order.Mix.Bands)
+	for i := range order.Mix.Bands {
+		band := &order.Mix.Bands[i]
+		band.Full = cloneSectionRefs(band.Full)
+		band.Left = cloneSectionRefs(band.Left)
+		band.Right = cloneSectionRefs(band.Right)
+	}
+	return template
+}
 
 func DefaultTemplateID() string { return catalog.DefaultTemplateID }
 
 func Templates() []Template {
 	out := make([]Template, len(catalog.Templates))
 	for i, template := range catalog.Templates {
-		template.Tags = slices.Clone(template.Tags)
-		template.SupportedModes = slices.Clone(template.SupportedModes)
-		template.SupportedFields = slices.Clone(template.SupportedFields)
-		out[i] = template
+		out[i] = cloneTemplate(template)
 	}
 	return out
 }
 
 func FindTemplate(id string) (Template, bool) {
-	for _, template := range Templates() {
+	for _, template := range catalog.Templates {
 		if template.ID == id {
-			return template, true
+			return cloneTemplate(template), true
 		}
 	}
 	return Template{}, false
@@ -130,7 +185,15 @@ func NormalizeTemplate(d ResumeDesign) ResumeDesign {
 			seen[key] = true
 		}
 	}
-	d.SectionOrder.One.Sections = merged
-	d.Layout.Mode = LayoutMode(template.SupportedModes[0])
+	d.Layout.Mode = template.Defaults.Layout.Mode
+	switch d.Layout.Mode {
+	case LayoutOne:
+		d.SectionOrder.One.Sections = merged
+	case LayoutTwo:
+		d.SectionOrder.Two.Left = []SectionRef{}
+		d.SectionOrder.Two.Right = merged
+	case LayoutMix:
+		d.SectionOrder.Mix.Bands = []SectionBand{{Full: merged}}
+	}
 	return d
 }

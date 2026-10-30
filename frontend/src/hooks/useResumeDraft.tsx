@@ -47,7 +47,11 @@ function ResumeDraftSession({ resumeId, children }: { resumeId: string; children
     // Update this ref synchronously so an in-flight sync sees edits from this event,
     // even before React commits the render. Persist before scheduling any network work.
     const next = draftReducer(stateRef.current as DraftState, action)
-    if (action.type === 'design_update' && stateRef.current) designHistory.record(stateRef.current.data.design, next.data.design)
+    if ((action.type === 'design_update' || action.type === 'restore_design_defaults') && stateRef.current) {
+      designHistory.record(stateRef.current.data.design, next.data.design, Date.now(), {
+        separate: action.type === 'restore_design_defaults',
+      })
+    }
     stateRef.current = next
     saveDraft(resumeId, stateRef.current)
     reactDispatch(action)

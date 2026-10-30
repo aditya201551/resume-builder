@@ -6,7 +6,7 @@ import type {
   SkillItem,
 } from '@/types/resume'
 import type { ResumeDesign } from '@/types/design'
-import { normalizeTemplateDesign } from '@/templates/catalog'
+import { normalizeTemplateDesign, restoreTemplateDefaults } from '@/templates/catalog'
 
 export type FlatKind =
   | 'work_experiences'
@@ -21,6 +21,7 @@ export type DraftAction =
   | { type: 'hydrate'; data: FullResume; lastSynced: FullResume }
   | { type: 'update_meta'; patch: Record<string, unknown> }
   | { type: 'design_update'; patch: Partial<ResumeDesign> }
+  | { type: 'restore_design_defaults' }
   | { type: 'flat_create'; entity: FlatKind; tempId: string; fields: Record<string, unknown> }
   | { type: 'flat_update'; entity: FlatKind; id: string; patch: Record<string, unknown> }
   | { type: 'flat_delete'; entity: FlatKind; id: string }
@@ -89,6 +90,9 @@ export function draftReducer(state: DraftState, action: DraftAction): DraftState
 
     case 'design_update':
       return { ...state, data: { ...d, design: normalizeTemplateDesign({ ...d.design, ...action.patch }) } }
+
+    case 'restore_design_defaults':
+      return { ...state, data: { ...d, design: restoreTemplateDefaults(d.design) } }
 
     case 'flat_create':
       return {

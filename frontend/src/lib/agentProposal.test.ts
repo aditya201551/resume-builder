@@ -5,6 +5,7 @@ import {
   proposalCurrentValues,
   editProposalText,
   proposalToDraftAction,
+  shouldApplyProposalAutomatically,
 } from './agentProposal'
 import type { AgentProposal } from './agentChat'
 import type { AssistantPart } from '@/hooks/useAgentChat'
@@ -53,6 +54,31 @@ function customSection(
 ): CustomSection {
   return { id, resume_id: 'r1', title: 'Extras', sort_order: 0, entries }
 }
+
+describe('direct additions', () => {
+  const complete: AgentProposal = {
+    type: 'flat_create', entity: 'work_experiences', tempId: 'temp-google', applyDirectly: true,
+    fields: { company: 'Google', title: 'Software Engineer', location: 'Bengaluru', start_date: '2026-01-01T00:00:00Z', is_current: true, content: '' },
+  }
+
+  it('adds a backend-validated complete entry even when other edits require review', () => {
+    expect(shouldApplyProposalAutomatically(complete, false)).toBe(true)
+    expect(proposalToDraftAction(complete)).toMatchObject({
+      type: 'flat_create', entity: 'work_experiences', fields: complete.fields,
+    })
+  })
+
+  it('keeps unvalidated additions and other edits in review when auto-accept is off', () => {
+    expect(shouldApplyProposalAutomatically({ ...complete, applyDirectly: false }, false)).toBe(false)
+    expect(shouldApplyProposalAutomatically({ ...complete, applyDirectly: undefined }, false)).toBe(false)
+    for (const type of ['flat_update', 'flat_delete', 'update_meta', 'design_update', 'skill_item_create']) {
+      expect(shouldApplyProposalAutomatically({ ...complete, type }, false)).toBe(false)
+    }
+    expect(shouldApplyProposalAutomatically({ ...complete, entity: 'unknown' }, false)).toBe(false)
+    expect(shouldApplyProposalAutomatically({ ...complete, tempId: undefined }, false)).toBe(false)
+    expect(shouldApplyProposalAutomatically({ type: 'flat_update', entity: 'work_experiences', id: 'w1', patch: { title: 'Engineer' } }, true)).toBe(true)
+  })
+})
 
 describe('canApplyProposal', () => {
   it('allows creates that have no parent', () => {

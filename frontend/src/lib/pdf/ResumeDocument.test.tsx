@@ -23,7 +23,9 @@ const fonts = [{ family: 'Georgia', src: new Uint8Array(font) }]
 
 describe('client resume PDF', () => {
   it('renders real Letter pages with searchable content and rich text', async () => {
-    const result = await renderDocumentWithLayout(<ResumeDocument input={input()} fonts={fonts} />)
+    const value = input()
+    value.design.page.format = 'Letter'
+    const result = await renderDocumentWithLayout(<ResumeDocument input={value} fonts={fonts} />)
     expect(new TextDecoder().decode(result.pdf.slice(0, 5))).toBe('%PDF-')
     expect(result.layout.pages).toHaveLength(1)
     expect(result.layout.pages[0].width).toBe(PDF_PAGE_SIZES.Letter.width)

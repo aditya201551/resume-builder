@@ -312,7 +312,8 @@ export default function ChatPanel({
   }, [])
 
   useEffect(() => {
-    if (shouldStickRef.current) scrollToBottom('auto')
+    if ((messages.length > 0 || streamingParts) && shouldStickRef.current)
+      scrollToBottom('auto')
   }, [messages, streamingParts, scrollToBottom])
 
   useEffect(() => {
@@ -364,7 +365,7 @@ export default function ChatPanel({
             </span>
             <h1>Resume assistant</h1>
           </div>
-          <span role="status" className="text-[10px] text-muted-foreground">
+          <span role="status" className="text-xs text-muted-foreground">
             {isStreaming ? 'Working on it...' : 'Here to help'}
           </span>
         </div>
@@ -399,7 +400,7 @@ export default function ChatPanel({
               rows={4}
               placeholder="Paste a job description to guide your next request."
             />
-            <div className="flex items-center justify-between gap-2 text-[10px] text-muted-foreground">
+            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
               <span>Used as context for your next message.</span>
               <button
                 type="button"
@@ -424,18 +425,12 @@ export default function ChatPanel({
           <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
             {messages.length === 0 && !streamingParts && (
               <div className="assistant-welcome">
-                <span className="assistant-welcome-mark">
-                  <Sparkles className="size-6" aria-hidden />
-                </span>
                 <h2>
-                  A fresh perspective.
-                  <br />
-                  Still entirely you.
+                  Work on your resume.
                 </h2>
                 <p>
-                  Let's bring your experience into focus. Ask for a rewrite,
-                  build a new section, or find a layout that fits. You'll review
-                  the changes.
+                  Rewrite an entry, add a section, or find a layout that fits.
+                  You’ll review the changes.
                 </p>
                 <div className="assistant-starters">
                   {QUICK_ACTIONS.map(({ label, icon: Icon, prompt }) => (
@@ -530,9 +525,10 @@ export default function ChatPanel({
           <div className="flex items-center justify-between gap-3 pt-0.5">
             <button
               type="button"
-              className="flex items-center gap-1.5 rounded-full px-0.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+              className="flex min-h-8 items-center gap-1.5 rounded-md px-0.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => setAutoAccept(!autoAccept)}
               aria-pressed={autoAccept}
+              title="Automatically apply other edits. Complete new entries are added directly."
             >
               <span
                 className="relative inline-flex h-3 w-5 shrink-0 rounded-full bg-input transition-colors data-[checked=true]:bg-primary"

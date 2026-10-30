@@ -96,6 +96,41 @@ func TestProposeToolsReportBadArgumentsWithoutFailingTheRun(t *testing.T) {
 	}
 }
 
+func TestCompleteExperienceIsPreparedForDirectAddition(t *testing.T) {
+	proposal, err := prepareCreateProposal(proposeCreateArgs{
+		Entity: "work_experiences",
+		Fields: map[string]any{
+			"company": "Google", "title": "Software Engineer", "location": "Bengaluru",
+			"start_date": "2026-01", "is_current": true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !proposal.ApplyDirectly || proposal.Type != "flat_create" || proposal.TempID == "" {
+		t.Fatal("complete work experience should be added directly")
+	}
+	if proposal.Fields["start_date"] != "2026-01-01T00:00:00Z" || proposal.Fields["is_current"] != true || proposal.Fields["location"] != "Bengaluru" {
+		t.Fatalf("supplied facts were not retained: %+v", proposal.Fields)
+	}
+	if proposal.Fields["content"] != "" {
+		t.Fatal("missing responsibilities must stay empty")
+	}
+	if end := proposal.Fields["end_date"]; end != nil {
+		t.Fatal("a current role must not invent an end date")
+	}
+	for _, fields := range []map[string]any{
+		{"company": "Google"},
+		{"title": "Software Engineer"},
+		{"company": "Google", "title": " "},
+	} {
+		incomplete, err := prepareCreateProposal(proposeCreateArgs{Entity: "work_experiences", Fields: fields})
+		if err == nil || incomplete.ApplyDirectly {
+			t.Fatal("missing required facts must block direct addition")
+		}
+	}
+}
+
 func TestProposeToolsStillErrorWhenSinkIsMissing(t *testing.T) {
 	out, err := newProposeCreateTool().InvokableRun(
 		context.Background(),

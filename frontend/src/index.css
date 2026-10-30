@@ -1,14 +1,20 @@
+/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral (dealt 1/3) · redesign: full
+ * nav: compact workspace bar · signature: the resume on a writing desk · states: loading, empty, error, full
+ * axes: light/grotesk-sans/warm · posture: restrained · modes: light+dark · v2.0.0 */
+/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: S; replaced promotional chrome with document-led working surfaces. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "./styles/tokens.css";
+@import "./styles/base.css" layer(base);
 @import "./styles/workspace.css";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
+    --font-sans: var(--font-body);
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -50,72 +56,38 @@
 }
 
 :root {
-    --background: #F5F4FA;
-    --foreground: #2D2A38;
-    --card: #FFFFFF;
-    --card-foreground: #2D2A38;
-    --popover: #FFFFFF;
-    --popover-foreground: #2D2A38;
-    --primary: #6752B3;
-    --primary-foreground: #FFFFFF;
-    --secondary: #EEEAF8;
-    --secondary-foreground: #2D2A38;
-    --muted: #EEEAF8;
-    --muted-foreground: #706A7E;
-    --accent: #6752B3;
-    --accent-foreground: #FFFFFF;
-    --destructive: #BC3F55;
-    --border: #E5E1EE;
-    --input: #E5E1EE;
-    --ring: #6752B3;
-    --chart-1: #6752B3;
-    --chart-2: #2D2A38;
-    --chart-3: #706A7E;
-    --chart-4: #E5E1EE;
-    --chart-5: #EEEAF8;
-    --radius: 1rem;
-    --sidebar: #F5F4FA;
-    --sidebar-foreground: #2D2A38;
-    --sidebar-primary: #6752B3;
-    --sidebar-primary-foreground: #FFFFFF;
-    --sidebar-accent: #EEEAF8;
-    --sidebar-accent-foreground: #2D2A38;
-    --sidebar-border: #E5E1EE;
-    --sidebar-ring: #6752B3;
-}
-
-.dark {
-    --background: #191722;
-    --foreground: #F5F4FA;
-    --card: #23202F;
-    --card-foreground: #F5F4FA;
-    --popover: #23202F;
-    --popover-foreground: #F5F4FA;
-    --primary: #B9A5F1;
-    --primary-foreground: #23202F;
-    --secondary: #2E293D;
-    --secondary-foreground: #F5F4FA;
-    --muted: #2E293D;
-    --muted-foreground: #B8B1C9;
-    --accent: #B9A5F1;
-    --accent-foreground: #2D2A38;
-    --destructive: #F093A4;
-    --border: #3C354D;
-    --input: #3C354D;
-    --ring: #B9A5F1;
-    --chart-1: #B9A5F1;
-    --chart-2: #F5F4FA;
-    --chart-3: #B8B1C9;
-    --chart-4: #3C354D;
-    --chart-5: #2E293D;
-    --sidebar: #191722;
-    --sidebar-foreground: #F5F4FA;
-    --sidebar-primary: #F5F4FA;
-    --sidebar-primary-foreground: #2D2A38;
-    --sidebar-accent: #2E293D;
-    --sidebar-accent-foreground: #F5F4FA;
-    --sidebar-border: #3C354D;
-    --sidebar-ring: #B9A5F1;
+    --background: var(--color-paper);
+    --foreground: var(--color-ink);
+    --card: var(--color-cotton);
+    --card-foreground: var(--color-ink);
+    --popover: var(--color-cotton);
+    --popover-foreground: var(--color-ink);
+    --primary: var(--color-ink);
+    --primary-foreground: var(--color-paper);
+    --secondary: var(--color-paper-2);
+    --secondary-foreground: var(--color-ink-2);
+    --muted: var(--color-paper-2);
+    --muted-foreground: var(--color-ink-muted);
+    --accent: var(--color-paper-3);
+    --accent-foreground: var(--color-ink);
+    --destructive: var(--color-error);
+    --border: var(--color-rule);
+    --input: var(--color-rule-2);
+    --ring: var(--color-focus);
+    --chart-1: var(--color-signal);
+    --chart-2: var(--color-ink);
+    --chart-3: var(--color-ink-muted);
+    --chart-4: var(--color-rule);
+    --chart-5: var(--color-paper-3);
+    --radius: 0.5rem;
+    --sidebar: var(--color-paper);
+    --sidebar-foreground: var(--color-ink);
+    --sidebar-primary: var(--color-ink);
+    --sidebar-primary-foreground: var(--color-paper);
+    --sidebar-accent: var(--color-paper-2);
+    --sidebar-accent-foreground: var(--color-ink);
+    --sidebar-border: var(--color-rule);
+    --sidebar-ring: var(--color-focus);
 }
 
 @layer base {

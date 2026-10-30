@@ -39,6 +39,14 @@ afterEach(() => {
 })
 
 describe('streamAgentChat', () => {
+  it('preserves the validated direct-addition flag on proposal events', async () => {
+    const action = { type: 'flat_create', entity: 'work_experiences', tempId: 'temp-google', applyDirectly: true, fields: { company: 'Google', title: 'Software Engineer' } }
+    mockFetchWithStream([`event: proposal\ndata: ${JSON.stringify({ action })}\n\n`, 'event: done\ndata: {}\n\n'])
+    const h = handlers()
+    await streamAgentChat('r1', { messages: [{ role: 'user', content: 'Add Google as Software Engineer' }], draft: {} }, h)
+    expect(h.onProposal).toHaveBeenCalledExactlyOnceWith(action)
+    expect(h.onUI).not.toHaveBeenCalled()
+  })
   it('separates complete UI events from proposal mutations and rejects unsupported envelopes', async () => {
     const ui = { id: 'ui1', version: 1, kind: 'experience_form', code: 'root = AssistantPanel("Experience", [form])', fallback: 'Add experience' }
     mockFetchWithStream([`event: ui\ndata: ${JSON.stringify(ui)}\n\n`, `event: ui\ndata: ${JSON.stringify({ ...ui, version: 99 })}\n\n`, 'event: done\ndata: {}\n\n'])

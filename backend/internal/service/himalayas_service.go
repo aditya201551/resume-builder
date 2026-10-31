@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -18,19 +18,26 @@ const himalayasCheckInterval = 10 * time.Minute
 // instead of discarding progress or holding a transaction during network calls.
 func (s *JobService) refreshHimalayas(ctx context.Context) {
 	claimed, err := s.repo.ClaimSearch(ctx, "himalayas-feed-refresh", 15*time.Minute)
-	if err != nil || !claimed {
+	if err != nil {
+		logJobError(ctx, "himalayas_sync_lease_failed", err)
 		return
 	}
-	defer s.repo.ReleaseSearch(ctx, "himalayas-feed-refresh")
+	if !claimed {
+		slog.Info("himalayas_sync_skipped", "reason", "refresh_lease_active")
+		return
+	}
+	defer s.releaseSearch(ctx, "himalayas-feed-refresh", "himalayas")
 	p, err := s.repo.FeedProgress(ctx, "himalayas")
 	if err != nil {
-		log.Printf("Himalayas checkpoint: %v", err)
+		logJobError(ctx, "himalayas_checkpoint_failed", err)
 		return
 	}
 	if p.RetryAt != nil && p.RetryAt.After(time.Now()) {
+		slog.Info("himalayas_sync_skipped", "reason", "provider_backoff", "retry_at", *p.RetryAt)
 		return
 	}
 	if p.Cursor == "" && p.CompletedAt != nil && time.Since(*p.CompletedAt) < himalayasRefreshInterval {
+		slog.Info("himalayas_sync_skipped", "reason", "not_due", "completed_at", *p.CompletedAt, "next_sync_at", p.CompletedAt.Add(himalayasRefreshInterval))
 		return
 	}
 	if p.Cursor == "" {
@@ -38,18 +45,25 @@ func (s *JobService) refreshHimalayas(ctx context.Context) {
 	}
 	status := jobmap.SourceStatus{ID: "himalayas", Name: "Himalayas", Kind: "aggregator", Status: "refreshing", JobCount: p.JobCount, RefreshedAt: p.CompletedAt}
 	if err := s.repo.StoreStatus(ctx, status); err != nil {
+		logJobError(ctx, "himalayas_status_failed", err, "status", "refreshing")
 		return
 	}
+	started := time.Now()
+	pages, received, accepted := 0, 0, 0
+	slog.Info("himalayas_sync_started", "resuming", p.Cursor != "", "previously_collected", p.JobCount, "pass_timeout", "10m")
 	workCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 	seen := map[string]bool{p.Cursor: true}
+	operation := "reserve_request"
 	for {
+		operation = "reserve_request"
 		err = s.reserveHimalayasRequest(workCtx)
 		if err != nil {
 			break
 		}
 		var jobs []jobmap.Job
 		var cursor string
+		operation = "fetch_page"
 		jobs, cursor, err = s.client.FetchHimalayasPage(workCtx, p.Cursor)
 		if err != nil {
 			s.himalayasBackoff(ctx, err)
@@ -58,12 +72,15 @@ func (s *JobService) refreshHimalayas(ctx context.Context) {
 				// An expired cursor restarts the next walk without deleting any jobs.
 				p.Cursor, p.JobCount, p.CompletedAt = "", 0, nil
 				if saveErr := s.repo.StoreFeedPage(ctx, "himalayas", nil, p); saveErr != nil {
-					log.Printf("Himalayas reset: %v", saveErr)
+					logJobError(ctx, "himalayas_cursor_reset_failed", saveErr)
+				} else {
+					slog.Warn("himalayas_cursor_reset", "reason", "invalid_or_expired_cursor")
 				}
 			}
 			break
 		}
 		if cursor != "" && seen[cursor] {
+			operation = "validate_cursor"
 			err = fmt.Errorf("Himalayas cursor cycle")
 			break
 		}
@@ -79,12 +96,20 @@ func (s *JobService) refreshHimalayas(ctx context.Context) {
 		if cursor == "" {
 			p.CompletedAt = &now
 		}
+		operation = "store_page"
 		if err = s.repo.StoreFeedPage(workCtx, "himalayas", valid, p); err != nil {
 			break
 		}
 		status.JobCount = p.JobCount
+		pages++
+		received += len(jobs)
+		accepted += len(valid)
+		if pages == 1 || pages%25 == 0 {
+			slog.Info("himalayas_sync_progress", "pages", pages, "received", received, "accepted", accepted, "collected_total", p.JobCount, "has_more", cursor != "", "duration_ms", time.Since(started).Milliseconds())
+		}
 		if cursor == "" {
 			status.Status, status.RefreshedAt = "ready", p.CompletedAt
+			slog.Info("himalayas_sync_completed", "pages", pages, "received", received, "accepted", accepted, "collected_total", p.JobCount, "duration_ms", time.Since(started).Milliseconds(), "next_sync_at", p.CompletedAt.Add(himalayasRefreshInterval))
 			break
 		}
 		seen[cursor] = true
@@ -92,10 +117,10 @@ func (s *JobService) refreshHimalayas(ctx context.Context) {
 	if err != nil {
 		status.Status = "error"
 		status.Message = "Remote feed sync paused. Collected listings remain available; the next attempt resumes from its saved page."
-		log.Printf("Himalayas sync: %v", err)
+		logJobError(workCtx, "himalayas_sync_paused", err, "operation", operation, "pages_committed", pages, "collected_total", status.JobCount, "duration_ms", time.Since(started).Milliseconds())
 	}
 	if err := s.repo.StoreStatus(ctx, status); err != nil {
-		log.Printf("Himalayas status: %v", err)
+		logJobError(ctx, "himalayas_status_failed", err, "status", status.Status)
 	}
 }
 
@@ -135,6 +160,7 @@ func (s *JobService) reserveHimalayasRequest(ctx context.Context) error {
 		if err := s.repo.DelayFeed(ctx, "himalayas", until); err != nil {
 			return err
 		}
+		slog.Warn("himalayas_quota_exhausted", "daily_limit", 10000, "retry_at", until)
 		return fmt.Errorf("Himalayas daily request budget exhausted")
 	}
 	return nil
@@ -147,22 +173,28 @@ func (s *JobService) himalayasBackoff(ctx context.Context, err error) {
 		if delay <= 0 {
 			delay = 15 * time.Minute
 		}
-		if err := s.repo.DelayFeed(ctx, "himalayas", time.Now().UTC().Add(delay)); err != nil {
-			log.Printf("Himalayas backoff: %v", err)
+		until := time.Now().UTC().Add(delay)
+		if err := s.repo.DelayFeed(ctx, "himalayas", until); err != nil {
+			logJobError(ctx, "himalayas_backoff_save_failed", err)
+		} else {
+			slog.Warn("himalayas_rate_limited", "retry_at", until, "retry_after_seconds", delay.Seconds())
 		}
 	}
 }
 
 func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached jobmap.Job) (jobmap.Job, error) {
 	if cached.CheckedAt != nil && time.Since(*cached.CheckedAt) < himalayasCheckInterval {
+		slog.Debug("himalayas_check_skipped", "reason", "recently_checked", "job_id", cached.ID)
 		return cached, nil
 	}
 	key := "himalayas-check:" + cached.ID
 	claimed, err := s.repo.ClaimSearch(ctx, key, himalayasCheckInterval)
 	if err != nil {
+		logJobError(ctx, "himalayas_check_lease_failed", err, "job_id", cached.ID)
 		return cached, err
 	}
 	if !claimed {
+		slog.Debug("himalayas_check_skipped", "reason", "check_lease_active", "job_id", cached.ID)
 		// An in-flight or failed check cannot claim that cached availability is fresh.
 		cached.CheckFailed = true
 		return cached, nil
@@ -177,6 +209,7 @@ func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached 
 	}
 	if err != nil {
 		s.himalayasBackoff(ctx, err)
+		logJobError(checkCtx, "himalayas_check_failed", err, "job_id", cached.ID, "using_cached", true)
 		cached.CheckFailed = true
 		return cached, nil // outages never close a job or erase its bookmark
 	}
@@ -187,6 +220,7 @@ func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached 
 		var ok bool
 		current, ok = jobmap.Prepare(current, now)
 		if !ok {
+			slog.Warn("himalayas_check_invalid_job", "job_id", cached.ID, "using_cached", true)
 			cached.CheckFailed = true
 			return cached, nil
 		}
@@ -194,7 +228,14 @@ func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached 
 		err = s.repo.StoreSource(ctx, "himalayas", []jobmap.Job{current}, false)
 	}
 	if err != nil {
+		logJobError(ctx, "himalayas_check_save_failed", err, "job_id", cached.ID, "closed", closed)
 		return cached, err
 	}
-	return s.repo.Get(ctx, userID, cached.ID)
+	current, err = s.repo.Get(ctx, userID, cached.ID)
+	if err != nil {
+		logJobError(ctx, "himalayas_check_read_failed", err, "job_id", cached.ID)
+		return current, err
+	}
+	slog.Info("himalayas_check_completed", "job_id", cached.ID, "closed", closed)
+	return current, nil
 }

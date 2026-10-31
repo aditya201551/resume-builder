@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 
 	"resume-builder/backend/internal/auth"
@@ -84,5 +85,10 @@ func (h *ResumeImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeImportError(w http.ResponseWriter, code, message string, status int) {
+	level := slog.LevelWarn
+	if status >= 500 {
+		level = slog.LevelError
+	}
+	slog.Log(context.Background(), level, "resume_import_failed", "code", code, "status", status)
 	writeJSON(w, status, map[string]string{"code": code, "message": message})
 }

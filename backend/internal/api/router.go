@@ -105,7 +105,7 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 		mux.Handle("/", spaFileServer(staticDir))
 	}
 
-	return mux
+	return middleware.LogErrors(mux)
 }
 
 func spaFileServer(dir string) http.HandlerFunc {

@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -108,27 +108,28 @@ func (h *AuthHandler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	token, err := provider.OAuth2.Exchange(r.Context(), code)
 	if err != nil {
-		log.Printf("oauth exchange failed for %s: %v", providerName, err)
+		slog.Error("oauth_exchange_failed", "provider", providerName, "error", err)
 		http.Error(w, "authentication failed", http.StatusBadGateway)
 		return
 	}
 
 	profile, err := auth.FetchProfile(r.Context(), providerName, provider.OAuth2, token)
 	if err != nil {
-		log.Printf("fetch profile failed for %s: %v", providerName, err)
+		slog.Error("fetch_profile_failed", "provider", providerName, "error", err)
 		http.Error(w, "authentication failed", http.StatusBadGateway)
 		return
 	}
 
 	user, err := h.authService.Login(r.Context(), providerName, profile)
 	if err != nil {
-		log.Printf("login failed for %s: %v", providerName, err)
+		slog.Error("login_failed", "provider", providerName, "error", err)
 		http.Error(w, "authentication failed", http.StatusInternalServerError)
 		return
 	}
 
 	jwtToken, err := h.jwt.Issue(user.ID)
 	if err != nil {
+		slog.Error("session_issue_failed", "error", err)
 		http.Error(w, "failed to issue session", http.StatusInternalServerError)
 		return
 	}

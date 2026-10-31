@@ -3,7 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 
 	"resume-builder/backend/internal/service"
@@ -12,7 +12,9 @@ import (
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(v)
+	if err := json.NewEncoder(w).Encode(v); err != nil {
+		slog.Error("http_response_encode_failed", "status", status, "error", err)
+	}
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -30,7 +32,7 @@ func writeError(w http.ResponseWriter, err error) {
 	case errors.Is(err, service.ErrValidation):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	default:
-		log.Printf("internal error: %v", err)
+		slog.Error("internal_error", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 	}
 }

@@ -47,6 +47,9 @@ func (c *Client) get(ctx context.Context, rawURL string, headers map[string]stri
 	}
 	resp, err := c.HTTP.Do(req)
 	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("feed request failed: %w", ctx.Err())
+		}
 		return fmt.Errorf("feed request failed")
 	} // do not leak API keys in request URLs
 	defer resp.Body.Close()

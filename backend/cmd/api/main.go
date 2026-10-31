@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"resume-builder/backend/internal/agent"
@@ -14,30 +15,42 @@ import (
 	"resume-builder/backend/internal/config"
 	"resume-builder/backend/internal/db"
 	"resume-builder/backend/internal/jobmap"
+	"resume-builder/backend/internal/logging"
 	"resume-builder/backend/internal/repository"
 	"resume-builder/backend/internal/service"
 )
 
 func main() {
 	cfg, err := config.Load()
+	if err := logging.Configure(); err != nil {
+		slog.Error("logging_configuration_failed", "error", err)
+		os.Exit(1)
+	}
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		slog.Error("startup_failed", "operation", "load config", "error", err)
+		os.Exit(1)
 	}
 
+	slog.Info("database_migrations_started")
 	if err := db.RunMigrations(cfg.DatabaseURL); err != nil {
-		log.Fatalf("run migrations: %v", err)
+		slog.Error("startup_failed", "operation", "run migrations", "error", err)
+		os.Exit(1)
 	}
+	slog.Info("database_migrations_completed")
 
 	ctx := context.Background()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
-		log.Fatalf("connect to database: %v", err)
+		slog.Error("startup_failed", "operation", "connect to database", "error", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
+	slog.Info("database_pool_initialized")
 
 	jobConfig, err := jobmap.LoadConfig()
 	if err != nil {
-		log.Fatalf("load job map config: %v", err)
+		slog.Error("startup_failed", "operation", "load job map config", "error", err)
+		os.Exit(1)
 	}
 	jobService := service.NewJobService(repository.NewJobRepository(pool), jobConfig)
 	jobContext, stopJobs := context.WithCancel(ctx)
@@ -45,7 +58,7 @@ func main() {
 
 	providers := auth.NewProviders(cfg.OAuthRedirectBaseURL, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GithubClientID, cfg.GithubClientSecret)
 	if len(providers) == 0 {
-		log.Println("warning: no SSO providers configured (set GOOGLE_CLIENT_ID/SECRET or GITHUB_CLIENT_ID/SECRET in .env)")
+		slog.Warn("oauth_providers_not_configured")
 	}
 
 	jwtIssuer := auth.NewJWTIssuer(cfg.JWTSecret, cfg.JWTTTL)
@@ -81,16 +94,19 @@ func main() {
 
 	agentCfg, err := agent.LoadConfig()
 	if err != nil {
-		log.Fatalf("load agent config: %v", err)
+		slog.Error("startup_failed", "operation", "load agent config", "error", err)
+		os.Exit(1)
 	}
 	aiAgent, err := agent.New(ctx, agentCfg)
 	if err != nil {
-		log.Fatalf("create agent: %v", err)
+		slog.Error("startup_failed", "operation", "create agent", "error", err)
+		os.Exit(1)
 	}
 	agentHandler := handlers.NewAgentHandler(aiAgent, resumeService, templateService)
 	importAIConfig, err := ai.LoadConfig()
 	if err != nil {
-		log.Fatalf("load resume import AI config: %v", err)
+		slog.Error("startup_failed", "operation", "load resume import AI config", "error", err)
+		os.Exit(1)
 	}
 	resumeImportService := service.NewResumeImportService(ai.NewPDFClient(importAIConfig), repository.NewResumeImportRepository(pool))
 
@@ -116,6 +132,7 @@ func main() {
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {
 		if err := pool.Ping(r.Context()); err != nil {
+			slog.ErrorContext(r.Context(), "health_database_failed", "error", err)
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte(`{"status":"db_unreachable"}`))
 			return
@@ -126,8 +143,10 @@ func main() {
 	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
 	jobService.Start(jobContext)
 
-	log.Printf("api listening on :%s", cfg.Port)
-	if err := http.ListenAndServe(":"+cfg.Port, router); err != nil {
-		log.Fatal(err)
+	slog.Info("api_listening", "port", cfg.Port)
+	server := &http.Server{Addr: ":" + cfg.Port, Handler: router, ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError)}
+	if err := server.ListenAndServe(); err != nil {
+		slog.Error("api_server_failed", "error", err)
+		os.Exit(1)
 	}
 }

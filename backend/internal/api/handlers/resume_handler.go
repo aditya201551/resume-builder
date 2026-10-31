@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -49,7 +49,7 @@ func (h *ResumeHandler) ExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	token, err := h.jwtIssuer.IssueExportToken(userID, resumeID, exportTokenTTL)
 	if err != nil {
-		log.Printf("issue export token: %v", err)
+		slog.Error("issue_export_token", "error", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
@@ -58,7 +58,7 @@ func (h *ResumeHandler) ExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	pdfBytes, err := h.export.RenderPDF(r.Context(), printURL)
 	if err != nil {
-		log.Printf("render pdf: %v", err)
+		slog.Error("render_pdf", "error", err)
 		http.Error(w, "failed to generate pdf", http.StatusInternalServerError)
 		return
 	}

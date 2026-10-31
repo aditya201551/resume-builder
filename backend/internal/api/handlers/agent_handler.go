@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"resume-builder/backend/internal/agent"
@@ -94,6 +95,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	send := func(event string, v any) {
 		data, err := json.Marshal(v)
 		if err != nil {
+			slog.ErrorContext(r.Context(), "agent_event_encode_failed", "event", event, "error_type", fmt.Sprintf("%T", err))
 			data = []byte(`{}`)
 		}
 		fmt.Fprintf(w, "event: %s\ndata: %s\n\n", event, data)
@@ -114,6 +116,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 
 	iter, sink, err := h.agent.Chat(r.Context(), messages, string(body.Draft), fetchTemplates)
 	if err != nil {
+		logAgentFailure(r.Context(), "agent_chat_failed", err)
 		send("error", map[string]string{"message": err.Error()})
 		return
 	}
@@ -124,6 +127,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 		if event.Err != nil {
+			logAgentFailure(r.Context(), "agent_iteration_failed", event.Err)
 			send("error", map[string]string{"message": event.Err.Error()})
 			return
 		}
@@ -159,6 +163,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 				send("tool", toolEventFromCall(tc, "running"))
 			})
 			if streamErr != nil {
+				logAgentFailure(r.Context(), "agent_stream_failed", streamErr)
 				send("error", map[string]string{"message": streamErr.Error()})
 				return
 			}
@@ -172,4 +177,13 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		send("ui", ui)
 	}
 	send("done", map[string]any{})
+}
+
+func logAgentFailure(ctx context.Context, event string, err error) {
+	level := slog.LevelError
+	if ctx.Err() != nil {
+		level = slog.LevelInfo
+	}
+	// Agent errors can include prompts, tool arguments or provider bodies.
+	slog.Log(ctx, level, event, "error_type", fmt.Sprintf("%T", err), "request_canceled", ctx.Err() != nil)
 }

@@ -1,9 +1,11 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -21,6 +23,41 @@ type feedTestStore struct {
 	requests int
 	quota    bool
 	failPage bool
+}
+
+func TestHimalayasDiagnosticLogsDescribeCommittedProgress(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		t.Run(map[bool]string{false: "completed", true: "paused"}[fail], func(t *testing.T) {
+			previous := slog.Default()
+			var logs bytes.Buffer
+			slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+			t.Cleanup(func() { slog.SetDefault(previous) })
+			store := newFeedTestStore()
+			store.failPage = fail
+			svc := NewJobService(store, jobmap.Config{HimalayasKey: "private-api-key"})
+			svc.client.HTTP.Transport = feedTestTransport(func(*http.Request) (*http.Response, error) {
+				return feedTestResponse(200, `{"jobs":[`+remoteFeedJob+`]}`), nil
+			})
+			svc.refreshHimalayas(context.Background())
+			output := logs.String()
+			if !strings.Contains(output, "himalayas_sync_started") || strings.Contains(output, "private-api-key") {
+				t.Fatal(output)
+			}
+			if fail {
+				if !strings.Contains(output, `"msg":"himalayas_sync_paused"`) || !strings.Contains(output, `"operation":"store_page"`) || !strings.Contains(output, `"pages_committed":0`) || strings.Contains(output, "himalayas_sync_completed") {
+					t.Fatal(output)
+				}
+			} else {
+				if !strings.Contains(output, "himalayas_sync_progress") || !strings.Contains(output, "himalayas_sync_completed") || !strings.Contains(output, `"accepted":1`) {
+					t.Fatal(output)
+				}
+				svc.refreshHimalayas(context.Background())
+				if !strings.Contains(logs.String(), `"reason":"not_due"`) {
+					t.Fatal("daily skip was not explained")
+				}
+			}
+		})
+	}
 }
 
 func newFeedTestStore() *feedTestStore {

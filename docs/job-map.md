@@ -113,3 +113,13 @@ The database check reads only `DATABASE_URL` from the local `.env`, or accepts `
 - Lever: https://github.com/lever/postings-api
 
 Internal publishing, employer submissions, matching, resume tailoring, alerts and routing/commute estimates remain future features.
+
+## Startup and diagnostic logs
+
+Startup starts both collection workers in the background; it does not force a fresh download of every provider. Employer boards check their shared refresh lease (six hours by default). Himalayas resumes a persisted cursor, or starts a new walk when the last completed walk is at least 24 hours old, subject to backoff and another process's lease. JSearch only runs for an eligible user search with its key configured. Existing database listings remain available during collection.
+
+The backend emits JSON logs to stdout with explicit INFO, WARN and ERROR levels. Set optional `LOG_LEVEL=debug` in the backend environment for cache/check-skip diagnostics; the default is info. Allowed values are debug, info, warn and error. Restart or redeploy to apply a level change.
+
+Filter Railway runtime logs by event names such as `job_workers_started`, `himalayas_sync_started`, `himalayas_sync_skipped`, `himalayas_sync_progress`, `himalayas_sync_completed`, `himalayas_sync_paused`, `himalayas_check_failed`, `employer_source_failed`, `jsearch_failed`, or `http_request_failed`. Progress is emitted after the first committed page and every 25 pages, with page/record counts, elapsed time and whether more pages remain. Skip logs include the reason and next sync/retry time where known. Failure logs identify the operation, source, HTTP status/retry delay where available, and number of committed pages. Status writes, checkpoint reads and lease releases also log failures.
+
+HTTP failures log method, route pattern, status and elapsed time, excluding query strings, request bodies, cookies and authorization headers. Known environment secrets are redacted from error attributes; OAuth response bodies and provider request URLs are excluded. Resume-import and agent failures log error codes/types rather than extracted resume content, chat prompts or tool arguments. Normal startup is logged at INFO, rather than appearing as an error merely because the standard logger wrote to stderr.

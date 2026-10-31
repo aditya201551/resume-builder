@@ -15,7 +15,7 @@ const WorkplaceMap = lazy(() => import('@/components/jobs/JobMap'))
 
 export default function JobMapPage({ direct = false }: { direct?: boolean }) {
   return <main className="jobs-page">
-    <header className="jobs-heading"><div><h1>Job map</h1><p>Technology roles, near you or remote.</p></div></header>
+    <header className="jobs-heading"><div><h1>Jobs</h1><p>Technology roles, near you or remote.</p></div></header>
     <nav className="jobs-source-tabs" aria-label="Job sources">
       <NavLink to="/jobs/external">Third-party jobs</NavLink>
       <NavLink to="/jobs/direct">Direct jobs</NavLink>

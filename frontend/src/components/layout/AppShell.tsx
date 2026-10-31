@@ -1,10 +1,10 @@
 import { NavLink, Outlet } from 'react-router'
 import {
+  BriefcaseBusiness,
   ChevronDown,
   Files,
   House,
   LogOut,
-  MapPin,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -42,7 +42,7 @@ export default function AppShell() {
           {[
             { to: '/resumes', label: 'Home', icon: House },
             { to: '/resumes/library', label: 'My resumes', icon: Files },
-            { to: '/jobs', label: 'Job map', icon: MapPin },
+            { to: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
           ].map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}

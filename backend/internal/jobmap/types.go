@@ -97,7 +97,7 @@ type SourceStatus struct {
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
 	Kind        string     `json:"kind"`
-	Status      string     `json:"status"` // ready, refreshing, error, needs_key, quota_exhausted
+	Status      string     `json:"status"` // ready, refreshing, paused, error, needs_key, quota_exhausted
 	Message     string     `json:"message,omitempty"`
 	JobCount    int        `json:"jobCount"`
 	RefreshedAt *time.Time `json:"refreshedAt,omitempty"`

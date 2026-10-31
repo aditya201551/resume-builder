@@ -178,6 +178,12 @@ func (s *JobService) sourceStatuses(ctx context.Context) ([]jobmap.SourceStatus,
 		if old, ok := byID[defaults[i].ID]; ok {
 			defaults[i] = old
 		}
+		if defaults[i].ID == "himalayas" {
+			// Override persisted refresh state so a stopped crawl cannot keep the
+			// UI polling as though new pages are still being imported.
+			defaults[i].Status = "paused"
+			defaults[i].Message = "Full-feed import is paused. Previously collected listings remain available while current."
+		}
 		if defaults[i].ID == "jsearch" && s.cfg.JSearchKey == "" {
 			defaults[i].Status = "needs_key"
 			defaults[i].Message = "Optional broad search is not connected. Company feeds and remote jobs remain available."

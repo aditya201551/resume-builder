@@ -46,7 +46,7 @@ export interface JobSource {
   id: string
   name: string
   kind: string
-  status: 'ready' | 'refreshing' | 'error' | 'needs_key' | 'quota_exhausted'
+  status: 'ready' | 'refreshing' | 'paused' | 'error' | 'needs_key' | 'quota_exhausted'
   message?: string
   jobCount: number
   refreshedAt?: string

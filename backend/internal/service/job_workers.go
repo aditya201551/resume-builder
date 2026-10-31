@@ -6,7 +6,8 @@ import (
 	"time"
 )
 
-// Start checks persisted schedules, with prompt retries of interrupted passes.
+// Start refreshes employer feeds only. The full Himalayas crawl is paused while
+// the jobs module is redesigned; cached listings and individual checks remain.
 // The ticker starts before the first pass, so a long pass does not add an idle delay.
 func (s *JobService) Start(ctx context.Context) {
 	s.workMu.Lock()
@@ -16,7 +17,7 @@ func (s *JobService) Start(ctx context.Context) {
 	}
 	s.started = true
 	s.workMu.Unlock()
-	slog.Info("job_workers_started", "employer_sources", len(s.cfg.Companies), "employer_refresh_interval", s.cfg.RefreshInterval.String(), "himalayas_refresh_interval", himalayasRefreshInterval.String(), "schedule_check_interval", "1m", "himalayas_key_configured", s.cfg.HimalayasKey != "", "jsearch_key_configured", s.cfg.JSearchKey != "")
+	slog.Info("job_workers_started", "employer_sources", len(s.cfg.Companies), "employer_refresh_interval", s.cfg.RefreshInterval.String(), "himalayas_feed_enabled", false, "schedule_check_interval", "1m", "himalayas_key_configured", s.cfg.HimalayasKey != "", "jsearch_key_configured", s.cfg.JSearchKey != "")
 	context.AfterFunc(ctx, func() {
 		cleanup, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
@@ -24,24 +25,22 @@ func (s *JobService) Start(ctx context.Context) {
 			logJobError(cleanup, "job_workers_stop_failed", err)
 		}
 	})
-	for _, pass := range []func(context.Context){s.refresh, s.refreshHimalayas} {
-		s.runBackground(func(ctx context.Context) {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			if ctx.Err() != nil {
+	s.runBackground(func(ctx context.Context) {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		if ctx.Err() != nil {
+			return
+		}
+		s.refresh(ctx)
+		for {
+			select {
+			case <-ctx.Done():
 				return
+			case <-ticker.C:
+				s.refresh(ctx)
 			}
-			pass(ctx)
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					pass(ctx)
-				}
-			}
-		})
-	}
+		}
+	})
 }
 
 func (s *JobService) runBackground(work func(context.Context)) bool {

@@ -31,8 +31,11 @@ export interface Job {
   salary?: string
   language?: string
   postedAt?: string
+  sourceUpdatedAt?: string
   expiresAt?: string
   fetchedAt: string
+  checkedAt?: string
+  checkFailed?: boolean
   closed: boolean
   saved: boolean
 }

@@ -228,7 +228,7 @@ func TestHimalayasExplicitEmptyRestrictionsDifferFromMissing(t *testing.T) {
 		body := `{"jobs":[{"guid":"https://himalayas.app/companies/example/jobs/a","title":"Software Engineer","companyName":"Example","applicationLink":"https://himalayas.app/companies/example/jobs/a?utm_source=api","locationRestrictions":[],"timezoneRestrictions":[5.5]},{"guid":"https://himalayas.app/companies/example/jobs/b","title":"Software Engineer","companyName":"Example","applicationLink":"https://himalayas.app/companies/example/jobs/b?utm_source=api"}]}`
 		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
 	})}
-	jobs, err := c.FetchHimalayas(context.Background())
+	jobs, _, err := c.FetchHimalayasPage(context.Background(), "")
 	if err != nil || len(jobs) != 2 {
 		t.Fatalf("%v %+v", err, jobs)
 	}

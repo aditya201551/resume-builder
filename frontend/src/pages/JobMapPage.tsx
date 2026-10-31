@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { useJobCountries, useJobs, useSaveJob } from '@/hooks/useJobs'
 import LocationSearch from '@/components/jobs/LocationSearch'
 import JobDetails from '@/components/jobs/JobDetails'
-import { jobDate, jobSearchQuery, locationLabel, parseBounds, safeJobUrl, workplaceLabels } from '@/lib/jobs'
+import { jobDate, jobListingDate, jobSearchQuery, locationLabel, parseBounds, safeJobUrl, workplaceLabels } from '@/lib/jobs'
 import { jobMapViewportParams, type JobMapViewport } from '@/lib/jobMapViewport'
 import type { Job, JobPlace, JobSource } from '@/types/job'
 import '@/styles/jobs.css'
@@ -115,7 +115,7 @@ function ExternalJobs() {
       <label>Workplace country<select value={params.get('country') ?? ''} onChange={event => update({ country: event.target.value, bounds: undefined, place: undefined, lat: undefined, lng: undefined, zoom: undefined })}><option value="">All countries</option>{countryOptions.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}</select></label>
       <label>Employment<select value={params.get('employment') ?? ''} onChange={event => update({ employment: event.target.value })}><option value="">Any employment</option><option value="full_time">Full time</option><option value="part_time">Part time</option><option value="contract">Contract</option><option value="internship">Internship</option></select></label>
       <label>Seniority<select value={params.get('seniority') ?? ''} onChange={event => update({ seniority: event.target.value })}><option value="">Any seniority</option><option value="junior">Junior / intern</option><option value="mid">Mid level</option><option value="senior">Senior</option><option value="lead">Staff / lead</option></select></label>
-      <label>Listing date<select value={params.get('days') ?? ''} onChange={event => update({ days: event.target.value })}><option value="">Any date</option><option value="1">Past day</option><option value="7">Past week</option><option value="30">Past month</option></select></label>
+      <label>Posted / updated<select value={params.get('days') ?? ''} onChange={event => update({ days: event.target.value })}><option value="">Any date</option><option value="1">Past day</option><option value="7">Past week</option><option value="30">Past month</option></select></label>
       <label>Listing source<select value={params.get('source') ?? ''} onChange={event => update({ source: event.target.value })}><option value="">All sources</option><option value="company">Company hiring feeds</option><option value="aggregator">Job boards</option><option value="career_page">Public career pages</option></select></label>
       <Button variant="ghost" size="sm" onClick={() => setParams({})}>Clear all filters</Button>
     </div>
@@ -142,11 +142,12 @@ function ExternalJobs() {
 
 function JobRow({ job, selected, onSelect, onSave, saving }: { job: Job; selected: boolean; onSelect: () => void; onSave: () => void; saving: boolean }) {
   const source = safeJobUrl(job.sourceUrl)
+  const listingDate = jobListingDate(job)
   return <article className="jobs-row" data-selected={selected}>
     <div className="jobs-row-top"><p>{job.company}</p><button type="button" className="jobs-icon-button" aria-label={`${job.saved ? 'Unsave' : 'Save'} ${job.title} at ${job.company}`} aria-pressed={job.saved} disabled={saving} onClick={onSave}><Bookmark size={17} fill={job.saved ? 'currentColor' : 'none'} /></button></div>
     <h3><button type="button" onClick={onSelect}>{job.title}</button></h3>
     <p className="jobs-row-location">{job.workplace === 'remote' ? <Monitor size={14} /> : <MapPin size={14} />}<span>{locationLabel(job)}</span></p>
-    <div className="jobs-row-meta"><span>{workplaceLabels[job.workplace]}</span>{job.salary && <span>{job.salary}</span>}{job.closed ? <span>Closed / unconfirmed</span> : job.postedAt && <time dateTime={job.postedAt}>{jobDate(job.postedAt)}</time>}</div>
+    <div className="jobs-row-meta"><span>{workplaceLabels[job.workplace]}</span>{job.salary && <span>{job.salary}</span>}{job.closed ? <span>Closed / unconfirmed</span> : listingDate.date && <time dateTime={listingDate.date}>{listingDate.label} {jobDate(listingDate.date)}</time>}</div>
     <div className="jobs-row-bottom">{source ? <a href={source} target="_blank" rel="noopener noreferrer">{job.sourceName}<ExternalLink size={11} /></a> : <span>{job.sourceName}</span>}{job.locations.some(l => l.precision === 'city') && <span>Approximate city location</span>}</div>
   </article>
 }

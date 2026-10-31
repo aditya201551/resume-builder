@@ -27,6 +27,10 @@ type jobStore interface {
 	ClaimSearch(context.Context, string, time.Duration) (bool, error)
 	ReleaseSearch(context.Context, string) error
 	Prune(context.Context) error
+	FeedProgress(context.Context, string) (jobmap.FeedProgress, error)
+	StoreFeedPage(context.Context, string, []jobmap.Job, jobmap.FeedProgress) error
+	DelayFeed(context.Context, string, time.Time) error
+	MarkJobClosed(context.Context, string, time.Time) error
 }
 
 type JobService struct {
@@ -51,6 +55,19 @@ func NewJobService(repo jobStore, cfg jobmap.Config) *JobService {
 // Start refreshes public company feeds in the background. Search never scrapes
 // a company page and never waits for the initial corpus to finish loading.
 func (s *JobService) Start(ctx context.Context) {
+	go func() {
+		s.refreshHimalayas(ctx)
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				s.refreshHimalayas(ctx)
+			}
+		}
+	}()
 	go func() {
 		s.refresh(ctx)
 		ticker := time.NewTicker(s.cfg.RefreshInterval)
@@ -137,7 +154,6 @@ func (s *JobService) refresh(ctx context.Context) {
 		}
 		run(jobmap.CompanySource(company), company.Name+" careers", kind, company.Provider != "career_page", func(ctx context.Context) ([]jobmap.Job, error) { return s.client.FetchCompany(ctx, company) })
 	}
-	run("himalayas", "Himalayas", "aggregator", false, s.client.FetchHimalayas)
 	wg.Wait()
 	// Allow another attempt after an outage, without retrying on each user search.
 	if failed.Load() {
@@ -265,6 +281,9 @@ func (s *JobService) Get(ctx context.Context, userID, id string) (jobmap.Job, er
 	job, err := s.repo.Get(ctx, userID, id)
 	if errors.Is(err, repository.ErrNotFound) {
 		return job, ErrNotFound
+	}
+	if err == nil && job.Source == "himalayas" {
+		return s.verifyHimalayas(ctx, userID, job)
 	}
 	return job, err
 }

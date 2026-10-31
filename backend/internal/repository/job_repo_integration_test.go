@@ -2,6 +2,8 @@ package repository_test
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -18,6 +20,7 @@ import (
 	"resume-builder/backend/internal/repository"
 	"resume-builder/backend/internal/service"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -44,6 +47,10 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 	defer admin.Close()
 	schema := fmt.Sprintf("job_map_test_%d", time.Now().UnixNano())
 	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+schema); err != nil {
+		var pgError *pgconn.PgError
+		if errors.As(err, &pgError) {
+			t.Fatalf("could not create isolated test schema (SQLSTATE %s)", pgError.Code)
+		}
 		t.Fatal("could not create isolated test schema")
 	}
 	defer func() {
@@ -69,6 +76,32 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, string(migration)); err != nil {
+		t.Fatal(err)
+	}
+	legacy := jobmap.Job{ID: "legacy", ProviderID: "legacy", Source: "himalayas", PostedAt: timePtr(time.Now().Add(-time.Hour)), FetchedAt: time.Now()}
+	legacyJSON, err := json.Marshal(legacy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO job_listings(id,source,provider_id,payload,fetched_at) VALUES('legacy','himalayas','legacy',$1,now())`, legacyJSON); err != nil {
+		t.Fatal(err)
+	}
+	feedMigration, err := os.ReadFile("../db/migrations/000007_himalayas_feed.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(feedMigration)); err != nil {
+		t.Fatal(err)
+	}
+	var migrated []byte
+	if err := pool.QueryRow(ctx, `SELECT payload FROM job_listings WHERE id='legacy'`).Scan(&migrated); err != nil {
+		t.Fatal(err)
+	}
+	var converted jobmap.Job
+	if err := json.Unmarshal(migrated, &converted); err != nil || converted.PostedAt != nil || converted.SourceUpdatedAt == nil {
+		t.Fatal("legacy Himalayas date migration", err)
+	}
+	if _, err := pool.Exec(ctx, `DELETE FROM job_listings WHERE id='legacy'`); err != nil {
 		t.Fatal(err)
 	}
 	a, b := "00000000-0000-4000-8000-000000000001", "00000000-0000-4000-8000-000000000002"
@@ -166,6 +199,73 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 	if err := repo.Prune(ctx); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("resumable feed and authoritative closures", func(t *testing.T) {
+		remote, ok := jobmap.Prepare(jobmap.Job{Source: "himalayas", ProviderID: "https://himalayas.app/companies/acme/jobs/a", Company: "Acme", Title: "Software Engineer", ApplyURL: "https://example.com/a", Workplace: "remote"}, time.Now())
+		if !ok {
+			t.Fatal("invalid remote fixture")
+		}
+		progress := jobmap.FeedProgress{Cursor: "opaque-next", JobCount: 1}
+		if err := repo.StoreFeedPage(ctx, "himalayas", []jobmap.Job{remote}, progress); err != nil {
+			t.Fatal(err)
+		}
+		if got, err := repo.FeedProgress(ctx, "himalayas"); err != nil || got.Cursor != "opaque-next" || got.JobCount != 1 {
+			t.Fatal("checkpoint lost", got, err)
+		}
+		if err := repo.Save(ctx, a, remote.ID); err != nil {
+			t.Fatal(err)
+		}
+		checked := time.Now().UTC()
+		if err := repo.MarkJobClosed(ctx, remote.ID, checked); err != nil {
+			t.Fatal(err)
+		}
+		remote.FetchedAt = time.Now()
+		progress.Cursor = ""
+		progress.CompletedAt = timePtr(time.Now())
+		if err := repo.StoreFeedPage(ctx, "himalayas", []jobmap.Job{remote}, progress); err != nil {
+			t.Fatal(err)
+		}
+		got, err := repo.Get(ctx, a, remote.ID)
+		if err != nil || !got.Closed || !got.Saved || got.CheckedAt == nil {
+			t.Fatal("cached feed reopened closed job or lost bookmark", got, err)
+		}
+		// A later explicit 200 can reopen it; an older cached 200 cannot override a newer 410.
+		remote.CheckedAt = timePtr(checked.Add(time.Second))
+		if err := repo.StoreSource(ctx, "himalayas", []jobmap.Job{remote}, false); err != nil {
+			t.Fatal(err)
+		}
+		got, err = repo.Get(ctx, a, remote.ID)
+		if err != nil || got.Closed || !got.Saved {
+			t.Fatal("explicit check could not reopen job", got, err)
+		}
+		if err := repo.MarkJobClosed(ctx, remote.ID, checked.Add(2*time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.StoreSource(ctx, "himalayas", []jobmap.Job{remote}, false); err != nil {
+			t.Fatal(err)
+		}
+		got, err = repo.Get(ctx, a, remote.ID)
+		if err != nil || !got.Closed {
+			t.Fatal("stale check overrode newer closure", got, err)
+		}
+		// A checkpoint failure rolls back its page's job writes as well.
+		remote.ID = "rolled-back"
+		remote.ProviderID = "rolled-back"
+		progress.JobCount = -1
+		if err := repo.StoreFeedPage(ctx, "himalayas", []jobmap.Job{remote}, progress); err == nil {
+			t.Fatal("expected checkpoint constraint failure")
+		}
+		var count int
+		if err := pool.QueryRow(ctx, `SELECT count(*) FROM job_listings WHERE id='rolled-back'`).Scan(&count); err != nil || count != 0 {
+			t.Fatal("page did not roll back", count, err)
+		}
+	})
+	feedDown, err := os.ReadFile("../db/migrations/000007_himalayas_feed.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(feedDown)); err != nil {
+		t.Fatal("feed down migration", err)
+	}
 	down, err := os.ReadFile("../db/migrations/000006_job_map.down.sql")
 	if err != nil {
 		t.Fatal(err)
@@ -174,3 +274,5 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 		t.Fatal("down migration", err)
 	}
 }
+
+func timePtr(t time.Time) *time.Time { return &t }

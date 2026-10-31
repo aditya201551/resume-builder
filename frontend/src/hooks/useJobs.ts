@@ -12,14 +12,19 @@ export function useJobs(query: string) {
     placeholderData: (previous, previousQuery) => previousQuery?.queryKey[1] === user?.id ? previous : undefined,
     enabled: Boolean(user),
     staleTime: 60_000,
-    refetchInterval: query => query.state.data?.refreshing || query.state.data?.sources.some(s => s.status === 'refreshing') ? 5_000 : false,
+    refetchInterval: query => query.state.data?.refreshing || query.state.data?.sources.some(s => s.status === 'refreshing') ? 5_000 : 60_000,
     retry: 1,
   })
 }
 
 export function useJob(id: string | null) {
   const { user } = useAuth()
-  return useQuery({ queryKey: ['job-detail', user?.id, id], queryFn: () => apiGet<Job>(`/api/jobs/${id}`), enabled: Boolean(id && user), staleTime: 60_000, retry: 1 })
+  const client = useQueryClient()
+  return useQuery({ queryKey: ['job-detail', user?.id, id], queryFn: async ({ signal }) => {
+    const job = await apiGet<Job>(`/api/jobs/${id}`, { signal })
+    if (job.closed) void client.invalidateQueries({ queryKey: ['jobs', user?.id] })
+    return job
+  }, enabled: Boolean(id && user), staleTime: 60_000, retry: 1 })
 }
 
 export function useJobCountries() {

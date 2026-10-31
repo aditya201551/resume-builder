@@ -17,6 +17,13 @@ type Client struct {
 	Config Config
 }
 
+type FeedHTTPError struct {
+	StatusCode int
+	RetryAfter time.Duration
+}
+
+func (e *FeedHTTPError) Error() string { return fmt.Sprintf("feed returned HTTP %d", e.StatusCode) }
+
 func NewClient(cfg Config) *Client {
 	return &Client{Config: cfg, HTTP: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(req *http.Request, via []*http.Request) error {
 		if len(via) >= 3 || req.URL.Scheme != "https" || (len(via) > 0 && req.URL.Hostname() != via[0].URL.Hostname()) {
@@ -44,7 +51,13 @@ func (c *Client) get(ctx context.Context, rawURL string, headers map[string]stri
 	} // do not leak API keys in request URLs
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+		delay := time.Duration(0)
+		if seconds, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && seconds > 0 && seconds <= 7*24*60*60 {
+			delay = time.Duration(seconds) * time.Second
+		} else if at, err := http.ParseTime(resp.Header.Get("Retry-After")); err == nil {
+			delay = max(0, time.Until(at))
+		}
+		return &FeedHTTPError{StatusCode: resp.StatusCode, RetryAfter: delay}
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 24<<20)).Decode(out); err != nil {
 		return fmt.Errorf("invalid feed response")
@@ -255,86 +268,6 @@ func parseTime(s string) *time.Time {
 		}
 	}
 	return nil
-}
-
-// FetchHimalayas uses targeted, bounded remote searches, not a claim to mirror
-// the entire feed. Successful partial searches must never expire unseen jobs.
-func (c *Client) FetchHimalayas(ctx context.Context) ([]Job, error) {
-	jobs := []Job{}
-	seen := map[string]bool{}
-	for _, query := range []string{"software", "data", "devops", "security", "product designer"} {
-		var body struct {
-			Jobs []struct {
-				GUID        string    `json:"guid"`
-				Title       string    `json:"title"`
-				Company     string    `json:"companyName"`
-				Description string    `json:"description"`
-				Excerpt     string    `json:"excerpt"`
-				ApplyURL    string    `json:"applicationLink"`
-				Regions     *[]string `json:"locationRestrictions"`
-				Timezones   []float64 `json:"timezoneRestrictions"`
-				Employment  string    `json:"employmentType"`
-				Seniority   []string  `json:"seniority"`
-				Published   int64     `json:"pubDate"`
-				Expiry      int64     `json:"expiryDate"`
-				Currency    string    `json:"currency"`
-				Min         *float64  `json:"minSalary"`
-				Max         *float64  `json:"maxSalary"`
-				Period      string    `json:"salaryPeriod"`
-			} `json:"jobs"`
-		}
-		headers := map[string]string{}
-		if c.Config.HimalayasKey != "" {
-			headers["Authorization"] = "Bearer " + c.Config.HimalayasKey
-		}
-		if err := c.get(ctx, "https://himalayas.app/jobs/api/search?q="+url.QueryEscape(query)+"&page=1", headers, &body); err != nil {
-			return nil, err
-		}
-		for _, j := range body.Jobs {
-			if seen[j.GUID] {
-				continue
-			}
-			seen[j.GUID] = true
-			job := Job{ProviderID: j.GUID, Source: "himalayas", SourceName: "Himalayas", SourceKind: "aggregator", Company: j.Company, Title: j.Title, Description: j.Description, SourceURL: j.GUID, ApplyURL: j.ApplyURL, Workplace: "remote", EmploymentType: Employment(j.Employment), Seniority: Seniority(strings.Join(j.Seniority, " ")), Remote: RemotePolicy{Scope: "unspecified", Regions: []string{}, Timezones: j.Timezones}}
-			if job.Description == "" {
-				job.Description = j.Excerpt
-			}
-			if j.Regions != nil {
-				job.Remote.Regions = *j.Regions
-				job.Remote.Scope = "worldwide" // explicitly empty means unrestricted geography in this provider's documented schema
-				if len(*j.Regions) > 0 {
-					job.Remote.Scope = "restricted"
-				}
-				for _, r := range *j.Regions {
-					if strings.EqualFold(r, "worldwide") || strings.EqualFold(r, "anywhere") {
-						job.Remote.Scope = "worldwide"
-					}
-				}
-			}
-			// Missing/null restrictions remain unspecified. Preserve timezone lists
-			// exactly; their length alone cannot establish unrestricted hiring.
-			if j.Published > 0 {
-				t := time.Unix(j.Published, 0)
-				job.PostedAt = &t
-			}
-			if j.Expiry > 0 {
-				t := time.Unix(j.Expiry, 0)
-				job.ExpiresAt = &t
-			}
-			if j.Min != nil || j.Max != nil {
-				parts := []string{}
-				if j.Min != nil {
-					parts = append(parts, fmt.Sprintf("%.0f", *j.Min))
-				}
-				if j.Max != nil {
-					parts = append(parts, fmt.Sprintf("%.0f", *j.Max))
-				}
-				job.Salary = strings.TrimSpace(j.Currency + " " + strings.Join(parts, " to ") + " " + j.Period)
-			}
-			jobs = append(jobs, job)
-		}
-	}
-	return jobs, nil
 }
 
 func (c *Client) FetchJSearch(ctx context.Context, query, country string) ([]Job, error) {

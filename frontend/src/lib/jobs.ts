@@ -65,6 +65,16 @@ export function jobDate(raw?: string): string {
   return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(date) : 'Date not supplied'
 }
 
+export function jobListingDate(job: Pick<Job, 'postedAt' | 'sourceUpdatedAt'>) {
+  return { date: job.postedAt ?? job.sourceUpdatedAt, label: job.postedAt ? 'Posted' : job.sourceUpdatedAt ? 'Updated' : 'Listing date' }
+}
+
+export function jobDateTime(raw?: string): string {
+  if (!raw) return 'Not yet checked'
+  const date = new Date(raw)
+  return Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date) : 'Date not supplied'
+}
+
 export function timezoneLabel(offset: number): string {
   const minutes = Math.round(Math.abs(offset) * 60)
   return `UTC${offset >= 0 ? '+' : '-'}${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`

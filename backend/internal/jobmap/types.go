@@ -27,29 +27,48 @@ type RemotePolicy struct {
 }
 
 type Job struct {
-	ID             string       `json:"id"`
-	ProviderID     string       `json:"providerId"`
-	Source         string       `json:"source"`
-	SourceName     string       `json:"sourceName"`
-	SourceKind     string       `json:"sourceKind"` // company, aggregator, career_page
-	SourceURL      string       `json:"sourceUrl"`
-	ApplyURL       string       `json:"applyUrl"`
-	Company        string       `json:"company"`
-	CompanyURL     string       `json:"companyUrl,omitempty"`
-	Title          string       `json:"title"`
-	Description    string       `json:"description"`
-	Workplace      string       `json:"workplace"` // onsite, hybrid, remote, unknown
-	Locations      []Location   `json:"locations"`
-	Remote         RemotePolicy `json:"remote"`
-	EmploymentType string       `json:"employmentType"`
-	Seniority      string       `json:"seniority"`
-	Salary         string       `json:"salary,omitempty"`
-	Language       string       `json:"language,omitempty"`
-	PostedAt       *time.Time   `json:"postedAt,omitempty"`
-	ExpiresAt      *time.Time   `json:"expiresAt,omitempty"`
-	FetchedAt      time.Time    `json:"fetchedAt"`
-	Closed         bool         `json:"closed"`
-	Saved          bool         `json:"saved"`
+	ID              string       `json:"id"`
+	ProviderID      string       `json:"providerId"`
+	Source          string       `json:"source"`
+	SourceName      string       `json:"sourceName"`
+	SourceKind      string       `json:"sourceKind"` // company, aggregator, career_page
+	SourceURL       string       `json:"sourceUrl"`
+	ApplyURL        string       `json:"applyUrl"`
+	Company         string       `json:"company"`
+	CompanyURL      string       `json:"companyUrl,omitempty"`
+	Title           string       `json:"title"`
+	Description     string       `json:"description"`
+	Workplace       string       `json:"workplace"` // onsite, hybrid, remote, unknown
+	Locations       []Location   `json:"locations"`
+	Remote          RemotePolicy `json:"remote"`
+	EmploymentType  string       `json:"employmentType"`
+	Seniority       string       `json:"seniority"`
+	Salary          string       `json:"salary,omitempty"`
+	Language        string       `json:"language,omitempty"`
+	PostedAt        *time.Time   `json:"postedAt,omitempty"`
+	SourceUpdatedAt *time.Time   `json:"sourceUpdatedAt,omitempty"`
+	ExpiresAt       *time.Time   `json:"expiresAt,omitempty"`
+	FetchedAt       time.Time    `json:"fetchedAt"`
+	CheckedAt       *time.Time   `json:"checkedAt,omitempty"`
+	CheckFailed     bool         `json:"checkFailed,omitempty"`
+	Closed          bool         `json:"closed"`
+	Saved           bool         `json:"saved"`
+}
+
+// ListingDate keeps source updates distinct from original publication dates.
+func (j Job) ListingDate() *time.Time {
+	if j.PostedAt != nil {
+		return j.PostedAt
+	}
+	return j.SourceUpdatedAt
+}
+
+// FeedProgress is a durable checkpoint, independent of public source status.
+type FeedProgress struct {
+	Cursor      string
+	JobCount    int
+	CompletedAt *time.Time
+	RetryAt     *time.Time
 }
 
 func StableID(source, id string) string {

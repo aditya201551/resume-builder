@@ -2,7 +2,7 @@ import { Bookmark, ExternalLink, MapPin, Monitor, X } from 'lucide-react'
 import { Dialog as DialogPrimitive } from 'radix-ui'
 import { Button } from '@/components/ui/button'
 import { useJob, useSaveJob } from '@/hooks/useJobs'
-import { employmentLabels, jobDate, locationLabel, safeJobUrl, timezoneLabel, workplaceLabels } from '@/lib/jobs'
+import { employmentLabels, jobDate, jobDateTime, jobListingDate, locationLabel, safeJobUrl, timezoneLabel, workplaceLabels } from '@/lib/jobs'
 import { toast } from 'sonner'
 
 export default function JobDetails({ id, onClose }: { id: string | null; onClose: () => void }) {
@@ -11,6 +11,7 @@ export default function JobDetails({ id, onClose }: { id: string | null; onClose
   const job = query.data
   const apply = safeJobUrl(job?.applyUrl)
   const source = safeJobUrl(job?.sourceUrl)
+  const listingDate = job ? jobListingDate(job) : undefined
   return <DialogPrimitive.Root open={Boolean(id)} onOpenChange={open => { if (!open) onClose() }}>
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className="jobs-detail-overlay" />
@@ -20,13 +21,15 @@ export default function JobDetails({ id, onClose }: { id: string | null; onClose
         {query.isError && <><DialogPrimitive.Title>Could not load this job</DialogPrimitive.Title><DialogPrimitive.Description id="job-detail-summary">Try again, or return to the results.</DialogPrimitive.Description><Button variant="outline" onClick={() => void query.refetch()}>Retry</Button></>}
         {job && <>
           <div className="jobs-detail-heading"><p>{job.company}</p><DialogPrimitive.Title>{job.title}</DialogPrimitive.Title><DialogPrimitive.Description id="job-detail-summary"><MapPin size={15} />{locationLabel(job)}</DialogPrimitive.Description></div>
-          {job.closed && <p className="jobs-notice" role="status">This listing is closed or no longer recently confirmed. It stays here because you saved it.</p>}
+          {job.closed && <p className="jobs-notice" role="status">This listing is closed or no longer recently confirmed.{job.saved && ' It stays here because you saved it.'}</p>}
+          {job.checkFailed && <p className="jobs-notice" role="status">Availability could not be verified. Showing the latest cached listing; confirm on the source website.</p>}
           <dl className="jobs-detail-facts">
             <div><dt>Workplace</dt><dd>{workplaceLabels[job.workplace]}</dd></div>
             <div><dt>Employment</dt><dd>{employmentLabels[job.employmentType] ?? job.employmentType}</dd></div>
             {job.salary && <div><dt>Salary as listed</dt><dd>{job.salary}</dd></div>}
-            <div><dt>Listing date</dt><dd>{jobDate(job.postedAt)}</dd></div>
-            <div><dt>Last fetched</dt><dd>{jobDate(job.fetchedAt)}</dd></div>
+            <div><dt>{listingDate?.label}</dt><dd>{jobDate(listingDate?.date)}</dd></div>
+            <div><dt>Last fetched</dt><dd>{jobDateTime(job.fetchedAt)}</dd></div>
+            {job.source === 'himalayas' && <div><dt>Availability checked</dt><dd>{jobDateTime(job.checkedAt)}</dd></div>}
           </dl>
           {job.workplace === 'remote' && <div className="jobs-remote-policy"><Monitor size={18} /><div><h3>Remote hiring locations</h3><p>{job.remote.scope === 'worldwide' ? 'The source lists worldwide hiring.' : job.remote.scope === 'restricted' ? job.remote.regions.join(', ') : 'The source does not specify accepted hiring regions.'}</p>{job.remote.timezones.length > 0 && <p>{job.remote.timezones.length <= 12 ? `Listed timezone offsets: ${job.remote.timezones.map(timezoneLabel).join(', ')}.` : 'Timezone information is supplied with this listing.'} Check the original posting for working hours.</p>}</div></div>}
           {job.locations.some(l => l.precision === 'city') && <p className="jobs-detail-note">The map uses approximate city centres from GeoNames. These are not verified office addresses.</p>}

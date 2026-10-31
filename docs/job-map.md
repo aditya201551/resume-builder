@@ -1,10 +1,10 @@
-# Job map
+# Jobs
 
-The authenticated Job map tab has third-party listings and a Direct jobs placeholder. The initial scope is technology roles worldwide. Search operates on the listings actually indexed, not a claim to cover every opening worldwide.
+The authenticated Jobs tab has third-party listings and a Direct jobs placeholder. The initial scope is technology roles worldwide. Search operates on the listings actually indexed, not a claim to cover every opening worldwide.
 
 ## Run locally
 
-Run `npm install` after pulling the feature, then restart `npm run dev`. The API applies migration `000006_job_map` and refreshes its sources in the background. The first listings normally arrive within a few seconds; the page polls while that refresh is running. No new account or API key is needed for the seeded company feeds, Himalayas, basemap, or bundled city search.
+Run `npm install` after pulling the feature, then restart `npm run dev`. The API applies migrations `000006_job_map` and `000007_himalayas_feed` and refreshes its sources in the background. Listings arrive incrementally; the page polls while collection is running. No new account or API key is needed for the seeded company feeds, Himalayas, basemap, or bundled city search. A free Himalayas API key is recommended for a dedicated allowance rather than sharing the public limit.
 
 Optional settings in `backend/.env`:
 
@@ -15,21 +15,21 @@ JSEARCH_PROVIDER=rapidapi
 JSEARCH_API_KEY=
 JSEARCH_MONTHLY_LIMIT=200
 
-# Optional free Himalayas key; the public endpoints also work without it.
+# Optional free Himalayas key; server-side only. Public access shares an allowance.
 HIMALAYAS_API_KEY=
 
 # Extends city search when the bundled gazetteer has no match.
 GEOAPIFY_API_KEY=
 GEOAPIFY_DAILY_LIMIT=1000
 
-# Minimum 1h; default 6h. Existing required app settings remain unchanged.
+# Employer feeds only: minimum 1h; default 6h. Himalayas syncs daily independently.
 JOB_MAP_REFRESH_INTERVAL=6h
 
 # Optional replacement company registry; relative paths resolve from backend/.
 JOB_MAP_COMPANIES_FILE=
 ```
 
-JSearch is optional. Without its key the page still combines curated employer feeds with Himalayas remote-job searches. With a key, a workplace country, focused map area (under 20 degrees across), or independent remote-work country can trigger a supplemental search. An empty role field searches for technology jobs in that location; an unscoped world view does not call the provider. Each search requests one provider page, not every opening in the area. Repeated queries share a 24-hour cache lease. Atomic database counters enforce a maximum of 200 outbound JSearch requests per UTC calendar month, across users and process restarts. No automatic paid fallback is implemented. The quota covers this app's requests only; another app using the same key can consume the vendor's allowance independently.
+JSearch is optional. Without its key the page still combines curated employer feeds with the Himalayas remote-job feed. With a key, a workplace country, focused map area (under 20 degrees across), or independent remote-work country can trigger a supplemental search. An empty role field searches for technology jobs in that location; an unscoped world view does not call the provider. Each search requests one provider page, not every opening in the area. Repeated queries share a 24-hour cache lease. Atomic database counters enforce a maximum of 200 outbound JSearch requests per UTC calendar month, across users and process restarts. No automatic paid fallback is implemented. The quota covers this app's requests only; another app using the same key can consume the vendor's allowance independently.
 
 For RapidAPI, subscribe to [JSearch](https://rapidapi.com/letscrape-6bRBa3QguO5/api/jsearch) and set `JSEARCH_PROVIDER=rapidapi`. Requests use `jsearch.p.rapidapi.com/search-v2` with `X-RapidAPI-Key` and `X-RapidAPI-Host`. Direct keys use `api.openwebninja.com/jsearch/search-v2` with `x-api-key`. Both adapters read the current `data.jobs` response and request one page per search. There is no automatic retry through the other provider. Restart the backend after changing these settings.
 
@@ -37,9 +37,15 @@ For RapidAPI, subscribe to [JSearch](https://rapidapi.com/letscrape-6bRBa3QguO5/
 
 `backend/internal/jobmap/companies.json` seeds nine real employer boards validated during implementation. It records company websites and ATS board identifiers, not invented office positions or job content. Operators can replace the registry using the configuration above. Supported sources are `ashby`, `greenhouse`, `lever`, and `career_page`. Removing a source from the registry removes its jobs from discovery; existing user bookmarks remain readable.
 
-The worker refreshes two sources concurrently. Successful complete employer feeds close jobs that disappeared. Bounded Himalayas searches, supplemental JSearch responses and single career pages are partial collections and never close unseen jobs merely because they were not returned. Listings expire at their supplied expiry time or fall out of discovery after 72 hours without a successful observation. Unavailable saved jobs retain their closed/unconfirmed state. Unsaved records older than 14 days are pruned.
+The employer worker refreshes two sources concurrently. Successful complete employer feeds close jobs that disappeared. Supplemental JSearch responses and single career pages never close unseen jobs merely because they were not returned. Listings expire at their supplied expiry time or fall out of discovery after 72 hours without a successful observation or availability check. Unavailable saved jobs retain their closed/unconfirmed state. Unsaved records not observed or checked for 14 days are pruned.
 
-Himalayas uses five bounded technology searches. Its original application link and source attribution are preserved. Empty versus absent restrictions are distinguished according to the provider's documented schema; country matching also respects its standard-UTC-offset restrictions. Expiry does not guarantee a role cannot close sooner: the original posting remains authoritative.
+Himalayas walks `GET /jobs/api?limit=20`, following opaque `nextCursor` values until the feed ends. Each page's technology listings and cursor are committed together. A separate worker starts on boot and checks every 15 minutes for a due or interrupted sync. Completed walks repeat after 24 hours; 10-minute passes fit inside shared 15-minute leases, so large feeds resume at the persisted cursor on later passes or after a restart. An invalid cursor restarts the next walk without deleting cached jobs. Short pages do not end a walk if a cursor remains. The visible Jobs page polls our database-backed API every five seconds during collection and once a minute otherwise, so it also notices resumed passes.
+
+Provider requests are spaced at least 1.1 seconds apart through a shared database lease and capped at 10,000 attempts per UTC day across this app, including detail checks. HTTP 429 honors `Retry-After`; exhausted local budgets wait until the next UTC day. A provider account used by another integration can reach its own allowance sooner. Anonymous access can be throttled by unrelated public callers. The backend uses `HIMALAYAS_API_KEY` as a bearer token when present; it never sends it to the browser.
+
+Opening a Himalayas job checks its documented single-job endpoint, with a 10-minute shared check cache and a six-second request deadline. A 200 refreshes the record; a 410 marks it closed while preserving bookmarks. A 404, timeout, malformed response, or provider outage leaves availability unchanged and shows a verification warning. A cached feed page cannot reopen a confirmed closed job; a later explicit successful check can. The cursor feed is not an atomic snapshot, so even a completed walk does not automatically close absent jobs.
+
+Original application links and visible Himalayas attribution are preserved. Empty versus absent restrictions are distinguished according to the provider's documented schema; country matching also respects its standard-UTC-offset restrictions. Remote jobs never receive office markers. Himalayas `pubDate` is stored as `sourceUpdatedAt`, separately from original posting dates, fetch timestamps, and explicit availability checks. List dates are labelled Posted or Updated; sorting and date filters use the posting date when available, otherwise the source update date. Refreshing a record never promotes it using its fetch timestamp. The migration converts previously stored Himalayas posting dates to source update dates.
 
 A replacement company registry is an array like:
 

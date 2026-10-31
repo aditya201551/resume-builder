@@ -79,7 +79,7 @@ func FilterJobs(jobs []Job, s Search, now time.Time) SearchResult {
 		if s.SourceKind != "" && j.SourceKind != s.SourceKind {
 			continue
 		}
-		if s.PostedDays > 0 && (j.PostedAt == nil || j.PostedAt.Before(now.Add(-time.Duration(s.PostedDays)*24*time.Hour))) {
+		if date := j.ListingDate(); s.PostedDays > 0 && (date == nil || date.Before(now.Add(-time.Duration(s.PostedDays)*24*time.Hour))) {
 			continue
 		}
 		if j.Workplace == "remote" {
@@ -115,7 +115,7 @@ func FilterJobs(jobs []Job, s Search, now time.Time) SearchResult {
 				return !aRemote
 			}
 		}
-		a, b := filtered[i].PostedAt, filtered[j].PostedAt
+		a, b := filtered[i].ListingDate(), filtered[j].ListingDate()
 		if a == nil && b != nil {
 			return false
 		}

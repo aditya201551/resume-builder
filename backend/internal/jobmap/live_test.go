@@ -51,7 +51,7 @@ func TestLivePublicFeeds(t *testing.T) {
 	t.Run("Himalayas", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
-		jobs, err := client.FetchHimalayas(ctx)
+		jobs, cursor, err := client.FetchHimalayasPage(ctx, "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,6 +67,17 @@ func TestLivePublicFeeds(t *testing.T) {
 		t.Logf("%d usable remote tech listings", valid)
 		if valid == 0 {
 			t.Fatal("expected remote tech listings")
+		}
+		// Keep this smoke check bounded: two pages and one status check, not a full import.
+		if cursor != "" {
+			time.Sleep(1100 * time.Millisecond)
+			if _, next, err := client.FetchHimalayasPage(ctx, cursor); err != nil || next == cursor {
+				t.Fatal("live cursor pagination", err)
+			}
+		}
+		time.Sleep(1100 * time.Millisecond)
+		if _, _, err := client.FetchHimalayasJob(ctx, jobs[0].ProviderID); err != nil {
+			t.Fatal("live availability endpoint", err)
 		}
 	})
 }

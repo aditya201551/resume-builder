@@ -2,9 +2,12 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"resume-builder/backend/internal/agent"
@@ -38,7 +41,8 @@ func main() {
 	}
 	slog.Info("database_migrations_completed")
 
-	ctx := context.Background()
+	ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
 	pool, err := db.NewPool(ctx, cfg.DatabaseURL)
 	if err != nil {
 		slog.Error("startup_failed", "operation", "connect to database", "error", err)
@@ -53,8 +57,6 @@ func main() {
 		os.Exit(1)
 	}
 	jobService := service.NewJobService(repository.NewJobRepository(pool), jobConfig)
-	jobContext, stopJobs := context.WithCancel(ctx)
-	defer stopJobs()
 
 	providers := auth.NewProviders(cfg.OAuthRedirectBaseURL, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GithubClientID, cfg.GithubClientSecret)
 	if len(providers) == 0 {
@@ -132,6 +134,10 @@ func main() {
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {
 		if err := pool.Ping(r.Context()); err != nil {
+			if r.Context().Err() != nil {
+				slog.Info("health_request_canceled")
+				return
+			}
 			slog.ErrorContext(r.Context(), "health_database_failed", "error", err)
 			w.WriteHeader(http.StatusServiceUnavailable)
 			w.Write([]byte(`{"status":"db_unreachable"}`))
@@ -141,12 +147,36 @@ func main() {
 	}
 
 	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
-	jobService.Start(jobContext)
+	jobService.Start(ctx)
 
 	slog.Info("api_listening", "port", cfg.Port)
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: router, ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError)}
-	if err := server.ListenAndServe(); err != nil {
-		slog.Error("api_server_failed", "error", err)
+	serverErrors := make(chan error, 1)
+	go func() { serverErrors <- server.ListenAndServe() }()
+	failed := false
+	select {
+	case err := <-serverErrors:
+		if !errors.Is(err, http.ErrServerClosed) {
+			slog.Error("api_server_failed", "error", err)
+			failed = true
+		}
+	case <-ctx.Done():
+		slog.Info("api_shutdown_started")
+	}
+	stopSignals()
+	shutdown, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdown); err != nil {
+		slog.Warn("api_shutdown_timeout", "error", err)
+		if closeErr := server.Close(); closeErr != nil {
+			slog.Error("api_close_failed", "error", closeErr)
+		}
+	}
+	if err := jobService.Stop(shutdown); err != nil {
+		slog.Error("job_workers_stop_failed", "error", err)
+	}
+	slog.Info("api_shutdown_completed")
+	if failed {
 		os.Exit(1)
 	}
 }

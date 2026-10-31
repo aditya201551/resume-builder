@@ -250,6 +250,44 @@ func (r *JobRepository) ReleaseSearch(ctx context.Context, key string) error {
 	return err
 }
 
+func (r *JobRepository) ClaimExternalSearch(ctx context.Context, key, token string, lease, cache time.Duration) (bool, error) {
+	var claimed string
+	err := r.pool.QueryRow(ctx, `INSERT INTO job_external_search_cache(cache_key,lease_token,lease_until)
+	 VALUES($1,$2,now()+($3*interval '1 second')) ON CONFLICT(cache_key) DO UPDATE
+	 SET lease_token=EXCLUDED.lease_token,lease_until=EXCLUDED.lease_until
+	 WHERE (job_external_search_cache.lease_until IS NULL OR job_external_search_cache.lease_until<=now())
+	 AND (job_external_search_cache.retry_at IS NULL OR job_external_search_cache.retry_at<=now())
+	 AND (job_external_search_cache.refreshed_at IS NULL OR job_external_search_cache.refreshed_at<=now()-($4*interval '1 second'))
+	 RETURNING lease_token`, key, token, lease.Seconds(), cache.Seconds()).Scan(&claimed)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return err == nil, err
+}
+
+func (r *JobRepository) CompleteExternalSearch(ctx context.Context, key, token string) error {
+	result, err := r.pool.Exec(ctx, `UPDATE job_external_search_cache SET refreshed_at=now(),lease_token=NULL,lease_until=NULL,retry_at=NULL
+	 WHERE cache_key=$1 AND lease_token=$2 AND lease_until>now()`, key, token)
+	if err != nil {
+		return err
+	}
+	if result.RowsAffected() != 1 {
+		return fmt.Errorf("external search lease expired or changed owner")
+	}
+	return nil
+}
+
+func (r *JobRepository) ReleaseExternalSearch(ctx context.Context, key, token string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE job_external_search_cache SET lease_token=NULL,lease_until=NULL WHERE cache_key=$1 AND lease_token=$2`, key, token)
+	return err
+}
+
+func (r *JobRepository) FailExternalSearch(ctx context.Context, key, token string, retryAt time.Time) error {
+	_, err := r.pool.Exec(ctx, `UPDATE job_external_search_cache SET retry_at=$3,lease_token=NULL,lease_until=NULL
+	 WHERE cache_key=$1 AND lease_token=$2`, key, token, retryAt)
+	return err
+}
+
 func (r *JobRepository) Prune(ctx context.Context) error {
 	// Keep unavailable saved records to explain closed bookmarks; purge other stale data.
 	_, err := r.pool.Exec(ctx, `DELETE FROM job_listings j WHERE GREATEST(j.fetched_at,j.checked_at)<now()-interval '14 days'
@@ -258,5 +296,11 @@ func (r *JobRepository) Prune(ctx context.Context) error {
 		return err
 	}
 	_, err = r.pool.Exec(ctx, `DELETE FROM job_search_cache WHERE fetched_at<now()-interval '7 days'`)
+	if err != nil {
+		return err
+	}
+	_, err = r.pool.Exec(ctx, `DELETE FROM job_external_search_cache
+	 WHERE (lease_until IS NULL OR lease_until<=now()) AND (retry_at IS NULL OR retry_at<=now())
+	 AND (refreshed_at IS NULL OR refreshed_at<now()-interval '7 days')`)
 	return err
 }

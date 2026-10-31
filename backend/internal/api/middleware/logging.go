@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"time"
@@ -11,8 +12,12 @@ import (
 func LogErrors(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		started := time.Now()
-		tracked := &loggedResponse{ResponseWriter: w}
+		tracked := &loggedResponse{ResponseWriter: w, ctx: r.Context()}
 		next.ServeHTTP(tracked, r)
+		if r.Context().Err() == context.Canceled {
+			slog.InfoContext(r.Context(), "http_request_canceled", "method", r.Method, "route", r.Pattern, "response_status", tracked.status, "duration_ms", time.Since(started).Milliseconds())
+			return
+		}
 		if tracked.status < 400 {
 			return
 		}
@@ -31,6 +36,7 @@ func LogErrors(next http.Handler) http.Handler {
 type loggedResponse struct {
 	http.ResponseWriter
 	status int
+	ctx    context.Context
 }
 
 func (w *loggedResponse) WriteHeader(status int) {
@@ -50,11 +56,12 @@ func (w *loggedResponse) Write(body []byte) (int, error) {
 	}
 	n, err := w.ResponseWriter.Write(body)
 	if err != nil {
-		slog.Warn("http_write_failed", "error", err)
+		w.logWriteError("http_write_failed", err)
 	}
 	return n, err
 }
-func (w *loggedResponse) Unwrap() http.ResponseWriter { return w.ResponseWriter }
+func (w *loggedResponse) Unwrap() http.ResponseWriter     { return w.ResponseWriter }
+func (w *loggedResponse) RequestContext() context.Context { return w.ctx }
 
 // Preserve flushing for the AI assistant's streaming responses.
 func (w *loggedResponse) Flush() {
@@ -62,6 +69,14 @@ func (w *loggedResponse) Flush() {
 		w.WriteHeader(http.StatusOK)
 	}
 	if err := http.NewResponseController(w.ResponseWriter).Flush(); err != nil {
-		slog.Warn("http_flush_failed", "error", err)
+		w.logWriteError("http_flush_failed", err)
 	}
+}
+
+func (w *loggedResponse) logWriteError(event string, err error) {
+	if w.ctx != nil && w.ctx.Err() != nil {
+		slog.Info(event, "reason", "request_canceled")
+		return
+	}
+	slog.Warn(event, "error", err)
 }

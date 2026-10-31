@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"resume-builder/backend/internal/jobmap"
 )
@@ -29,13 +30,21 @@ func logJobError(ctx context.Context, event string, err error, attrs ...any) {
 }
 
 func (s *JobService) storeSourceStatus(ctx context.Context, status jobmap.SourceStatus) {
-	if err := s.repo.StoreStatus(ctx, status); err != nil {
-		logJobError(ctx, "job_source_status_failed", err, "source", status.ID, "status", status.Status)
+	cleanup, cancel := jobCleanupContext(ctx)
+	defer cancel()
+	if err := s.repo.StoreStatus(cleanup, status); err != nil {
+		logJobError(cleanup, "job_source_status_failed", err, "source", status.ID, "status", status.Status)
 	}
 }
 
 func (s *JobService) releaseSearch(ctx context.Context, key, source string) {
-	if err := s.repo.ReleaseSearch(ctx, key); err != nil {
-		logJobError(ctx, "job_lease_release_failed", err, "source", source)
+	cleanup, cancel := jobCleanupContext(ctx)
+	defer cancel()
+	if err := s.repo.ReleaseSearch(cleanup, key); err != nil {
+		logJobError(cleanup, "job_lease_release_failed", err, "source", source)
 	}
+}
+
+func jobCleanupContext(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 }

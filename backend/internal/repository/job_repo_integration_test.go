@@ -93,6 +93,13 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 	if _, err := pool.Exec(ctx, string(feedMigration)); err != nil {
 		t.Fatal(err)
 	}
+	externalMigration, err := os.ReadFile("../db/migrations/000008_external_job_search_cache.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(externalMigration)); err != nil {
+		t.Fatal(err)
+	}
 	var migrated []byte
 	if err := pool.QueryRow(ctx, `SELECT payload FROM job_listings WHERE id='legacy'`).Scan(&migrated); err != nil {
 		t.Fatal(err)
@@ -259,6 +266,103 @@ func TestJobMapPostgresIntegration(t *testing.T) {
 			t.Fatal("page did not roll back", count, err)
 		}
 	})
+	t.Run("external search ownership and successful-result cache", func(t *testing.T) {
+		claim := func(key, token string) bool {
+			got, err := repo.ClaimExternalSearch(ctx, key, token, time.Minute, 24*time.Hour)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return got
+		}
+		if !claim("q", "first") || claim("q", "second") {
+			t.Fatal("concurrent ownership was not exclusive")
+		}
+		if _, err := pool.Exec(ctx, `UPDATE job_external_search_cache SET lease_until=now()-interval '1 second' WHERE cache_key='q'`); err != nil {
+			t.Fatal(err)
+		}
+		if !claim("q", "new-owner") {
+			t.Fatal("expired in-flight lock did not recover")
+		}
+		if err := repo.ReleaseExternalSearch(ctx, "q", "first"); err != nil {
+			t.Fatal(err)
+		}
+		if claim("q", "third") {
+			t.Fatal("old cleanup removed a new owner's lease")
+		}
+		if err := repo.CompleteExternalSearch(ctx, "q", "first"); err == nil {
+			t.Fatal("old owner could complete someone else's search")
+		}
+		if err := repo.CompleteExternalSearch(ctx, "q", "new-owner"); err != nil {
+			t.Fatal(err)
+		}
+		if claim("q", "cached") {
+			t.Fatal("successful result was not cached")
+		}
+		if _, err := pool.Exec(ctx, `UPDATE job_external_search_cache SET refreshed_at=now()-interval '25 hours' WHERE cache_key='q'`); err != nil {
+			t.Fatal(err)
+		}
+		if !claim("q", "daily-refresh") {
+			t.Fatal("successful cache did not expire")
+		}
+		if err := repo.ReleaseExternalSearch(ctx, "q", "daily-refresh"); err != nil {
+			t.Fatal(err)
+		}
+		if !claim("q", "retry") {
+			t.Fatal("failed or interrupted query blocked its retry")
+		}
+		if _, err := pool.Exec(ctx, `INSERT INTO job_search_cache(cache_key,fetched_at) VALUES('legacy-poison',now())`); err != nil {
+			t.Fatal(err)
+		}
+		if !claim("legacy-poison", "recovered") {
+			t.Fatal("legacy canceled query poisoned new cache")
+		}
+		if !claim("backoff", "failed-owner") {
+			t.Fatal("failed-query fixture not claimed")
+		}
+		if err := repo.FailExternalSearch(ctx, "backoff", "failed-owner", time.Now().Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if claim("backoff", "premature-retry") {
+			t.Fatal("provider failure caused an immediate retry")
+		}
+		if _, err := pool.Exec(ctx, `UPDATE job_external_search_cache SET retry_at=now()-interval '1 second' WHERE cache_key='backoff'`); err != nil {
+			t.Fatal(err)
+		}
+		if !claim("backoff", "recovered-owner") {
+			t.Fatal("failed-query backoff did not expire")
+		}
+		results := make(chan bool, 20)
+		var claims sync.WaitGroup
+		for i := 0; i < 20; i++ {
+			claims.Add(1)
+			go func(i int) {
+				defer claims.Done()
+				owned, err := repo.ClaimExternalSearch(ctx, "concurrent", fmt.Sprintf("owner-%d", i), time.Minute, 24*time.Hour)
+				if err != nil {
+					t.Error(err)
+				}
+				results <- owned
+			}(i)
+		}
+		claims.Wait()
+		close(results)
+		owners := 0
+		for owned := range results {
+			if owned {
+				owners++
+			}
+		}
+		if owners != 1 {
+			t.Fatal("concurrent provider requests were not deduplicated", owners)
+		}
+	})
+	externalDown, err := os.ReadFile("../db/migrations/000008_external_job_search_cache.down.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, string(externalDown)); err != nil {
+		t.Fatal("external search down migration", err)
+	}
 	feedDown, err := os.ReadFile("../db/migrations/000007_himalayas_feed.down.sql")
 	if err != nil {
 		t.Fatal(err)

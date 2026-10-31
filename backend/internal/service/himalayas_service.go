@@ -115,13 +115,17 @@ func (s *JobService) refreshHimalayas(ctx context.Context) {
 		seen[cursor] = true
 	}
 	if err != nil {
-		status.Status = "error"
-		status.Message = "Remote feed sync paused. Collected listings remain available; the next attempt resumes from its saved page."
-		logJobError(workCtx, "himalayas_sync_paused", err, "operation", operation, "pages_committed", pages, "collected_total", status.JobCount, "duration_ms", time.Since(started).Milliseconds())
+		if workCtx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+			status.Status = "refreshing"
+			status.Message = "Remote feed collection is continuing from its saved page."
+			slog.Info("himalayas_sync_checkpointed", "reason", "pass_time_limit", "pages_committed", pages, "collected_total", status.JobCount)
+		} else {
+			status.Status = "error"
+			status.Message = "Remote feed sync paused. Collected listings remain available; the next attempt resumes from its saved page."
+			logJobError(workCtx, "himalayas_sync_paused", err, "operation", operation, "pages_committed", pages, "collected_total", status.JobCount, "duration_ms", time.Since(started).Milliseconds())
+		}
 	}
-	if err := s.repo.StoreStatus(ctx, status); err != nil {
-		logJobError(ctx, "himalayas_status_failed", err, "status", status.Status)
-	}
+	s.storeSourceStatus(ctx, status)
 }
 
 // A database lease spaces provider calls across workers, users and processes.
@@ -209,6 +213,9 @@ func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached 
 	}
 	if err != nil {
 		s.himalayasBackoff(ctx, err)
+		if ctx.Err() != nil {
+			s.releaseSearch(ctx, key, "himalayas-check")
+		}
 		logJobError(checkCtx, "himalayas_check_failed", err, "job_id", cached.ID, "using_cached", true)
 		cached.CheckFailed = true
 		return cached, nil // outages never close a job or erase its bookmark
@@ -228,6 +235,9 @@ func (s *JobService) verifyHimalayas(ctx context.Context, userID string, cached 
 		err = s.repo.StoreSource(ctx, "himalayas", []jobmap.Job{current}, false)
 	}
 	if err != nil {
+		if ctx.Err() != nil {
+			s.releaseSearch(ctx, key, "himalayas-check")
+		}
 		logJobError(ctx, "himalayas_check_save_failed", err, "job_id", cached.ID, "closed", closed)
 		return cached, err
 	}

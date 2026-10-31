@@ -76,7 +76,10 @@ func (s *feedTestStore) ClaimSearch(_ context.Context, key string, ttl time.Dura
 	s.leases[key] = time.Now().Add(ttl)
 	return true, nil
 }
-func (s *feedTestStore) ReleaseSearch(_ context.Context, key string) error {
+func (s *feedTestStore) ReleaseSearch(ctx context.Context, key string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	delete(s.leases, key)
 	return nil
 }
@@ -87,9 +90,27 @@ func (s *feedTestStore) ReserveRequest(_ context.Context, provider, period strin
 	s.requests++
 	return s.quota, nil
 }
-func (s *feedTestStore) StoreStatus(_ context.Context, status jobmap.SourceStatus) error {
+func (s *feedTestStore) StoreStatus(ctx context.Context, status jobmap.SourceStatus) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
 	s.status = status
 	return nil
+}
+
+func TestCanceledHimalayasPassReleasesLeaseAndPersistsStatus(t *testing.T) {
+	store := newFeedTestStore()
+	svc := NewJobService(store, jobmap.Config{})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	svc.client.HTTP.Transport = feedTestTransport(func(*http.Request) (*http.Response, error) { cancel(); return nil, context.Canceled })
+	svc.refreshHimalayas(ctx)
+	if _, exists := store.leases["himalayas-feed-refresh"]; exists {
+		t.Fatal("shutdown left refresh lock behind")
+	}
+	if store.status.Status != "error" {
+		t.Fatal("shutdown left source stuck refreshing", store.status)
+	}
 }
 func (s *feedTestStore) DelayFeed(_ context.Context, _ string, until time.Time) error {
 	s.progress.RetryAt = &until

@@ -26,6 +26,10 @@ type jobStore interface {
 	ReserveRequest(context.Context, string, string, int) (bool, error)
 	ClaimSearch(context.Context, string, time.Duration) (bool, error)
 	ReleaseSearch(context.Context, string) error
+	ClaimExternalSearch(context.Context, string, string, time.Duration, time.Duration) (bool, error)
+	CompleteExternalSearch(context.Context, string, string) error
+	ReleaseExternalSearch(context.Context, string, string) error
+	FailExternalSearch(context.Context, string, string, time.Time) error
 	Prune(context.Context) error
 	FeedProgress(context.Context, string) (jobmap.FeedProgress, error)
 	StoreFeedPage(context.Context, string, []jobmap.Job, jobmap.FeedProgress) error
@@ -34,13 +38,22 @@ type jobStore interface {
 }
 
 type JobService struct {
-	repo       jobStore
-	client     *jobmap.Client
-	cfg        jobmap.Config
-	refreshing atomic.Bool
-	searchGate chan struct{}
-	placeMu    sync.Mutex
-	placeCache map[string]placeCacheEntry
+	repo               jobStore
+	client             *jobmap.Client
+	cfg                jobmap.Config
+	refreshing         atomic.Bool
+	searchGate         chan struct{}
+	placeMu            sync.Mutex
+	placeCache         map[string]placeCacheEntry
+	externalGate       chan struct{}
+	externalRefreshing atomic.Bool
+	workMu             sync.Mutex
+	workCtx            context.Context
+	cancelWork         context.CancelFunc
+	workWG             sync.WaitGroup
+	started            bool
+	stopping           bool
+	stopped            chan struct{}
 }
 
 type placeCacheEntry struct {
@@ -49,39 +62,8 @@ type placeCacheEntry struct {
 }
 
 func NewJobService(repo jobStore, cfg jobmap.Config) *JobService {
-	return &JobService{repo: repo, cfg: cfg, client: jobmap.NewClient(cfg), searchGate: make(chan struct{}, 1), placeCache: map[string]placeCacheEntry{}}
-}
-
-// Start refreshes public company feeds in the background. Search never scrapes
-// a company page and never waits for the initial corpus to finish loading.
-func (s *JobService) Start(ctx context.Context) {
-	slog.Info("job_workers_started", "employer_sources", len(s.cfg.Companies), "employer_refresh_interval", s.cfg.RefreshInterval.String(), "himalayas_refresh_interval", himalayasRefreshInterval.String(), "himalayas_key_configured", s.cfg.HimalayasKey != "", "jsearch_key_configured", s.cfg.JSearchKey != "")
-	go func() {
-		s.refreshHimalayas(ctx)
-		ticker := time.NewTicker(15 * time.Minute)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.refreshHimalayas(ctx)
-			}
-		}
-	}()
-	go func() {
-		s.refresh(ctx)
-		ticker := time.NewTicker(s.cfg.RefreshInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				s.refresh(ctx)
-			}
-		}
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	return &JobService{repo: repo, cfg: cfg, client: jobmap.NewClient(cfg), searchGate: make(chan struct{}, 1), placeCache: map[string]placeCacheEntry{}, externalGate: make(chan struct{}, 1), workCtx: ctx, cancelWork: cancel, stopped: make(chan struct{})}
 }
 
 func (s *JobService) refresh(ctx context.Context) {
@@ -166,7 +148,7 @@ func (s *JobService) refresh(ctx context.Context) {
 	}
 	wg.Wait()
 	// Allow another attempt after an outage, without retrying on each user search.
-	if failed.Load() {
+	if failed.Load() || ctx.Err() != nil {
 		s.releaseSearch(ctx, "company-feed-refresh", "employers")
 	}
 	if err := s.repo.Prune(ctx); err != nil {
@@ -209,8 +191,12 @@ func (s *JobService) Search(ctx context.Context, userID string, search jobmap.Se
 	if userID == "" {
 		return jobmap.SearchResult{}, ErrNotFound
 	}
+	if err := ctx.Err(); err != nil {
+		return jobmap.SearchResult{}, err
+	}
+	queued := false
 	if !search.SavedOnly && s.cfg.JSearchKey != "" && search.SourceKind != "company" && search.SourceKind != "career_page" {
-		s.searchExternal(ctx, search)
+		queued = s.queueExternal(ctx, search)
 	}
 	jobs, err := s.repo.List(ctx, userID, search.SavedOnly)
 	if err != nil {
@@ -238,66 +224,8 @@ func (s *JobService) Search(ctx context.Context, userID string, search jobmap.Se
 	if err != nil {
 		return jobmap.SearchResult{}, err
 	}
-	result.Refreshing = s.refreshing.Load()
+	result.Refreshing = queued || s.refreshing.Load() || s.externalRefreshing.Load()
 	return result, nil
-}
-
-func (s *JobService) searchExternal(ctx context.Context, search jobmap.Search) {
-	query, country := jobmap.ExternalSearch(search)
-	if query == "" {
-		return
-	} // no default US search for a global user
-	// Repeated pans, pages and filters share the same daily provider search.
-	key := "jsearch:" + strings.ToLower(country+":"+query)
-	select {
-	case s.searchGate <- struct{}{}:
-		defer func() { <-s.searchGate }()
-	default:
-		return
-	}
-	claimed, err := s.repo.ClaimSearch(ctx, key, 24*time.Hour)
-	if err != nil {
-		logJobError(ctx, "jsearch_lease_failed", err)
-		return
-	}
-	if !claimed {
-		slog.Debug("jsearch_skipped", "reason", "query_cached")
-		return
-	}
-	reserved, err := s.repo.ReserveRequest(ctx, "jsearch", time.Now().UTC().Format("2006-01"), s.cfg.JSearchLimit)
-	if err != nil || !reserved {
-		s.releaseSearch(ctx, key, "jsearch")
-		if err != nil {
-			logJobError(ctx, "jsearch_budget_failed", err)
-			s.storeSourceStatus(ctx, jobmap.SourceStatus{ID: "jsearch", Name: "JSearch", Kind: "aggregator", Status: "error", Message: "Broad search is unavailable. Showing available indexed listings."})
-		} else {
-			slog.Warn("jsearch_quota_exhausted", "monthly_limit", s.cfg.JSearchLimit)
-			s.storeSourceStatus(ctx, jobmap.SourceStatus{ID: "jsearch", Name: "JSearch", Kind: "aggregator", Status: "quota_exhausted", Message: "Broad search has reached its prototype request budget. Cached and company-feed jobs remain available."})
-		}
-		return
-	}
-	started := time.Now()
-	slog.Info("jsearch_started", "country", country)
-	jobs, err := s.client.FetchJSearch(ctx, query, country)
-	if err == nil {
-		valid := []jobmap.Job{}
-		now := time.Now().UTC()
-		for _, j := range jobs {
-			if job, ok := jobmap.Prepare(j, now); ok {
-				valid = append(valid, job)
-			}
-		}
-		err = s.repo.StoreSource(ctx, "jsearch", valid, false)
-		if err == nil {
-			s.storeSourceStatus(ctx, jobmap.SourceStatus{ID: "jsearch", Name: "JSearch", Kind: "aggregator", Status: "ready", JobCount: len(valid), RefreshedAt: &now})
-			slog.Info("jsearch_completed", "received", len(jobs), "accepted", len(valid), "duration_ms", time.Since(started).Milliseconds())
-		}
-	}
-	if err != nil {
-		logJobError(ctx, "jsearch_failed", err, "duration_ms", time.Since(started).Milliseconds())
-		s.releaseSearch(ctx, key, "jsearch")
-		s.storeSourceStatus(ctx, jobmap.SourceStatus{ID: "jsearch", Name: "JSearch", Kind: "aggregator", Status: "error", Message: "Broad search is unavailable. Showing available indexed listings."})
-	}
 }
 
 func (s *JobService) Get(ctx context.Context, userID, id string) (jobmap.Job, error) {
@@ -361,6 +289,9 @@ func (s *JobService) Places(ctx context.Context, query string) ([]jobmap.Place, 
 	places, err := s.client.Geocode(ctx, query)
 	if err != nil {
 		logJobError(ctx, "geocoding_failed", err)
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		return nil, fmt.Errorf("location search is unavailable; try a major city: %w", ErrValidation)
 	}
 	s.placeMu.Lock()

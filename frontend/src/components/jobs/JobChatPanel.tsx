@@ -45,13 +45,18 @@ export default function JobChatPanel({ chat, active, saved, onManual }: { chat: 
     stickToBottom.current = true
     void chat.send(text)
   }
+  function clearConversation() {
+    chat.clear()
+    setInput('')
+    textareaRef.current?.focus()
+  }
   function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); send() }
   }
 
   return <section className="assistant-panel jobs-chat-panel" aria-label="Job search assistant">
     <header className="assistant-header">
-      <div className="jobs-chat-heading"><div><span className="jobs-chat-mark"><Sparkles size={16} aria-hidden /></span><h2>Job search assistant</h2></div><Button variant="ghost" size="icon-sm" aria-label="Clear job search conversation" disabled={chat.messages.length === 0 && !chat.thinking} onClick={() => { chat.clear(); setInput(''); textareaRef.current?.focus() }}><RotateCcw size={15} /></Button></div>
+      <div className="jobs-chat-heading"><div><span className="jobs-chat-mark"><Sparkles size={16} aria-hidden /></span><h2>Job search assistant</h2></div><Button variant="ghost" size="icon-sm" aria-label="Clear job search conversation" disabled={chat.messages.length === 0 && !chat.thinking} onClick={clearConversation}><RotateCcw size={15} /></Button></div>
       <div className="assistant-scope"><span>{saved ? <Bookmark size={12} /> : <BriefcaseBusiness size={12} />}{saved ? 'Saved jobs' : 'Worldwide tech jobs'}</span><button type="button" onClick={onManual}><SlidersHorizontal size={12} />Edit filters</button></div>
     </header>
     <div className="jobs-chat-history-wrap">
@@ -70,7 +75,7 @@ export default function JobChatPanel({ chat, active, saved, onManual }: { chat: 
     </div>
     {chat.error && <div className="jobs-chat-error" role="alert"><p>{chat.error}</p><div><Button variant="ghost" size="sm" disabled={chat.thinking} onClick={() => void chat.retry()}>Retry request</Button><Button variant="ghost" size="sm" onClick={onManual}>Manual search</Button></div></div>}
     <form className="jobs-chat-composer" onSubmit={event => { event.preventDefault(); send() }}>
-      <div className="assistant-composer"><Textarea ref={textareaRef} value={input} onChange={event => setInput(event.target.value)} onKeyDown={onKeyDown} maxLength={2000} rows={3} disabled={chat.thinking} aria-label="Message the job search assistant" placeholder={saved ? 'How would you like to filter your saved jobs?' : 'Describe your next role, or refine this search…'} /><div className="jobs-chat-composer-actions"><span>Enter to send · Shift+Enter for a new line</span>{chat.thinking ? <Button type="button" size="icon" variant="secondary" className="rounded-full" onClick={chat.cancel} aria-label="Stop job assistant response"><Square size={14} /></Button> : <Button type="submit" size="icon" className="rounded-full" disabled={!input.trim()} aria-label="Send job search message"><Send size={14} /></Button>}</div></div>
+      <div className="assistant-composer"><Textarea ref={textareaRef} value={input} onChange={event => setInput(event.target.value)} onKeyDown={onKeyDown} maxLength={2000} rows={3} disabled={chat.thinking} aria-label="Message the job search assistant" placeholder={saved ? 'How would you like to filter your saved jobs?' : 'Describe your next role, or refine this search…'} /><div className="jobs-chat-composer-actions">{(chat.messages.length > 0 || chat.thinking) && <button type="button" className="jobs-mobile-clear" aria-label="Clear job search conversation" onClick={clearConversation}><RotateCcw size={16} aria-hidden /></button>}<span>Enter to send · Shift+Enter for a new line</span>{chat.thinking ? <Button type="button" size="icon" variant="secondary" className="rounded-full" onClick={chat.cancel} aria-label="Stop job assistant response"><Square size={14} /></Button> : <Button type="submit" size="icon" className="rounded-full" disabled={!input.trim()} aria-label="Send job search message"><Send size={14} /></Button>}</div></div>
       <p className="jobs-chat-footnote">Search criteria stay visible in results. You can edit them in Manual search.</p>
     </form>
   </section>

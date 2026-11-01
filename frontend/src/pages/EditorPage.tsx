@@ -508,6 +508,8 @@ function EditorPageContent() {
         resume={data.resume}
         mode={mode}
         onModeChange={changeMode}
+        mobilePreview={mobilePreview}
+        onMobilePreviewChange={setMobilePreview}
       />
       {importWarnings.length > 0 && (
         <div role="status" className="mx-4 mt-2 flex max-h-32 shrink-0 items-start gap-3 overflow-y-auto rounded-2xl bg-secondary px-4 py-3 text-xs leading-relaxed sm:mx-6">
@@ -524,30 +526,6 @@ function EditorPageContent() {
           </button>
         </div>
       )}
-      <div
-        className="mobile-view-switch"
-        role="group"
-        aria-label="Workspace surface"
-      >
-        <button
-          type="button"
-          aria-pressed={!mobilePreview}
-          onClick={() => setMobilePreview(false)}
-        >
-          {mode === 'chat'
-            ? 'Assistant'
-            : mode === 'design'
-              ? 'Design'
-              : 'Edit'}
-        </button>
-        <button
-          type="button"
-          aria-pressed={mobilePreview}
-          onClick={() => setMobilePreview(true)}
-        >
-          Preview
-        </button>
-      </div>
       <div
         className="workspace-content"
         data-mode={mode}

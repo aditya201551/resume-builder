@@ -27,6 +27,7 @@ import { isDraftDirty } from '@/lib/resumeDraftSync'
 import { useResumePdf } from '@/hooks/useResumePdf'
 import { downloadPdfBlob } from '@/lib/pdf/download'
 import { cn } from '@/lib/utils'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import Brand from '@/components/layout/Brand'
 import type { Resume } from '@/types/resume'
 
@@ -103,7 +104,7 @@ function DownloadButton({ resume }: { resume: Resume }) {
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="workspace-export flex items-center gap-2">
       {error && (
         <span className="max-w-40 text-xs text-destructive" role="alert">
           {error}
@@ -112,7 +113,9 @@ function DownloadButton({ resume }: { resume: Resume }) {
       <Button
         type="button"
         size="sm"
-        className="h-9 rounded-xl px-3"
+        className="workspace-export-button h-9 rounded-xl px-3"
+        aria-label={phase === 'generating' ? 'Generating PDF' : 'Export PDF'}
+        title="Export PDF"
         disabled={phase !== 'idle'}
         onClick={handleDownload}
       >
@@ -121,9 +124,9 @@ function DownloadButton({ resume }: { resume: Resume }) {
         ) : (
           <Download className="size-3.5" />
         )}
-        {phase === 'generating'
+        <span className="workspace-export-label">{phase === 'generating'
             ? 'Generating…'
-            : 'Export PDF'}
+            : 'Export PDF'}</span>
       </Button>
     </div>
   )
@@ -151,7 +154,8 @@ function SyncStatus() {
         ) : syncStatus !== 'error' ? (
           <Check className="size-3" aria-hidden />
         ) : null}
-      {label}
+      <span className="workspace-sync-label">{label}</span>
+      <span className="workspace-sync-compact">{syncStatus === 'error' ? 'Sync issue' : syncStatus === 'syncing' || dirty ? 'Syncing…' : 'Saved'}</span>
     </span>
   )
 }
@@ -245,10 +249,15 @@ const NAV_ITEMS = [
 function EditorNavItems({
   mode,
   onModeChange,
+  mobilePreview,
+  onMobilePreviewChange,
 }: {
   mode: EditorMode
   onModeChange: (mode: EditorMode) => void
+  mobilePreview: boolean
+  onMobilePreviewChange: (preview: boolean) => void
 }) {
+  const mobile = useMediaQuery('(max-width: 899px)')
   const index = NAV_ITEMS.findIndex((item) => item.key === mode)
   return (
     <nav className="workspace-mode-picker" aria-label="Editor mode">
@@ -264,13 +273,23 @@ function EditorNavItems({
           key={key}
           type="button"
           className="workspace-mode-button"
-          aria-pressed={mode === key}
-          onClick={() => onModeChange(key)}
+          aria-pressed={mode === key && !(mobile && mobilePreview)}
+          aria-label={label}
+          onClick={() => { onMobilePreviewChange(false); onModeChange(key) }}
         >
           <Icon className="size-3.5" aria-hidden />
-          {label}
+          <span className="workspace-mode-label">{label}</span>
+          <span className="workspace-mode-short">{key === 'chat' ? 'AI' : label}</span>
         </button>
       ))}
+      <button
+        type="button"
+        className="workspace-mode-button workspace-mobile-preview"
+        aria-pressed={mobilePreview}
+        onClick={() => onMobilePreviewChange(true)}
+      >
+        Preview
+      </button>
     </nav>
   )
 }
@@ -279,10 +298,14 @@ export default function EditorNavbar({
   resume,
   mode,
   onModeChange,
+  mobilePreview,
+  onMobilePreviewChange,
 }: {
   resume: Resume
   mode: EditorMode
   onModeChange: (mode: EditorMode) => void
+  mobilePreview: boolean
+  onMobilePreviewChange: (preview: boolean) => void
 }) {
   return (
     <header className="workspace-navbar">
@@ -295,14 +318,14 @@ export default function EditorNavbar({
         >
           <Brand compact />
         </Link>
-        <div className="min-w-0">
+        <div className="workspace-resume-info min-w-0">
           <EditableResumeName resume={resume} />
-          <div className="mt-1">
+          <div className="workspace-sync-wrap mt-1">
             <SyncStatus />
           </div>
         </div>
       </div>
-      <EditorNavItems mode={mode} onModeChange={onModeChange} />
+      <EditorNavItems mode={mode} onModeChange={onModeChange} mobilePreview={mobilePreview} onMobilePreviewChange={onMobilePreviewChange} />
       <div className="workspace-actions">
         <DownloadButton resume={resume} />
       </div>

@@ -16,6 +16,7 @@ import {
   Loader2,
   Palette,
   Plus,
+  SlidersHorizontal,
   SpellCheck,
   Square,
   X,
@@ -23,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Message, MessageContent } from '@/components/ui/message'
+import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ActionItem from '@/components/agent/ActionItem'
 import ChatMarkdown from '@/components/agent/ChatMarkdown'
 import CopyButton from '@/components/agent/CopyButton'
@@ -525,6 +527,18 @@ export default function ChatPanel({
                 </span>
                 <span>Auto-accept</span>
               </button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button type="button" className="resume-composer-settings" aria-label="Assistant options" title="Assistant options">
+                    <SlidersHorizontal className="size-4" aria-hidden />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-56">
+                  <DropdownMenuCheckboxItem checked={autoAccept} onCheckedChange={setAutoAccept}>
+                    Auto-accept edits
+                  </DropdownMenuCheckboxItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {isStreaming ? (

@@ -67,7 +67,7 @@ export default function JobsPage({ saved = false }: { saved?: boolean }) {
   ? `Remote · ${b.country ? `work from ${countryLabel(b.country)}` : 'any hiring region'}`
   : `${b.workplace === 'all' ? 'Any arrangement' : workplaceLabels[b.workplace]} · ${[b.city, countryLabel(b.country)].filter(Boolean).join(', ') || 'choose an office country'}`)
  return <section className="jobs-page">
-  <header className="jobs-heading"><div><h1>Job search</h1><p>Find your next role with the assistant or search manually.</p></div><Button variant="ghost" size="sm" onClick={copySearch}><Copy size={14} />Copy search</Button></header>
+  <header className="jobs-heading"><div><h1>Job search</h1><p>Find your next role with the assistant or search manually.</p></div><Button className="jobs-copy-search" aria-label="Copy search" title="Copy search" variant="ghost" size="sm" onClick={copySearch}><Copy size={14} /><span>Copy search</span></Button></header>
   <div className="jobs-workspace-toolbar">
    <nav className="jobs-source-tabs" aria-label="Jobs navigation"><NavLink to="/jobs" end>Discover</NavLink><NavLink to="/jobs/saved"><Bookmark size={14} />Saved jobs</NavLink></nav>
    <div className="jobs-mode-picker" role="group" aria-label="Job search mode">
@@ -75,7 +75,7 @@ export default function JobsPage({ saved = false }: { saved?: boolean }) {
     <button type="button" className="workspace-mode-button" aria-pressed={mode === 'manual'} aria-controls="jobs-manual-pane" onClick={() => changeMode('manual')}><SlidersHorizontal size={15} />Manual search</button>
    </div>
   </div>
-  <div className="jobs-mobile-surface" role="group" aria-label="Job search surface"><button type="button" aria-pressed={!mobileResults} onClick={() => setMobileResults(false)}>{mode === 'assistant' ? 'Assistant' : 'Filters'}</button><button type="button" aria-pressed={mobileResults} onClick={() => setMobileResults(true)}>Results{jobs.length > 0 && ` (${jobs.length})`}</button></div>
+  <div className="jobs-mobile-surface" role="group" aria-label="Job search surface"><button type="button" aria-pressed={mode === 'assistant' && !mobileResults} onClick={() => changeMode('assistant')}>AI assistant</button><button type="button" aria-pressed={mode === 'manual' && !mobileResults} onClick={() => changeMode('manual')}>Filters</button><button type="button" aria-pressed={mobileResults} onClick={() => setMobileResults(true)}>Results{jobs.length > 0 && ` (${jobs.length})`}</button></div>
   <div className="jobs-workspace" data-mobile-results={mobileResults}>
    <div className="jobs-controls">
     <div className="jobs-control-pane" id="jobs-assistant-pane" hidden={mode !== 'assistant'}><JobChatPanel chat={chat} active={mode === 'assistant' && !mobileResults} saved={saved} onManual={() => changeMode('manual')} /></div>

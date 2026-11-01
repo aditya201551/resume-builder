@@ -22,6 +22,7 @@ import {
 import { apiDelete, apiGet, apiPost } from '@/lib/http'
 import { ASSISTANT_STARTERS, type AssistantTask } from '@/lib/assistantTask'
 import { useAuth } from '@/hooks/useAuth'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { Resume } from '@/types/resume'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +60,7 @@ export default function DashboardPage({
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { user } = useAuth()
+  const mobile = useMediaQuery('(max-width: 767px)')
   const [prompt, setPrompt] = useState('')
   const [selection, setSelection] = useState('')
   const [jobOpen, setJobOpen] = useState(false)
@@ -66,6 +68,7 @@ export default function DashboardPage({
   const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  const [examplesOpen, setExamplesOpen] = useState(false)
   const resumesQuery = useQuery({
     queryKey: resumesKey,
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
@@ -221,15 +224,17 @@ export default function DashboardPage({
                   onClick={() => setJobOpen(!jobOpen)}
                   aria-expanded={jobOpen}
                   aria-controls="home-job"
+                  aria-label={jobDescription.trim() ? 'Edit job description' : 'Add job description'}
                 >
                   {jobDescription.trim() ? (
                     <Check className="size-3.5" />
                   ) : (
                     <Plus className="size-3.5" />
                   )}{' '}
-                  {jobDescription.trim()
+                  <span className="home-context-full">{jobDescription.trim()
                     ? 'Job context added'
-                    : 'Job description'}
+                    : 'Job description'}</span>
+                  <span className="home-context-short">Job context</span>
                 </button>
               </div>
               <Button
@@ -252,7 +257,16 @@ export default function DashboardPage({
               </Button>
             </div>
           </form>
-          <div className="starter-grid">
+          <button
+            type="button"
+            className="home-examples-toggle"
+            aria-expanded={examplesOpen}
+            aria-controls="home-starter-actions"
+            onClick={() => setExamplesOpen(!examplesOpen)}
+          >
+            Try an example <ChevronDown className="size-4" aria-hidden />
+          </button>
+          <div id="home-starter-actions" className={`starter-grid${examplesOpen ? ' is-expanded' : ''}`}>
             {ASSISTANT_STARTERS.map((starter, index) => {
               const Icon = starterIcons[index]
               return (
@@ -262,6 +276,7 @@ export default function DashboardPage({
                   className="starter-button"
                   onClick={() => {
                     setPrompt(starter.prompt)
+                    setExamplesOpen(false)
                     if (index === 2) setJobOpen(true)
                     document.getElementById('home-prompt')?.focus()
                   }}
@@ -289,16 +304,25 @@ export default function DashboardPage({
             >
               <Plus className="size-4" aria-hidden /> Create manually
             </button>
+            <button type="button" className="home-mobile-import" onClick={() => setImportOpen(true)}>
+              <FileUp className="size-4" aria-hidden /> Import resume
+            </button>
           </div>
           {error && (
             <div role="alert" className="home-notice">
               <p>That change couldn’t be completed. Please try again.</p>
             </div>
           )}
+          {mobile && resumesQuery.isError && (
+            <div role="alert" className="home-notice">
+              <p>We couldn’t load your resumes.</p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void resumesQuery.refetch()}>Try again</Button>
+            </div>
+          )}
         </section>
       )}
 
-      {!libraryOnly && (
+      {!libraryOnly && !mobile && (
         <RecentResumes
           resumes={resumes}
           isLoading={resumesQuery.isLoading}
@@ -318,7 +342,7 @@ export default function DashboardPage({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => setImportOpen(true)}>
-              <FileUp className="size-4" /> Import existing resume
+              <FileUp className="size-4" /> <span>Import<span className="library-import-extra"> existing</span> resume</span>
             </Button>
             <Button
               variant="outline"

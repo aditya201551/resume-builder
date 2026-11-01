@@ -1,5 +1,5 @@
-﻿/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral (dealt 1/3) · redesign: full */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: S; grounded the system in resume documents. */
+/* Hallmark · shape: app screen · genre: atmospheric · theme: Cobalt and ember (by request) · redesign: full · surface: absolute (PDF paper) · v2.0.0 */
+/* Hallmark · critique: expressive AI entry surfaces, opaque reading panes, independent PDF styling. */
 :root {
   color-scheme: light;
   --space-3xs: 2px;
@@ -26,51 +26,47 @@
   --font-body: "Geist Variable", sans-serif;
   --display-weight: 550;
   --tracking-display: -0.04em;
-  --color-paper: oklch(97% 0.006 55);
-  --color-paper-2: oklch(94.5% 0.007 55);
-  --color-paper-3: oklch(91.5% 0.009 55);
-  --color-cotton: oklch(98.8% 0.0045 80);
-  --color-desk: oklch(92% 0.009 64);
-  --color-ink: oklch(23% 0.012 38);
-  --color-ink-2: oklch(32% 0.013 40);
-  --color-ink-muted: oklch(47% 0.013 45);
-  --color-rule: oklch(86% 0.009 55);
-  --color-rule-2: oklch(62% 0.011 55);
-  --color-signal: oklch(54% 0.165 29);
-  --color-focus: oklch(54% 0.17 30);
+  --color-paper: oklch(99.7% 0.002 265);
+  --color-paper-2: oklch(95% 0.012 265);
+  --color-paper-3: oklch(91.8% 0.021 265);
+  --color-cotton: oklch(99.8% 0.002 265);
+  --color-desk: oklch(93% 0.016 265);
+  --color-ink: oklch(23% 0.025 265);
+  --color-ink-2: oklch(34% 0.027 265);
+  --color-ink-muted: oklch(47% 0.025 265);
+  --color-rule: oklch(88% 0.018 265);
+  --color-rule-2: oklch(70% 0.027 265);
+  --color-signal: oklch(49% 0.22 263);
+  --color-focus: oklch(49% 0.22 263);
   --color-error: oklch(49% 0.18 27);
   --color-success: oklch(43% 0.1 150);
   --color-pdf-paper: #fff;
-  --color-disabled-fill: oklch(92% 0.006 55);
-  --color-disabled-ink: oklch(52% 0.01 45);
-  --shadow-paper: 0 2px 4px oklch(23% 0.012 38 / 0.05), 0 12px 28px oklch(23% 0.012 38 / 0.07);
-  --shadow-control: 0 1px 2px oklch(23% 0.012 38 / 0.05);
-  --radius-card: 8px;
-  --radius-input: 6px;
+  --color-disabled-fill: oklch(93% 0.008 265);
+  --color-disabled-ink: oklch(51% 0.018 265);
+  --shadow-paper: 0 2px 4px oklch(23% 0.025 265 / 0.05), 0 12px 28px oklch(23% 0.025 265 / 0.07);
+  --shadow-control: 0 1px 2px oklch(23% 0.025 265 / 0.05);
+  --radius-card: 16px;
+  --radius-input: 9px;
   --container: 1440px;
   --motion-fast: 120ms;
-  --motion-standard: 160ms;
-  --motion-panel: 200ms;
+  --motion-standard: 180ms;
+  --motion-panel: 240ms;
   --motion-ease: cubic-bezier(0.2, 0, 0.38, 0.9);
-}
-:root.dark {
-  color-scheme: dark;
-  --color-paper: oklch(18% 0.008 55);
-  --color-paper-2: oklch(22% 0.009 55);
-  --color-paper-3: oklch(27% 0.01 55);
-  --color-cotton: oklch(21% 0.008 80);
-  --color-desk: oklch(15% 0.009 64);
-  --color-ink: oklch(94% 0.012 38);
-  --color-ink-2: oklch(86% 0.013 40);
-  --color-ink-muted: oklch(72% 0.013 45);
-  --color-rule: oklch(34% 0.009 55);
-  --color-rule-2: oklch(53% 0.011 55);
-  --color-signal: oklch(77% 0.12 29);
-  --color-focus: oklch(77% 0.13 30);
-  --color-error: oklch(75% 0.13 27);
-  --color-success: oklch(74% 0.1 150);
-  --color-disabled-fill: oklch(27% 0.006 55);
-  --color-disabled-ink: oklch(64% 0.01 45);
-  --shadow-paper: none;
-  --shadow-control: none;
+
+  --color-ember: oklch(65% 0.19 30);
+  --color-on-signal: oklch(99% 0.006 265);
+  --color-signal-soft: oklch(94% 0.03 263);
+  --color-halo-cobalt: oklch(65% 0.19 263 / 0.62);
+  --color-halo-ember: oklch(75% 0.17 28 / 0.60);
+  --color-halo-peach: oklch(88% 0.11 65 / 0.72);
+  --color-halo-soft: oklch(66% 0.15 263 / 0.10);
+  --color-clear: transparent;
+  --shadow-composer: 0 4px 8px oklch(23% 0.025 265 / 0.04), 0 20px 60px oklch(23% 0.025 265 / 0.12);
+  --radius-composer: 22px;
+  --radius-stage: 28px;
+  --color-field-focus: oklch(52% 0.008 265);
+  --color-glass: oklch(100% 0.002 265 / 0.52);
+  --color-glass-rule: oklch(100% 0.002 265 / 0.75);
+  --color-glass-selected: oklch(100% 0.002 265 / 0.72);
+  --shadow-glass: 0 2px 12px oklch(23% 0.025 265 / 0.04), inset 0 1px 0 oklch(100% 0.002 265 / 0.8);
 }

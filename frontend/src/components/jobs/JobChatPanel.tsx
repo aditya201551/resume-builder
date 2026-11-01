@@ -29,7 +29,10 @@ export default function JobChatPanel({ chat, active, saved, onManual }: { chat: 
   }, [])
 
   useEffect(() => {
-    if (active && stickToBottom.current) scrollToBottom()
+    if (active && stickToBottom.current) {
+      if (chat.messages.length > 0 || chat.thinking) scrollToBottom()
+      else if (scrollRef.current) scrollRef.current.scrollTop = 0
+    }
   }, [active, chat.messages, chat.thinking, scrollToBottom])
 
   useEffect(() => {

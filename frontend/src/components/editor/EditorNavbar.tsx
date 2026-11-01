@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useBlocker } from 'react-router'
+import * as m from 'motion/react-m'
 import {
   ArrowLeft,
   Check,
@@ -251,9 +252,11 @@ function EditorNavItems({
   const index = NAV_ITEMS.findIndex((item) => item.key === mode)
   return (
     <nav className="workspace-mode-picker" aria-label="Editor mode">
-      <span
+      <m.span
         className="workspace-mode-indicator"
-        style={{ transform: `translateX(${index * 100}%)` }}
+        initial={false}
+        animate={{ x: `${index * 100}%` }}
+        transition={{ duration: 0.22, ease: [0.2, 0, 0.38, 0.9] }}
         aria-hidden
       />
       {NAV_ITEMS.map(({ key, label, icon: Icon }) => (

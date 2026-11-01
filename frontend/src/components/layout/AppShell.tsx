@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from 'react-router'
+import { NavLink, Outlet, useLocation } from 'react-router'
 import {
   BriefcaseBusiness,
   ChevronDown,
@@ -18,6 +18,7 @@ import Brand from '@/components/layout/Brand'
 import { cn } from '@/lib/utils'
 
 export default function AppShell() {
+  const { pathname } = useLocation()
   const { user, logout } = useAuth()
   const name = user?.name || user?.email || 'Your workspace'
   const initials = name
@@ -29,8 +30,8 @@ export default function AppShell() {
     .toUpperCase()
 
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
+    <div className={cn('app-shell', pathname === '/resumes' && 'app-shell-home')}>
+      <header className="app-sidebar">
         <NavLink
           to="/resumes"
           className="brand-link"
@@ -56,6 +57,7 @@ export default function AppShell() {
             </NavLink>
           ))}
         </nav>
+        <div className="app-account">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
@@ -92,7 +94,8 @@ export default function AppShell() {
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-      </aside>
+        </div>
+      </header>
       <main className="app-main">
         <Outlet />
       </main>

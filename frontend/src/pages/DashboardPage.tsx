@@ -118,13 +118,11 @@ export default function DashboardPage({
         state: { assistantTask: task },
       })
   }
-  const shownResumes = libraryOnly
-    ? resumes.filter((resume) =>
-        `${resume.label} ${resume.full_name}`
-          .toLowerCase()
-          .includes(search.toLowerCase()),
-      )
-    : resumes.slice(0, 4)
+  const shownResumes = resumes.filter((resume) =>
+    `${resume.label} ${resume.full_name}`
+      .toLowerCase()
+      .includes(search.toLowerCase()),
+  )
   const error =
     createMutation.isError ||
     duplicateMutation.isError ||
@@ -135,13 +133,10 @@ export default function DashboardPage({
       {!libraryOnly && (
         <section className="home-intro" aria-labelledby="home-heading">
           <h1 id="home-heading">
-            Your experience,{' '}
-            <br />
-            on the page.
+            What are we working toward?
           </h1>
           <p>
-            {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} turn
-            your experience into a resume that feels like you.
+            {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} make your next move.
           </p>
           <form className="home-composer" onSubmit={startAssistant}>
             <label htmlFor="home-prompt" className="composer-label">
@@ -234,7 +229,7 @@ export default function DashboardPage({
                 ) : (
                   <Sparkles className="size-4" />
                 )}{' '}
-                Start with AI <ArrowRight className="size-4" />
+                Start with AI
               </Button>
             </div>
           </form>
@@ -268,38 +263,35 @@ export default function DashboardPage({
             })}
           </div>
           <div className="manual-start">
-            Prefer to start with a blank page?{' '}
             <button
               type="button"
               onClick={() => createMutation.mutate(undefined)}
               disabled={createMutation.isPending}
             >
-              Create manually <ArrowRight className="size-3" aria-hidden />
+              <Plus className="size-4" aria-hidden /> Create manually
+            </button>
+            <button type="button" onClick={() => setImportOpen(true)}>
+              <FileUp className="size-4" aria-hidden /> Import existing resume
             </button>
           </div>
+          {(error || resumesQuery.isError) && (
+            <div role="alert" className="home-notice">
+              <p>{resumesQuery.isError ? 'We couldn’t load your resumes.' : 'That change couldn’t be completed. Please try again.'}</p>
+              {resumesQuery.isError && <Button type="button" variant="outline" size="sm" onClick={() => void resumesQuery.refetch()}>Try again</Button>}
+            </div>
+          )}
         </section>
       )}
 
-      <section className="resume-library" aria-labelledby="library-heading">
+      {libraryOnly && <section className="resume-library" aria-labelledby="library-heading">
         <div className="library-heading">
           <div>
-            <h1 id="library-heading" className="library-title">
-              {libraryOnly
-                ? 'My resumes'
-                : 'Recent resumes'}
-            </h1>
-            {libraryOnly && (
+            <h1 id="library-heading" className="library-title">My resumes</h1>
               <p className="mt-2 text-sm text-muted-foreground">
                 A version for every opportunity. Your original is always yours.
               </p>
-            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {!libraryOnly && resumes.length > 0 && (
-              <Link to="/resumes/library" className="view-all-link">
-                View all <ArrowRight className="size-3.5" />
-              </Link>
-            )}
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp className="size-4" /> Import existing resume
             </Button>
@@ -312,7 +304,6 @@ export default function DashboardPage({
             </Button>
           </div>
         </div>
-        {libraryOnly && (
           <div className="library-search">
             <Search className="size-4 text-muted-foreground" aria-hidden />
             <Input
@@ -322,7 +313,6 @@ export default function DashboardPage({
               placeholder="Find a resume…"
             />
           </div>
-        )}
         {error && (
           <p role="alert" className="mb-4 text-sm text-destructive">
             That change couldn’t be completed. Please try again.
@@ -355,7 +345,7 @@ export default function DashboardPage({
             <p>
               {search
                 ? 'Try another name.'
-                : 'Start with the assistant above or create a blank resume.'}
+                : 'Import an existing resume or create a blank one.'}
             </p>
           </div>
         ) : (
@@ -429,13 +419,13 @@ export default function DashboardPage({
             ))}
           </div>
         )}
-      </section>
-      <footer className="dashboard-footer">
+      </section>}
+      {libraryOnly && <footer className="dashboard-footer">
         <span className="inline-flex items-center gap-1.5">
           <Sparkles className="size-3" aria-hidden /> Your experience. Your
           words. You’re in control.
         </span>
-      </footer>
+      </footer>}
       <ImportResumeDialog open={importOpen} onOpenChange={setImportOpen} />
       <AlertDialog
         open={deleteTarget !== null}

@@ -401,7 +401,7 @@ export default function DesignMode() {
   function goToSection(key: string) {
     setActiveCategory(key)
     suppressObserverUntilRef.current = Date.now() + CLICK_SCROLL_SUPPRESS_MS
-    sectionElsRef.current.get(key)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    sectionElsRef.current.get(key)?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' })
   }
 
   return (

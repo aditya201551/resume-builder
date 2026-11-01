@@ -111,7 +111,7 @@ function ToolActivity({
       ) : isError ? (
         <X className="size-3.5 text-destructive" />
       ) : (
-        <Check className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+        <Check className="size-3.5 text-emerald-600 " />
       )}
       <span>{label}</span>
       {isRunning && (
@@ -360,7 +360,7 @@ export default function ChatPanel({
       <header className="assistant-header">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-secondary text-primary">
+            <span className="assistant-mark" data-working={isStreaming}>
               <Sparkles className="size-4" aria-hidden />
             </span>
             <h1>Resume assistant</h1>
@@ -422,7 +422,7 @@ export default function ChatPanel({
           onScroll={handleScroll}
           className="h-full overflow-y-auto scroll-smooth"
         >
-          <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 px-4 py-6">
+          <div className="assistant-conversation mx-auto flex w-full max-w-2xl flex-col gap-6 px-5 py-6">
             {messages.length === 0 && !streamingParts && (
               <div className="assistant-welcome">
                 <h2>

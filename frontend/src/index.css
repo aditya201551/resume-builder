@@ -1,7 +1,5 @@
-/* Hallmark · shape: app screen · genre: modern-minimal · theme: Coral (dealt 1/3) · redesign: full
- * nav: compact workspace bar · signature: the resume on a writing desk · states: loading, empty, error, full
- * axes: light/grotesk-sans/warm · posture: restrained · modes: light+dark · v2.0.0 */
-/* Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4 · weakest: S; replaced promotional chrome with document-led working surfaces. */
+/* Hallmark · shape: app screen · genre: atmospheric · theme: Cobalt and ember (by request) · redesign: full · v2.0.0 */
+/* Hallmark · critique: expressive AI entry surfaces, opaque reading panes, independent PDF styling. */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -10,7 +8,6 @@
 @import "./styles/base.css" layer(base);
 @import "./styles/workspace.css";
 
-@custom-variant dark (&:is(.dark *));
 
 @theme inline {
     --font-heading: var(--font-sans);

@@ -1,50 +1,56 @@
 # Design: Resume Builder
 
-The shared system for the application's screens. Resume templates and PDF documents keep their independent user-controlled typography, colours, and geometry.
+The application uses **Cobalt and ember**, the gradient direction selected by the owner. Resume templates and generated PDFs retain independent user-controlled typography, colours and geometry.
 
 ## System
 
-- Genre: modern-minimal
-- Scope: app screens, including sign-in
-- Theme: Coral, adapted to a working document editor
-- Axes: light / grotesk sans / warm, with restrained colour
-- Signature: real resume documents on a writing desk
-- Navigation: compact top bar, with Home, My resumes and Job map; the editor keeps its own mode bar
-- Composition: dashboard writing prompt beside its introduction; document collection below; stable controls on the left and PDF preview on the right in every editor mode
+- Scope: sign-in, home, resume library, editor, assistant and job search.
+- Signature: cobalt and coral/peach light surrounding a focused, solid AI composer.
+- Composition: fixed, non-scrolling home with a viewport-filling gradient and centred AI composer. The full document gallery lives on My resumes; the home picker, import and manual creation remain available. Editor controls and PDF preview remain stable; jobs separates search from results.
+- Navigation: slim, translucent glass top bars with backdrop blur, a neutral selected surface, and Home, My resumes and Jobs. The editor retains AI workspace, Content and Design modes in the same glass treatment.
+- The application is light-only, including when the operating system or a previously saved preference requests dark mode. There is no theme switch or dark palette.
+- Geist Variable is bundled locally and supplies app headings, controls and body text.
 
-## Tokens
+## Tokens and surfaces
 
-`frontend/src/styles/tokens.css` is the source of truth. Application semantic aliases live in `frontend/src/index.css`.
+`frontend/src/styles/tokens.css` owns colour, type, spacing, radius, shadow and motion tokens. `frontend/src/index.css` maps these onto Tailwind/shadcn roles. Glass uses the `--color-glass*` and `--shadow-glass` tokens, with an opaque fallback when backdrop blur is unavailable.
 
-- Paper: `--color-paper`, `--color-paper-2`, `--color-paper-3`
-- Document surface: `--color-cotton`; preview desk: `--color-desk`
-- Text: `--color-ink`, `--color-ink-2`, `--color-ink-muted`
-- Dividers: `--color-rule`; input boundaries: `--color-rule-2`
-- Coral: `--color-signal`, `--color-focus`, reserved for selection and focus
-- Type: locally bundled Geist Variable, for both body and headings
-- Radii: 8px surfaces, 6px controls
-- Spacing: the declared 4px scale, with 2px optical adjustments
-- Dark mode: `:root.dark` redefines surface, text, boundary, and focus tokens
-- PDF page white stays independent of the application's dark mode
+- Grounds: `--color-paper`, `--color-paper-2`, `--color-paper-3`.
+- Opaque reading surfaces: `--color-cotton`; document surround: `--color-desk`.
+- Text and boundaries: `--color-ink*`, `--color-rule*`.
+- Interaction: `--color-signal`, `--color-focus`, `--color-signal-soft`.
+- Atmosphere: `--color-halo-cobalt`, `--color-halo-ember`, `--color-halo-peach`; restrained workspace echoes use `--color-halo-soft`.
+- Geometry: 9px controls, 16px work surfaces, 22px composers, 28px atmospheric stages. Spacing follows the declared 4px scale.
+- Gradient concentration is strongest on home and sign-in. Forms, assistant responses, job results and document pages remain readable opaque surfaces.
 
-The Hallmark accent and muted roles are named `--color-signal` and `--color-ink-muted` to avoid collisions with Tailwind/shadcn semantic colours. Geist is retained as the app-screen adaptation so the interface needs no network-loaded font.
+## Icons and controls
 
-## Controls
+Lucide is the single interface icon family, normally 16–20px with a consistent 1.8 stroke. The existing file mark gains the brand gradient; selected states use cobalt. Icon-only buttons have accessible names. Important actions retain text.
 
-- Primary: dark ink, 6px radius, typically 40px tall
-- Secondary: outlined or text, matching the same geometry
-- Touch: 44px minimum button height
-- Focus: instant 2px coral outline
-- Disabled: distinct fill and text plus a not-allowed cursor
-- Forms: visible labels and visible input boundaries
+Buttons retain an immediate 2px focus outline. Text inputs use a restrained 1px neutral focus indicator; composers show one neutral outer indicator instead of coloured inner and outer outlines. Controls use distinct hover, pressed, disabled and error states; touch controls have a 44px hit target. Primary actions use the ink treatment, with the AI entry action using cobalt. Selection indicators do not imply submission.
 
 ## Motion
 
-Still at rest. Short colour and state transitions only; no decorative entrance animation. Reduced-motion preferences disable movement immediately.
+Use CSS for hover, focus, contextual disclosures and surface transitions. Use `motion/react-m` under `LazyMotion` for the editor's selected-mode indicator and success feedback on Copy and Bookmark. Retain dnd-kit for sorting; do not add another drag engine.
 
-## Exports
+- Micro feedback: 120ms; standard state transitions: 180ms; pane transitions: 240ms.
+- The home gradient fills the whole viewport and remains still, including behind the glass navigation.
+- Loading motion follows actual work. Streaming messages are not reanimated for every text chunk.
+- `MotionConfig reducedMotion="user"` and CSS reduced-motion rules disable spatial motion. Keyboard focus and interactions never wait for an animation.
+- Editor panes stay mounted when their mode is hidden, preserving form, chat and draft state.
 
-- `frontend/src/styles/tokens.css`: colour, type, spacing, radius, and motion tokens
-- `frontend/src/styles/base.css`: scoped accessibility and browser defaults
-- `frontend/src/styles/workspace.css`: application layout and interaction surfaces
-- `frontend/src/styles/jobs.css`: job discovery, map/list workspace and job details
+## Responsive and export boundaries
+
+On phones, keep explicit controls/preview and controls/results switches. Do not squeeze two desktop panes into narrow columns. The home navigation stays in one compact row; starter tasks fit a compact grid. The home page stays fixed while long text and expanded job context can scroll within the composer. Other pages retain normal scrolling and document galleries reduce columns.
+
+Keep PDF canvas, text, link and section-target geometry intact in `workspace.css`. `--color-pdf-paper` remains exact white. App selectors are scoped so gradient, type and motion rules cannot change template content or document dimensions. The client preview and download continue to use the same generated PDF revision; the independent legacy print route is retained.
+
+## Files and verification
+
+- `styles/tokens.css`: shared light and glass design tokens.
+- `styles/base.css`: accessibility and browser defaults.
+- `styles/workspace.css`: app shell, dashboard, sign-in, editor and assistant surfaces.
+- `styles/jobs.css`: search, results and job details.
+- `main.tsx`: light appearance and reduced-motion-aware animation providers.
+
+Verify frontend build, lint and existing tests. Review mobile/desktop, light appearance under dark system preferences, home viewport fit with expanded context, glass navigation, neutral text-field focus, loading/empty/error/full states, draft preservation, AI review/apply, search/filter/save, keyboard focus and PDF parity. Do not start development servers without the owner's request.

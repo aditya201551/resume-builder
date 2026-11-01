@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useSearchParams } from 'react-router'
+import * as m from 'motion/react-m'
 import { Bookmark, BriefcaseBusiness, Copy, ExternalLink, Loader2, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -101,10 +102,10 @@ function JobCard({ job, selected, saving, onSelect, onSave }: { job: Job; select
   const date = jobListingDate(job)
   const source = safeJobUrl(job.sourceUrl)
   return <article className="jobs-row" data-selected={selected}>
-    <div className="jobs-row-top"><p>{job.company}</p><button type="button" className="jobs-icon-button" aria-label={`${job.saved ? 'Unsave' : 'Save'} ${job.title} at ${job.company}`} aria-pressed={job.saved} disabled={saving} onClick={onSave}><Bookmark size={17} fill={job.saved ? 'currentColor' : 'none'} /></button></div>
+    <div className="jobs-row-top"><p>{job.company}</p><button type="button" className="jobs-icon-button" aria-label={`${job.saved ? 'Unsave' : 'Save'} ${job.title} at ${job.company}`} aria-pressed={job.saved} disabled={saving} onClick={onSave}><m.span className="inline-flex" initial={false} animate={{ scale: job.saved ? [1, 1.18, 1] : 1 }} transition={{ duration: 0.18 }}><Bookmark size={17} fill={job.saved ? 'currentColor' : 'none'} /></m.span></button></div>
     <h3><button type="button" onClick={onSelect}>{job.title}</button></h3>
     <p className="jobs-row-location">{locationLabel(job)}</p>
     <div className="jobs-row-meta"><span>{workplaceLabels[job.workplace]}</span><span>{job.salary || 'Salary not disclosed'}</span>{job.employmentType !== 'unknown' && <span>{employmentLabels[job.employmentType] ?? job.employmentType}</span>}{job.closed ? <span>Closed / unconfirmed</span> : date.date && <time dateTime={date.date}>{date.label} {jobDate(date.date)}</time>}</div>
-    <div className="jobs-row-bottom">{source ? <a href={source} target="_blank" rel="noopener noreferrer">{job.sourceName}<ExternalLink size={11} /></a> : <span>{job.sourceName}</span>}<button type="button" onClick={onSelect}>View role and requirements</button></div>
+    <div className="jobs-row-bottom">{source ? <a href={source} target="_blank" rel="noopener noreferrer">{job.sourceName}<ExternalLink size={11} /></a> : <span>{job.sourceName}</span>}<button type="button" className="jobs-view-role" onClick={onSelect}>View role and requirements</button></div>
   </article>
 }

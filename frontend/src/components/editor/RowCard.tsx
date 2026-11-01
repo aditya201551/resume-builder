@@ -56,7 +56,7 @@ export default function RowCard({
 
   return (
     <>
-      <div className="flex items-center gap-1 rounded-md border border-border bg-card p-2">
+      <div className="workspace-entry-row flex items-center gap-1 p-2">
         {dragHandle && <span className="shrink-0">{dragHandle}</span>}
         <button
           type="button"

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import * as m from 'motion/react-m'
 import { cn } from '@/lib/utils'
 
 export default function CopyButton({ getText, className }: { getText: () => string; className?: string }) {
@@ -27,7 +28,15 @@ export default function CopyButton({ getText, className }: { getText: () => stri
       )}
       aria-label={copied ? 'Copied' : 'Copy message'}
     >
-      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+      <m.span
+        className="inline-flex"
+        initial={false}
+        animate={{ scale: copied ? [1, 1.18, 1] : 1 }}
+        transition={{ duration: 0.18 }}
+        aria-hidden
+      >
+        {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+      </m.span>
       {copied ? 'Copied' : 'Copy'}
     </button>
   )

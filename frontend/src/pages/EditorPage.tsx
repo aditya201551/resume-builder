@@ -23,6 +23,7 @@ import {
   Puzzle,
   Sparkles,
   Trophy,
+  UserRound,
   X,
 } from 'lucide-react'
 import { Accordion } from '@/components/ui/accordion'
@@ -332,6 +333,7 @@ function ContentMode({
         <SectionAccordionItem
           value="contact"
           title="Contact & Summary"
+          icon={UserRound}
           count={0}
         >
           <ContactSection resume={data.resume} />
@@ -344,6 +346,7 @@ function ContentMode({
             key={section.key}
             value={section.key}
             title={section.title}
+            icon={SLOT_META[section.key].icon}
             count={section.count}
           >
             {section.node}

@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useSearchParams } from 'react-router'
-import { ArrowDown, Bookmark, BriefcaseBusiness, Copy, ExternalLink, Loader2, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
+import { Bookmark, BriefcaseBusiness, Copy, ExternalLink, Loader2, Search, SlidersHorizontal, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import JobDetails from '@/components/jobs/JobDetails'
@@ -26,6 +26,21 @@ export default function JobsPage({ saved = false }: { saved?: boolean }) {
  const save = useSaveJob()
  const jobs = uniqueDiscoveryJobs(results.data?.pages ?? [])
  const lastPage = results.data?.pages.at(-1)
+ const resultsPanel = useRef<HTMLElement>(null)
+ const resultsFooter = useRef<HTMLDivElement>(null)
+ const { fetchNextPage, hasNextPage, isFetching, isError } = results
+ useEffect(() => {
+  if (!hasNextPage || isFetching || isError || lastPage?.retry || !resultsPanel.current || !resultsFooter.current) return
+  let requested = false
+  let active = true
+  const observer = new IntersectionObserver(entries => {
+   if (!active || requested || !entries.some(entry => entry.isIntersecting)) return
+   requested = true
+   void fetchNextPage({ cancelRefetch: false })
+  }, { root: resultsPanel.current, rootMargin: '0px 0px 240px 0px' })
+  observer.observe(resultsFooter.current)
+  return () => { active = false; observer.disconnect() }
+ }, [fetchNextPage, hasNextPage, isFetching, isError, lastPage?.retry, lastPage?.nextToken, intent, saved])
  const sources = [...new Map((results.data?.pages ?? []).flatMap(p => p.sources).map(s => [s.id, s])).values()]
  function applyIntent(next: SearchIntent) {
   if (JSON.stringify(next) === JSON.stringify(intent) && results.data) void results.refetch()
@@ -65,7 +80,7 @@ export default function JobsPage({ saved = false }: { saved?: boolean }) {
     <div className="jobs-control-pane" id="jobs-assistant-pane" hidden={mode !== 'assistant'}><JobChatPanel chat={chat} active={mode === 'assistant' && !mobileResults} saved={saved} onManual={() => changeMode('manual')} /></div>
     <div className="jobs-control-pane" id="jobs-manual-pane" hidden={mode !== 'manual'}><JobSearchFilters intent={intent} countries={countries.data ?? []} countriesError={countries.isError} onRetryCountries={() => void countries.refetch()} saved={saved} onChange={applyIntent} onSearch={manualSearch} onReset={() => applyIntent(defaultJobIntent())} /></div>
    </div>
-   <section className="jobs-discovery-main" aria-label="Job search results">
+   <section ref={resultsPanel} className="jobs-discovery-main" aria-label="Job search results">
     <div className="jobs-search-summary"><div><h2>Current search</h2><Button variant="ghost" size="sm" onClick={() => changeMode('manual')}>Edit filters</Button></div>{intent.query && <p className="jobs-summary-keywords">{intent.query}</p>}<ul>{summary.map((text, i) => <li key={i}>{i > 0 && <span>OR </span>}{text}</li>)}</ul><div className="jobs-active-filters">{intent.seniority && <span>{intent.seniority} level</span>}{intent.employmentType && <span>{employmentLabels[intent.employmentType]}</span>}{intent.postedDays > 0 && <span>Past {intent.postedDays} days</span>}{intent.excludeCompanies.map(c => <span key={c}>Exclude {c}</span>)}{intent.includeUnknown && <span>Include unspecified remote regions</span>}</div></div>
         <div className="jobs-results-heading" aria-live="polite"><h2>{saved ? 'Your saved jobs' : 'Search results'}</h2><span>{results.isFetching ? <><Loader2 size={13} className="animate-spin" />Searching…</> : results.data ? `${jobs.length} jobs loaded` : 'Ready when you are'}</span></div>
         {!results.data && !results.isFetching && !results.isError && <div className="jobs-empty"><BriefcaseBusiness size={28} /><h2>A clearer path to your next role.</h2><p>Use the assistant or switch to Manual search. Choose an office country for onsite and hybrid roles, or a remote work country to check hiring eligibility.</p><Button variant="outline" onClick={() => { applyIntent({ ...defaultJobIntent(), branches: [{ workplace: 'remote', country: '', city: '' }] }) }}>Explore remote roles</Button></div>}
@@ -74,7 +89,7 @@ export default function JobsPage({ saved = false }: { saved?: boolean }) {
         {sources.some(s => s.status !== 'ready') && <div className="jobs-source-notices" role="status">{sources.filter(s => s.status !== 'ready').map(s => <p key={s.id}><strong>{s.name}:</strong> {s.message}</p>)}</div>}
         {results.data && jobs.length === 0 && !results.isFetching && <div className="jobs-empty"><Search size={24} /><h2>{saved ? 'No saved jobs match these criteria.' : 'No matches in the pages checked.'}</h2><p>{saved ? 'Save roles from Discover, or change your filters.' : 'Try fewer keywords or another location. These sources do not cover every opening.'}{results.hasNextPage && ' More source pages may contain matches.'}</p></div>}
         <div className="jobs-results-list" aria-busy={results.isFetching}>{jobs.map(job => <JobCard key={job.id} job={job} selected={params.get('job') === job.id} onSelect={() => selectJob(job.id)} saving={save.isPending && save.variables?.id === job.id} onSave={() => save.mutate({ id: job.id, saved: !job.saved }, { onError: () => toast.error('Could not update saved jobs') })} />)}</div>
-        {results.data && <div className="jobs-pagination"><p>Results from requested source pages, with duplicates removed. Coverage varies by source.</p><div>{lastPage?.retry && <Button variant="outline" size="sm" disabled={results.isFetching} onClick={() => void results.refetch()}>Retry sources</Button>}{results.hasNextPage && <Button variant="outline" size="sm" disabled={results.isFetching} onClick={() => void results.fetchNextPage()}>{results.isFetchingNextPage ? <Loader2 size={14} className="animate-spin" /> : <ArrowDown size={14} />}Load more jobs</Button>}</div></div>}
+        {results.data && <div ref={resultsFooter} className="jobs-pagination"><p>Results from requested source pages, with duplicates removed. Coverage varies by source.</p><div role="status">{results.isFetchingNextPage ? <><Loader2 size={14} className="animate-spin" />Loading more jobs…</> : !results.isFetching && !results.isError && !lastPage?.retry && <span>{results.hasNextPage ? 'Scroll for more jobs' : 'You’ve reached the end of the available results.'}</span>}</div>{lastPage?.retry && <Button variant="outline" size="sm" disabled={results.isFetching} onClick={() => void results.refetch()}>Retry sources</Button>}</div>}
         {sources.some(s => s.status === 'ready') && <details className="jobs-sources"><summary>Sources and freshness</summary><ul>{sources.filter(s => s.status === 'ready').map(s => <li key={s.id}><strong>{s.name}</strong><span>Fetched {jobDateTime(s.fetchedAt)}</span></li>)}</ul></details>}
    </section>
   </div>

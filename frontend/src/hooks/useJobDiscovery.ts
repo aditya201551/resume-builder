@@ -9,7 +9,8 @@ export function useJobDiscovery(intent: SearchIntent, savedOnly: boolean, enable
     queryKey: ['jobs', user?.id, 'discovery', intent, savedOnly],
     queryFn: ({ pageParam, signal }) => apiPost<DiscoveryPage>('/api/jobs/search', { intent, savedOnly, nextToken: pageParam }, { signal }),
     initialPageParam: '',
-    getNextPageParam: page => page.nextToken || undefined,
+    // A repeated cursor must not turn automatic loading into a request loop.
+    getNextPageParam: (page, _pages, _pageParam, pageParams) => page.nextToken && !pageParams.includes(page.nextToken) ? page.nextToken : undefined,
     enabled: Boolean(user) && enabled,
     staleTime: 60_000,
     retry: false,

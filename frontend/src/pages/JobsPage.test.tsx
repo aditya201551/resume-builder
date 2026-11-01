@@ -57,4 +57,23 @@ describe('dedicated job search surfaces', () => {
     expect(html).toContain('Manual search')
     expect(html).not.toContain('Search criteria updated')
   })
+
+  it('shows automatic pagination status instead of a load-more button', () => {
+    discovery.mockReturnValue({ data: { pages: [{ jobs: [], sources: [], nextToken: 'next', retry: false }] }, hasNextPage: true, isFetching: true, isFetchingNextPage: true })
+    const html = render()
+    expect(html).toContain('Loading more jobs…')
+    expect(html).not.toContain('Load more jobs')
+  })
+
+  it('keeps a source retry available without claiming the results are exhausted', () => {
+    discovery.mockReturnValue({ data: { pages: [{ jobs: [], sources: [], retry: true }] }, hasNextPage: false, isFetching: false })
+    const html = render()
+    expect(html).toContain('Retry sources')
+    expect(html).not.toContain('reached the end')
+  })
+
+  it('announces the end when no further source pages are available', () => {
+    discovery.mockReturnValue({ data: { pages: [{ jobs: [], sources: [], retry: false }] }, hasNextPage: false, isFetching: false })
+    expect(render()).toContain('reached the end of the available results.')
+  })
 })

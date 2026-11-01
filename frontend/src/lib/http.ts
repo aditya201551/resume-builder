@@ -24,7 +24,7 @@ async function request<T>(method: string, url: string, body?: unknown, signal?: 
 }
 
 export const apiGet = <T>(url: string, options?: { signal?: AbortSignal }) => request<T>('GET', url, undefined, options?.signal)
-export const apiPost = <T>(url: string, body?: unknown) => request<T>('POST', url, body)
+export const apiPost = <T>(url: string, body?: unknown, options?: { signal?: AbortSignal }) => request<T>('POST', url, body, options?.signal)
 export const apiPatch = <T>(url: string, body?: unknown) => request<T>('PATCH', url, body)
 export const apiPut = <T>(url: string, body?: unknown) => request<T>('PUT', url, body)
 export const apiDelete = (url: string) => request<void>('DELETE', url)

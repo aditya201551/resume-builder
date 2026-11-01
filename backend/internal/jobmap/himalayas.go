@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -29,6 +30,32 @@ type himalayasJob struct {
 	Period      string    `json:"salaryPeriod"`
 }
 
+// SearchHimalayasPage requests a filtered page rather than the bulk feed. A
+// short page is not terminal; the provider documents an empty page as the end.
+func (c *Client) SearchHimalayasPage(ctx context.Context, query, country string, page int) ([]Job, bool, error) {
+	var body struct {
+		Jobs []himalayasJob `json:"jobs"`
+	}
+	v := url.Values{"page": {strconv.Itoa(page)}, "sort": {"recent"}}
+	if query != "" {
+		v.Set("q", query)
+	}
+	if country != "" {
+		v.Set("country", country)
+	}
+	if err := c.get(ctx, "https://himalayas.app/jobs/api/search?"+v.Encode(), c.himalayasHeaders(), &body); err != nil {
+		return nil, false, err
+	}
+	if body.Jobs == nil || len(body.Jobs) > 100 {
+		return nil, false, fmt.Errorf("invalid Himalayas search page")
+	}
+	jobs := []Job{}
+	for _, j := range body.Jobs {
+		jobs = append(jobs, j.job())
+	}
+	return jobs, len(body.Jobs) > 0, nil
+}
+
 func (c *Client) himalayasHeaders() map[string]string {
 	return map[string]string{"Authorization": bearer(c.Config.HimalayasKey)}
 }
@@ -38,35 +65,6 @@ func bearer(key string) string {
 		return ""
 	}
 	return "Bearer " + key
-}
-
-// FetchHimalayasPage reads exactly one cursor page. The service checkpoints each
-// page and controls pacing, daily budgets and retries across API processes.
-func (c *Client) FetchHimalayasPage(ctx context.Context, cursor string) ([]Job, string, error) {
-	var body struct {
-		Jobs       []himalayasJob `json:"jobs"`
-		NextCursor string         `json:"nextCursor"`
-	}
-	values := url.Values{"limit": {"20"}}
-	if cursor != "" {
-		values.Set("cursor", cursor)
-	}
-	if err := c.get(ctx, "https://himalayas.app/jobs/api?"+values.Encode(), c.himalayasHeaders(), &body); err != nil {
-		return nil, "", err
-	}
-	if body.Jobs == nil || (cursor != "" && body.NextCursor == cursor) {
-		return nil, "", fmt.Errorf("invalid Himalayas feed page")
-	}
-	jobs := []Job{}
-	seen := map[string]bool{}
-	for _, raw := range body.Jobs {
-		if raw.GUID == "" || seen[raw.GUID] {
-			continue
-		}
-		seen[raw.GUID] = true
-		jobs = append(jobs, raw.job())
-	}
-	return jobs, body.NextCursor, nil
 }
 
 // FetchHimalayasJob only requests the documented API path on the fixed provider

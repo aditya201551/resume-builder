@@ -32,7 +32,7 @@ export default function JobDetails({ id, onClose }: { id: string | null; onClose
             {job.source === 'himalayas' && <div><dt>Availability checked</dt><dd>{jobDateTime(job.checkedAt)}</dd></div>}
           </dl>
           {job.workplace === 'remote' && <div className="jobs-remote-policy"><Monitor size={18} /><div><h3>Remote hiring locations</h3><p>{job.remote.scope === 'worldwide' ? 'The source lists worldwide hiring.' : job.remote.scope === 'restricted' ? job.remote.regions.join(', ') : 'The source does not specify accepted hiring regions.'}</p>{job.remote.timezones.length > 0 && <p>{job.remote.timezones.length <= 12 ? `Listed timezone offsets: ${job.remote.timezones.map(timezoneLabel).join(', ')}.` : 'Timezone information is supplied with this listing.'} Check the original posting for working hours.</p>}</div></div>}
-          {job.locations.some(l => l.precision === 'city') && <p className="jobs-detail-note">The map uses approximate city centres from GeoNames. These are not verified office addresses.</p>}
+          <p className="jobs-detail-note">Country eligibility does not confirm work authorization or visa sponsorship. Check the original posting for these requirements.</p>
           <div className="jobs-detail-description"><h3>About the role</h3><p>{job.description || 'The source did not include a description. Read the original posting for details.'}</p></div>
           <p className="jobs-detail-source">Source: {source ? <a href={source} target="_blank" rel="noopener noreferrer">{job.sourceName}<ExternalLink size={12} /></a> : job.sourceName}</p>
           <div className="jobs-detail-actions">

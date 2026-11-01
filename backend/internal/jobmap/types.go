@@ -63,14 +63,6 @@ func (j Job) ListingDate() *time.Time {
 	return j.SourceUpdatedAt
 }
 
-// FeedProgress is a durable checkpoint, independent of public source status.
-type FeedProgress struct {
-	Cursor      string
-	JobCount    int
-	CompletedAt *time.Time
-	RetryAt     *time.Time
-}
-
 func StableID(source, id string) string {
 	h := sha256.Sum256([]byte(source + "\x00" + id))
 	return "job_" + hex.EncodeToString(h[:16])
@@ -83,61 +75,4 @@ func SafeURL(raw string) string {
 		return ""
 	}
 	return u.String()
-}
-
-type Company struct {
-	Name       string `json:"name"`
-	Website    string `json:"website"`
-	Provider   string `json:"provider"` // ashby, greenhouse, lever, career_page
-	Board      string `json:"board"`
-	CareersURL string `json:"careersUrl,omitempty"`
-}
-
-type SourceStatus struct {
-	ID          string     `json:"id"`
-	Name        string     `json:"name"`
-	Kind        string     `json:"kind"`
-	Status      string     `json:"status"` // ready, refreshing, paused, error, needs_key, quota_exhausted
-	Message     string     `json:"message,omitempty"`
-	JobCount    int        `json:"jobCount"`
-	RefreshedAt *time.Time `json:"refreshedAt,omitempty"`
-}
-
-type Search struct {
-	Query          string
-	Workplace      string
-	EmploymentType string
-	Seniority      string
-	SourceKind     string
-	Country        string // workplace country
-	RemoteCountry  string // independent remote-work preference
-	IncludeUnknown bool
-	PostedDays     int
-	Bounds         *[4]float64 // west, south, east, north; east < west crosses the dateline
-	Page           int
-	PageSize       int
-	SavedOnly      bool
-}
-
-// MapJob is a lightweight projection of every matching, open workplace job.
-// It is independent of list pagination and omits descriptions and application data.
-type MapJob struct {
-	ID        string     `json:"id"`
-	Title     string     `json:"title"`
-	Company   string     `json:"company"`
-	Workplace string     `json:"workplace"`
-	Locations []Location `json:"locations"`
-}
-
-type SearchResult struct {
-	Jobs        []Job          `json:"jobs"`
-	MapJobs     []MapJob       `json:"mapJobs"`
-	Total       int            `json:"total"` // indexed, matching unique listings, never a provider's global inventory
-	Page        int            `json:"page"`
-	PageSize    int            `json:"pageSize"`
-	HasMore     bool           `json:"hasMore"`
-	Mapped      int            `json:"mapped"` // matching open jobs with physical coordinates in the search area, across all pages
-	RemoteCount int            `json:"remoteCount"`
-	Sources     []SourceStatus `json:"sources"`
-	Refreshing  bool           `json:"refreshing"`
 }

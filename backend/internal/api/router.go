@@ -92,10 +92,9 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 
 	if h.Jobs != nil {
-		handle("GET /api/jobs", h.Jobs.Search)
+		handle("POST /api/jobs/search", h.Jobs.Discover)
+		handle("POST /api/jobs/assist", h.Jobs.Refine)
 		handle("GET /api/jobs/countries", h.Jobs.Countries)
-		handle("GET /api/jobs/places", h.Jobs.Places)
-		handle("GET /api/jobs/nearest", h.Jobs.Nearest)
 		handle("GET /api/jobs/{jobID}", h.Jobs.Get)
 		handle("PUT /api/jobs/{jobID}/saved", h.Jobs.Save)
 		handle("DELETE /api/jobs/{jobID}/saved", h.Jobs.Unsave)

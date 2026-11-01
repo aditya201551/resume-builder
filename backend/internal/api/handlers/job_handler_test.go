@@ -2,17 +2,18 @@ package handlers
 
 import (
 	"net/http/httptest"
+	"resume-builder/backend/internal/jobsearch"
+	"strings"
 	"testing"
 )
 
-func TestJobSearchRejectsInvalidFiltersAndBounds(t *testing.T) {
-	for _, query := range []string{"bounds=NaN,0,1,2", "bounds=0,4,1,2", "bounds=0,0,181,2", "pageSize=0", "pageSize=101", "page=-1", "days=999999", "country=not-a-country", "workplace=teleport", "source=internal"} {
-		if _, err := ParseJobSearch(httptest.NewRequest("GET", "/api/jobs?"+query, nil)); err == nil {
-			t.Fatalf("accepted %s", query)
+func TestDiscoveryRejectsUnsupportedHardFilters(t *testing.T) {
+	for _, body := range []string{`{"intent":{"version":1,"salary":100000}}`, `{"intent":{"version":1},"invented":true}`, `{} {}`} {
+		r := httptest.NewRequest("POST", "/api/jobs/search", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		var request jobsearch.Request
+		if decodeJobRequest(w, r, &request) || w.Code != 400 {
+			t.Fatal("unsupported request accepted", body, w.Code)
 		}
-	}
-	s, err := ParseJobSearch(httptest.NewRequest("GET", "/api/jobs?country=DE&remoteCountry=IN&bounds=170,-10,-170,10&saved=true", nil))
-	if err != nil || s.Country != "DE" || s.RemoteCountry != "IN" || !s.SavedOnly || s.Bounds == nil {
-		t.Fatalf("%+v %v", s, err)
 	}
 }

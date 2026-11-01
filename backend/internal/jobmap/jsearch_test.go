@@ -32,13 +32,13 @@ func TestJSearchProviderAuthenticationAndV2Results(t *testing.T) {
 				}
 				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"status":"OK","data":{"cursor":"next-page","jobs":[{"job_id":"job-1","job_title":"Software Engineer","employer_name":"Example","job_apply_link":"https://example.com/careers/1","job_is_remote":false,"job_location":"Bengaluru, Karnataka, India","job_country":"IN","job_employment_type":"Full-time"},{"job_id":"job-2","job_title":"Backend Engineer","employer_name":"Example","job_apply_link":"https://example.com/careers/2","job_is_remote":true,"job_location":"Remote, India"}]}}`))}, nil
 			})
-			jobs, err := client.FetchJSearch(context.Background(), "software engineer in Bengaluru, India", "IN")
-			if err != nil || len(jobs) != 2 {
+			jobs, cursor, err := client.FetchJSearchPage(context.Background(), "software engineer in Bengaluru, India", "IN", "")
+			if err != nil || len(jobs) != 2 || cursor != "next-page" {
 				t.Fatalf("expected two v2 listings: count=%d error=%v", len(jobs), err)
 			}
 			job, ok := Prepare(jobs[0], time.Now())
 			if !ok || job.Source != "jsearch" || job.EmploymentType != "full_time" || len(job.Locations) != 1 || job.Locations[0].Latitude == nil || job.Locations[0].CountryCode != "IN" {
-				t.Fatalf("job could not be prepared for map: %+v", job)
+				t.Fatalf("job could not be normalized: %+v", job)
 			}
 			if jobs[1].Workplace != "remote" || len(jobs[1].Locations) != 0 || jobs[1].Remote.Scope != "restricted" {
 				t.Fatalf("remote restrictions were lost: %+v", jobs[1])
@@ -69,7 +69,7 @@ func TestJSearchRejectsProviderFailuresAndMalformedSuccess(t *testing.T) {
 				calls++
 				return &http.Response{StatusCode: test.status, Body: io.NopCloser(strings.NewReader(test.body))}, nil
 			})
-			_, err := client.FetchJSearch(context.Background(), "software engineer in Bengaluru, India", "IN")
+			_, _, err := client.FetchJSearchPage(context.Background(), "software engineer in Bengaluru, India", "IN", "")
 			if (err != nil) != test.wantError || calls != 1 {
 				t.Fatalf("unexpected result or extra quota consumed: error=%v calls=%d", err, calls)
 			}
@@ -78,10 +78,7 @@ func TestJSearchRejectsProviderFailuresAndMalformedSuccess(t *testing.T) {
 }
 
 func TestJSearchProviderConfig(t *testing.T) {
-	t.Setenv("JOB_MAP_COMPANIES_FILE", "")
-	t.Setenv("JOB_MAP_REFRESH_INTERVAL", "")
 	t.Setenv("JSEARCH_MONTHLY_LIMIT", "")
-	t.Setenv("GEOAPIFY_DAILY_LIMIT", "")
 	for _, test := range []struct {
 		value, want string
 		invalid     bool

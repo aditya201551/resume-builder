@@ -1,4 +1,4 @@
-import type { Bounds, Job, JobSearchResult, MapJob } from '@/types/job'
+import type { Job } from '@/types/job'
 
 export function safeJobUrl(raw: string | undefined): string | undefined {
   if (!raw) return undefined
@@ -6,28 +6,6 @@ export function safeJobUrl(raw: string | undefined): string | undefined {
     const url = new URL(raw)
     return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password ? url.href : undefined
   } catch { return undefined }
-}
-
-export function parseBounds(raw: string | null): Bounds | undefined {
-  if (!raw) return undefined
-  const values = raw.split(',').map(Number)
-  if (values.length !== 4 || values.some(n => !Number.isFinite(n))) return undefined
-  const [west, south, east, north] = values
-  if (west < -180 || west > 180 || east < -180 || east > 180 || south < -90 || north > 90 || south >= north) return undefined
-  return values as Bounds
-}
-
-export function jobSearchQuery(params: URLSearchParams): string {
-  const out = new URLSearchParams()
-  for (const key of ['q', 'workplace', 'country', 'remoteCountry', 'includeUnknown', 'employment', 'seniority', 'days', 'source', 'saved', 'page']) {
-    const value = params.get(key)
-    if (value) out.set(key, value)
-  }
-  const bounds = parseBounds(params.get('bounds'))
-  if (bounds) out.set('bounds', bounds.join(','))
-  out.set('pageSize', '50')
-  out.sort()
-  return out.toString()
 }
 
 export const workplaceLabels = { onsite: 'Onsite', hybrid: 'Hybrid', remote: 'Remote', unknown: 'Workplace unspecified' }
@@ -40,23 +18,6 @@ export function locationLabel(job: Job): string {
     return 'Remote; hiring regions unspecified'
   }
   return job.locations.map(l => l.name).filter(Boolean).join(' / ') || 'Location unspecified'
-}
-
-export function jobFeatures(jobs: (MapJob & { closed?: boolean })[], bounds?: Bounds) {
-  const features = jobs.flatMap(job => job.workplace === 'remote' || job.closed ? [] : job.locations.flatMap((location, index) => {
-    const { longitude: lng, latitude: lat } = location
-    if (lng === undefined || lat === undefined || !Number.isFinite(lat) || !Number.isFinite(lng)) return []
-    if (bounds) {
-      const [west, south, east, north] = bounds
-      if (lat < south || lat > north || !(west <= east ? lng >= west && lng <= east : lng >= west || lng <= east)) return []
-    }
-    return [{ type: 'Feature' as const, id: `${job.id}-${index}`, geometry: { type: 'Point' as const, coordinates: [lng, lat] }, properties: { jobId: job.id, title: job.title, company: job.company, location: location.name, precision: location.precision } }]
-  }))
-  return { type: 'FeatureCollection' as const, features }
-}
-
-export function applySaved(result: JobSearchResult, id: string, saved: boolean): JobSearchResult {
-  return { ...result, jobs: result.jobs.map(job => job.id === id ? { ...job, saved } : job) }
 }
 
 export function jobDate(raw?: string): string {

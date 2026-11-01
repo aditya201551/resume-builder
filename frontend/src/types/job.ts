@@ -1,5 +1,4 @@
 export type Workplace = 'onsite' | 'hybrid' | 'remote' | 'unknown'
-export type Bounds = [number, number, number, number]
 
 export interface JobLocation {
   name: string
@@ -40,38 +39,4 @@ export interface Job {
   saved: boolean
 }
 
-export type MapJob = Pick<Job, 'id' | 'title' | 'company' | 'workplace' | 'locations'>
-
-export interface JobSource {
-  id: string
-  name: string
-  kind: string
-  status: 'ready' | 'refreshing' | 'paused' | 'error' | 'needs_key' | 'quota_exhausted'
-  message?: string
-  jobCount: number
-  refreshedAt?: string
-}
-
-export interface JobSearchResult {
-  jobs: Job[]
-  mapJobs: MapJob[]
-  total: number
-  page: number
-  pageSize: number
-  hasMore: boolean
-  mapped: number
-  remoteCount: number
-  sources: JobSource[]
-  refreshing: boolean
-}
-
 export interface JobCountry { code: string; name: string; continent: string; aliases: string[] }
-export interface JobPlace {
-  id: string
-  name: string
-  latitude: number
-  longitude: number
-  countryCode: string
-  country: string
-  attribution: string
-}

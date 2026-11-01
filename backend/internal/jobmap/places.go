@@ -161,19 +161,6 @@ func ResolveLocation(name, countryHint string) Location {
 	return out
 }
 
-func NearestPlace(lat, lng float64) *Place {
-	var nearest *Place
-	best := math.Inf(1)
-	for _, p := range gazetteer.Places {
-		d := math.Pow(p.Latitude-lat, 2) + math.Pow(math.Remainder(p.Longitude-lng, 360)*math.Cos(lat*math.Pi/180), 2)
-		if d < best {
-			copy := p
-			nearest, best = &copy, d
-		}
-	}
-	return nearest
-}
-
 var eu = map[string]bool{"AT": true, "BE": true, "BG": true, "HR": true, "CY": true, "CZ": true, "DK": true, "EE": true, "FI": true, "FR": true, "DE": true, "GR": true, "HU": true, "IE": true, "IT": true, "LV": true, "LT": true, "LU": true, "MT": true, "NL": true, "PL": true, "PT": true, "RO": true, "SK": true, "SI": true, "ES": true, "SE": true}
 
 func RemoteMatches(policy RemotePolicy, countryCode string, includeUnknown bool) bool {

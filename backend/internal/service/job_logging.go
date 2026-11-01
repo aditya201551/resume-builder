@@ -29,14 +29,6 @@ func logJobError(ctx context.Context, event string, err error, attrs ...any) {
 	slog.Log(ctx, level, event, attrs...)
 }
 
-func (s *JobService) storeSourceStatus(ctx context.Context, status jobmap.SourceStatus) {
-	cleanup, cancel := jobCleanupContext(ctx)
-	defer cancel()
-	if err := s.repo.StoreStatus(cleanup, status); err != nil {
-		logJobError(cleanup, "job_source_status_failed", err, "source", status.ID, "status", status.Status)
-	}
-}
-
 func (s *JobService) releaseSearch(ctx context.Context, key, source string) {
 	cleanup, cancel := jobCleanupContext(ctx)
 	defer cancel()

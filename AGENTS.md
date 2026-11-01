@@ -55,5 +55,7 @@ React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui (`components/ui/`) + TanS
 
 ## Cross-cutting notes
 
+- Always remove files, code, styles, dependencies, and tests made unused by a change. Trace references and run the relevant checks; do not retain obsolete implementations for hypothetical future use. Preserve applied migrations and user data.
+
 - Go workspace (`go.work`) currently has one module (`backend`); `frontend` and any future `shared/*` npm workspace packages are separate from the Go module graph.
 - Migrations are forward-and-back paired (`*.up.sql` / `*.down.sql`) under `backend/internal/db/migrations/`, applied automatically at API boot — don't hand-edit an already-applied migration; add a new one.

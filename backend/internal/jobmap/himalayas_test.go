@@ -10,17 +10,17 @@ import (
 	"time"
 )
 
-func TestHimalayasCursorPageAndSourceDate(t *testing.T) {
+func TestHimalayasSearchPageAndSourceDate(t *testing.T) {
 	c := NewClient(Config{HimalayasKey: "test-key"})
 	c.HTTP.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
-		if r.URL.Path != "/jobs/api" || r.URL.Query().Get("limit") != "20" || r.URL.Query().Get("cursor") != "opaque +/= token" || r.Header.Get("Authorization") != "Bearer test-key" {
+		if r.URL.Path != "/jobs/api/search" || r.URL.Query().Get("country") != "IN" || r.URL.Query().Get("page") != "2" || r.Header.Get("Authorization") != "Bearer test-key" {
 			t.Fatalf("unexpected feed request: %s", r.URL)
 		}
-		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"jobs":[{"guid":"https://himalayas.app/companies/acme/jobs/a","title":"Software Engineer","companyName":"Acme","pubDate":1700000000,"locationRestrictions":[],"applicationLink":"https://example.com/apply?ref=himalayas"},{"guid":"https://himalayas.app/companies/acme/jobs/a"}],"nextCursor":"next"}`))}, nil
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(`{"jobs":[{"guid":"https://himalayas.app/companies/acme/jobs/a","title":"Software Engineer","companyName":"Acme","pubDate":1700000000,"locationRestrictions":[],"applicationLink":"https://example.com/apply?ref=himalayas"}]}`))}, nil
 	})
-	jobs, next, err := c.FetchHimalayasPage(context.Background(), "opaque +/= token")
-	if err != nil || len(jobs) != 1 || next != "next" {
-		t.Fatalf("page: %+v %q %v", jobs, next, err)
+	jobs, more, err := c.SearchHimalayasPage(context.Background(), "engineer", "IN", 2)
+	if err != nil || len(jobs) != 1 || !more {
+		t.Fatalf("page: %+v %v %v", jobs, more, err)
 	}
 	if jobs[0].PostedAt != nil || jobs[0].SourceUpdatedAt == nil || jobs[0].SourceUpdatedAt.Unix() != 1700000000 {
 		t.Fatal("provider update was represented as a posting date")
@@ -30,13 +30,13 @@ func TestHimalayasCursorPageAndSourceDate(t *testing.T) {
 	}
 }
 
-func TestHimalayasRejectsInvalidAndNonAdvancingPages(t *testing.T) {
-	for _, body := range []string{`{}`, `{"jobs":null}`, `{"jobs":[],"nextCursor":"same"}`} {
+func TestHimalayasSearchRejectsMalformedPages(t *testing.T) {
+	for _, body := range []string{`{}`, `{"jobs":null}`} {
 		c := NewClient(Config{})
 		c.HTTP.Transport = roundTripFunc(func(*http.Request) (*http.Response, error) {
 			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(body))}, nil
 		})
-		if _, _, err := c.FetchHimalayasPage(context.Background(), "same"); err == nil {
+		if _, _, err := c.SearchHimalayasPage(context.Background(), "", "", 1); err == nil {
 			t.Fatalf("accepted invalid feed: %s", body)
 		}
 	}
@@ -75,23 +75,5 @@ func TestHimalayasStatusNeverFetchesArbitraryURLs(t *testing.T) {
 		if _, _, err := c.FetchHimalayasJob(context.Background(), guid); err == nil {
 			t.Fatal("accepted", guid)
 		}
-	}
-}
-
-func TestListingDatesSortAndFilterBySourceUpdateWithoutFetchPromotion(t *testing.T) {
-	now := time.Now()
-	recent, old := now.Add(-time.Hour), now.Add(-30*24*time.Hour)
-	jobs := []Job{
-		{ID: "old", ApplyURL: "https://example.com/old", PostedAt: &old, FetchedAt: now},
-		{ID: "updated", ApplyURL: "https://example.com/new", SourceUpdatedAt: &recent},
-		{ID: "unknown", ApplyURL: "https://example.com/unknown", FetchedAt: now},
-	}
-	result := FilterJobs(jobs, Search{}, now)
-	if result.Jobs[0].ID != "updated" || result.Jobs[2].ID != "unknown" {
-		t.Fatalf("wrong freshness order: %+v", result.Jobs)
-	}
-	result = FilterJobs(jobs, Search{PostedDays: 7}, now)
-	if len(result.Jobs) != 1 || result.Jobs[0].ID != "updated" {
-		t.Fatal("fetching an old job made it new")
 	}
 }

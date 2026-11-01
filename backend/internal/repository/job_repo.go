@@ -24,24 +24,17 @@ type JobRepository struct{ pool jobDB }
 
 func NewJobRepository(pool jobDB) *JobRepository { return &JobRepository{pool: pool} }
 
-func (r *JobRepository) StoreSource(ctx context.Context, source string, jobs []jobmap.Job, complete bool) error {
+func (r *JobRepository) StoreSource(ctx context.Context, source string, jobs []jobmap.Job) error {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("begin job refresh: %w", err)
 	}
 	defer tx.Rollback(ctx)
-	ids := []string{}
 	for _, job := range jobs {
 		if job.Source != source {
 			return fmt.Errorf("job source mismatch")
 		}
 		if err := storeJob(ctx, tx, job); err != nil {
-			return err
-		}
-		ids = append(ids, job.ID)
-	}
-	if complete {
-		if _, err := tx.Exec(ctx, `UPDATE job_listings SET closed=true WHERE source=$1 AND NOT (id=ANY($2::text[]))`, source, ids); err != nil {
 			return err
 		}
 	}
@@ -74,78 +67,19 @@ func (r *JobRepository) MarkJobClosed(ctx context.Context, id string, checkedAt 
 	return err
 }
 
-func (r *JobRepository) FeedProgress(ctx context.Context, source string) (jobmap.FeedProgress, error) {
-	var p jobmap.FeedProgress
-	err := r.pool.QueryRow(ctx, `SELECT cursor,job_count,completed_at,retry_at FROM job_feed_progress WHERE source=$1`, source).
-		Scan(&p.Cursor, &p.JobCount, &p.CompletedAt, &p.RetryAt)
+func (r *JobRepository) ProviderRetryAt(ctx context.Context, source string) (*time.Time, error) {
+	var retryAt *time.Time
+	err := r.pool.QueryRow(ctx, `SELECT retry_at FROM job_feed_progress WHERE source=$1`, source).Scan(&retryAt)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return p, nil
+		return nil, nil
 	}
-	return p, err
-}
-
-// Page data and its cursor commit together; crashes can safely retry the page.
-// Cursor feeds are not atomic snapshots: missing jobs are never closed here.
-func (r *JobRepository) StoreFeedPage(ctx context.Context, source string, jobs []jobmap.Job, p jobmap.FeedProgress) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-	for _, job := range jobs {
-		if job.Source != source {
-			return fmt.Errorf("feed source mismatch")
-		}
-		if err := storeJob(ctx, tx, job); err != nil {
-			return err
-		}
-	}
-	_, err = tx.Exec(ctx, `INSERT INTO job_feed_progress(source,cursor,job_count,completed_at)
-	 VALUES($1,$2,$3,$4) ON CONFLICT(source) DO UPDATE SET
-	 cursor=EXCLUDED.cursor,job_count=EXCLUDED.job_count,completed_at=EXCLUDED.completed_at`, source, p.Cursor, p.JobCount, p.CompletedAt)
-	if err != nil {
-		return err
-	}
-	return tx.Commit(ctx)
+	return retryAt, err
 }
 
 func (r *JobRepository) DelayFeed(ctx context.Context, source string, until time.Time) error {
 	_, err := r.pool.Exec(ctx, `INSERT INTO job_feed_progress(source,retry_at) VALUES($1,$2)
 	 ON CONFLICT(source) DO UPDATE SET retry_at=GREATEST(job_feed_progress.retry_at,EXCLUDED.retry_at)`, source, until)
 	return err
-}
-
-func (r *JobRepository) List(ctx context.Context, userID string, savedOnly bool) ([]jobmap.Job, error) {
-	query := `SELECT j.payload, j.checked_at, (j.closed OR (j.expires_at IS NOT NULL AND j.expires_at<=now()) OR GREATEST(j.fetched_at,j.checked_at)<now()-interval '72 hours') AS unavailable,
-	 EXISTS(SELECT 1 FROM saved_jobs s WHERE s.job_id=j.id AND s.user_id=$1) AS saved FROM job_listings j WHERE `
-	if savedOnly {
-		query += `EXISTS(SELECT 1 FROM saved_jobs s WHERE s.job_id=j.id AND s.user_id=$1)`
-	} else {
-		query += `NOT j.closed AND (j.expires_at IS NULL OR j.expires_at>now()) AND GREATEST(j.fetched_at,j.checked_at)>=now()-interval '72 hours'`
-	}
-	query += ` ORDER BY j.fetched_at DESC,j.id`
-	rows, err := r.pool.Query(ctx, query, userID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	jobs := []jobmap.Job{}
-	for rows.Next() {
-		var data []byte
-		var checkedAt *time.Time
-		var closed, saved bool
-		if err := rows.Scan(&data, &checkedAt, &closed, &saved); err != nil {
-			return nil, err
-		}
-		var job jobmap.Job
-		if err := json.Unmarshal(data, &job); err != nil {
-			return nil, err
-		}
-		job.Closed, job.Saved = closed, saved
-		job.CheckedAt = checkedAt
-		jobs = append(jobs, job)
-	}
-	return jobs, rows.Err()
 }
 
 func (r *JobRepository) Get(ctx context.Context, userID, id string) (jobmap.Job, error) {
@@ -187,36 +121,6 @@ func (r *JobRepository) Save(ctx context.Context, userID, id string) error {
 func (r *JobRepository) Unsave(ctx context.Context, userID, id string) error {
 	_, err := r.pool.Exec(ctx, `DELETE FROM saved_jobs WHERE user_id=$1 AND job_id=$2`, userID, id)
 	return err
-}
-
-func (r *JobRepository) StoreStatus(ctx context.Context, status jobmap.SourceStatus) error {
-	data, err := json.Marshal(status)
-	if err != nil {
-		return err
-	}
-	_, err = r.pool.Exec(ctx, `INSERT INTO job_source_status(source,payload) VALUES($1,$2) ON CONFLICT(source) DO UPDATE SET payload=EXCLUDED.payload`, status.ID, data)
-	return err
-}
-
-func (r *JobRepository) Statuses(ctx context.Context) ([]jobmap.SourceStatus, error) {
-	rows, err := r.pool.Query(ctx, `SELECT payload FROM job_source_status ORDER BY source`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	items := []jobmap.SourceStatus{}
-	for rows.Next() {
-		var data []byte
-		if err := rows.Scan(&data); err != nil {
-			return nil, err
-		}
-		var s jobmap.SourceStatus
-		if err := json.Unmarshal(data, &s); err != nil {
-			return nil, err
-		}
-		items = append(items, s)
-	}
-	return items, rows.Err()
 }
 
 func (r *JobRepository) ReserveRequest(ctx context.Context, provider, period string, limit int) (bool, error) {
@@ -285,22 +189,5 @@ func (r *JobRepository) ReleaseExternalSearch(ctx context.Context, key, token st
 func (r *JobRepository) FailExternalSearch(ctx context.Context, key, token string, retryAt time.Time) error {
 	_, err := r.pool.Exec(ctx, `UPDATE job_external_search_cache SET retry_at=$3,lease_token=NULL,lease_until=NULL
 	 WHERE cache_key=$1 AND lease_token=$2`, key, token, retryAt)
-	return err
-}
-
-func (r *JobRepository) Prune(ctx context.Context) error {
-	// Keep unavailable saved records to explain closed bookmarks; purge other stale data.
-	_, err := r.pool.Exec(ctx, `DELETE FROM job_listings j WHERE GREATEST(j.fetched_at,j.checked_at)<now()-interval '14 days'
-	 AND NOT EXISTS(SELECT 1 FROM saved_jobs s WHERE s.job_id=j.id)`)
-	if err != nil {
-		return err
-	}
-	_, err = r.pool.Exec(ctx, `DELETE FROM job_search_cache WHERE fetched_at<now()-interval '7 days'`)
-	if err != nil {
-		return err
-	}
-	_, err = r.pool.Exec(ctx, `DELETE FROM job_external_search_cache
-	 WHERE (lease_until IS NULL OR lease_until<=now()) AND (retry_at IS NULL OR retry_at<=now())
-	 AND (refreshed_at IS NULL OR refreshed_at<now()-interval '7 days')`)
 	return err
 }

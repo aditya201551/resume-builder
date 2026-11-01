@@ -17,6 +17,7 @@ import (
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/config"
 	"resume-builder/backend/internal/db"
+	"resume-builder/backend/internal/jobagent"
 	"resume-builder/backend/internal/jobmap"
 	"resume-builder/backend/internal/logging"
 	"resume-builder/backend/internal/repository"
@@ -53,10 +54,12 @@ func main() {
 
 	jobConfig, err := jobmap.LoadConfig()
 	if err != nil {
-		slog.Error("startup_failed", "operation", "load job map config", "error", err)
+		slog.Error("startup_failed", "operation", "load job search config", "error", err)
 		os.Exit(1)
 	}
-	jobService := service.NewJobService(repository.NewJobRepository(pool), jobConfig)
+	jobRepository := repository.NewJobRepository(pool)
+	jobService := service.NewJobService(jobRepository, jobConfig)
+	jobDiscovery := service.NewJobDiscoveryService(jobRepository, jobService)
 
 	providers := auth.NewProviders(cfg.OAuthRedirectBaseURL, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GithubClientID, cfg.GithubClientSecret)
 	if len(providers) == 0 {
@@ -111,6 +114,12 @@ func main() {
 		os.Exit(1)
 	}
 	resumeImportService := service.NewResumeImportService(ai.NewPDFClient(importAIConfig), repository.NewResumeImportRepository(pool))
+	jobPlanner, err := jobagent.New(ctx, importAIConfig)
+	if err != nil {
+		slog.Error("startup_failed", "operation", "create job assistant", "error", err)
+		os.Exit(1)
+	}
+	jobAssistant := service.NewJobAssistantService(jobPlanner, jobRepository)
 
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
@@ -129,7 +138,7 @@ func main() {
 		ResumeDesign:   handlers.NewResumeDesignHandler(resumeDesignService),
 		DesignSchema:   handlers.NewDesignSchemaHandler(),
 		Agent:          agentHandler,
-		Jobs:           handlers.NewJobHandler(jobService),
+		Jobs:           handlers.NewJobHandler(jobService).WithDiscovery(jobDiscovery, jobAssistant),
 	}
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {
@@ -147,7 +156,6 @@ func main() {
 	}
 
 	router := api.NewRouter(jwtIssuer, h, healthCheck, cfg.StaticDir)
-	jobService.Start(ctx)
 
 	slog.Info("api_listening", "port", cfg.Port)
 	server := &http.Server{Addr: ":" + cfg.Port, Handler: router, ErrorLog: slog.NewLogLogger(slog.Default().Handler(), slog.LevelError)}
@@ -171,9 +179,6 @@ func main() {
 		if closeErr := server.Close(); closeErr != nil {
 			slog.Error("api_close_failed", "error", closeErr)
 		}
-	}
-	if err := jobService.Stop(shutdown); err != nil {
-		slog.Error("job_workers_stop_failed", "error", err)
 	}
 	slog.Info("api_shutdown_completed")
 	if failed {

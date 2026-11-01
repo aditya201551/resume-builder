@@ -9,15 +9,14 @@ import {
 } from 'react'
 import {
   ArrowDown,
+  ArrowUp,
   ArrowUpRight,
   Check,
   FileText,
   Loader2,
   Palette,
   Plus,
-  Send,
   SpellCheck,
-  Sparkles,
   Square,
   X,
 } from 'lucide-react'
@@ -27,7 +26,6 @@ import { Message, MessageContent } from '@/components/ui/message'
 import ActionItem from '@/components/agent/ActionItem'
 import ChatMarkdown from '@/components/agent/ChatMarkdown'
 import CopyButton from '@/components/agent/CopyButton'
-import StreamingMarkdown from '@/components/agent/StreamingMarkdown'
 import { groupAssistantParts } from '@/lib/agentProposal'
 import {
   type AgentChatController,
@@ -158,11 +156,7 @@ function AssistantParts({
         const review = item.kind === 'ui' ? parts.find((p) => p.kind === 'proposal' && p.key === item.part.reviewKey) : undefined
         return item.kind === 'text' ? (
           <div key={item.key} className="text-sm leading-6 text-foreground">
-            {streaming && isLast ? (
-              <StreamingMarkdown text={item.text} streaming />
-            ) : (
-              <ChatMarkdown text={item.text} />
-            )}
+            <ChatMarkdown text={item.text} animateWords={streaming} streaming={streaming && isLast} />
           </div>
         ) : item.kind === 'tool' ? (
           <ToolActivity key={item.key} event={item.event} />
@@ -297,6 +291,7 @@ export default function ChatPanel({
   const scrollRef = useRef<HTMLDivElement>(null)
   const shouldStickRef = useRef(true)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const contextButtonRef = useRef<HTMLButtonElement>(null)
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     const el = scrollRef.current
@@ -336,7 +331,7 @@ export default function ChatPanel({
 
   function handleSend() {
     const content = input.trim()
-    if (!content) return
+    if (!content || isStreaming) return
     setInput('')
     shouldStickRef.current = true
     void sendMessage(content, jobDescription)
@@ -349,73 +344,17 @@ export default function ChatPanel({
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault()
       handleSend()
     }
   }
 
   return (
-    <div className="assistant-panel flex h-full min-h-0 w-full flex-col">
-      <header className="assistant-header">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="assistant-mark" data-working={isStreaming}>
-              <Sparkles className="size-4" aria-hidden />
-            </span>
-            <h1>Resume assistant</h1>
-          </div>
-          <span role="status" className="text-xs text-muted-foreground">
-            {isStreaming ? 'Working on it...' : 'Here to help'}
-          </span>
-        </div>
-        <div className="assistant-scope">
-          <span>
-            <FileText className="size-3" aria-hidden /> Current resume
-          </span>
-          <button
-            type="button"
-            onClick={() => setJobOpen(!jobOpen)}
-            aria-expanded={jobOpen}
-            aria-controls="assistant-job-context"
-          >
-            {jobDescription.trim() ? (
-              <Check className="size-3" />
-            ) : (
-              <Plus className="size-3" />
-            )}{' '}
-            {jobDescription.trim() ? 'Job context added' : 'Add job context'}
-          </button>
-        </div>
-        {jobOpen && (
-          <div id="assistant-job-context" className="job-context-field">
-            <label htmlFor="assistant-job" className="text-xs font-medium">
-              Job description
-            </label>
-            <Textarea
-              id="assistant-job"
-              value={jobDescription}
-              maxLength={16000}
-              onChange={(event) => onJobDescriptionChange(event.target.value)}
-              rows={4}
-              placeholder="Paste a job description to guide your next request."
-            />
-            <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
-              <span>Used as context for your next message.</span>
-              <button
-                type="button"
-                onClick={() => {
-                  onJobDescriptionChange('')
-                  setJobOpen(false)
-                }}
-                className="rounded-md p-1 hover:text-primary"
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
+    <section className="assistant-panel resume-assistant-panel flex h-full min-h-0 w-full flex-col" aria-label="Resume assistant">
+      <span role="status" className="sr-only">
+        {isStreaming ? 'Working on it...' : 'Here to help'}
+      </span>
       <div className="relative min-h-0 flex-1">
         <div
           ref={scrollRef}
@@ -509,45 +448,90 @@ export default function ChatPanel({
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-2xl p-3 pt-2">
-        <div className="assistant-composer">
-          <Textarea
-            ref={textareaRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="What would you like to work on?"
-            aria-label="Message the resume assistant"
-            rows={1}
-            className="min-h-12 resize-none border-0 bg-transparent! px-0 py-0.5 text-sm leading-6 shadow-none focus-visible:ring-0"
-            disabled={isStreaming}
-          />
-          <div className="flex items-center justify-between gap-3 pt-0.5">
-            <button
-              type="button"
-              className="flex min-h-8 items-center gap-1.5 rounded-md px-0.5 py-0.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => setAutoAccept(!autoAccept)}
-              aria-pressed={autoAccept}
-              title="Automatically apply other edits. Complete new entries are added directly."
-            >
-              <span
-                className="relative inline-flex h-3 w-5 shrink-0 rounded-full bg-input transition-colors data-[checked=true]:bg-primary"
-                data-checked={autoAccept}
-                aria-hidden
+      <form className="resume-chat-compose-wrap" onSubmit={(event) => { event.preventDefault(); handleSend() }}>
+        <div className="assistant-composer resume-chat-composer">
+          <div className="resume-composer-fields">
+            {jobOpen && (
+              <div id="assistant-job-context" className="resume-job-context">
+                <div className="resume-job-context-heading">
+                  <label htmlFor="assistant-job">Job description</label>
+                  <button
+                    type="button"
+                    aria-label="Remove job context"
+                    onClick={() => {
+                      onJobDescriptionChange('')
+                      setJobOpen(false)
+                      contextButtonRef.current?.focus()
+                    }}
+                  >
+                    <X className="size-3.5" aria-hidden />
+                  </button>
+                </div>
+                <Textarea
+                  id="assistant-job"
+                  autoFocus
+                  value={jobDescription}
+                  maxLength={16000}
+                  onChange={(event) => onJobDescriptionChange(event.target.value)}
+                  rows={3}
+                  placeholder="Paste a job description to guide your next request."
+                />
+              </div>
+            )}
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="What would you like to work on?"
+              aria-label="Message the resume assistant"
+              rows={1}
+              className="resume-chat-input"
+              disabled={isStreaming}
+            />
+          </div>
+          <div className="resume-composer-toolbar">
+            <div className="resume-composer-options">
+              <button
+                type="button"
+                ref={contextButtonRef}
+                className="resume-context-button"
+                data-filled={Boolean(jobDescription.trim())}
+                aria-label={jobDescription.trim() ? 'Edit job context' : 'Add job context'}
+                onClick={() => setJobOpen(!jobOpen)}
+                aria-expanded={jobOpen}
+                aria-controls="assistant-job-context"
+              >
+                {jobDescription.trim() ? <Check className="size-3.5" aria-hidden /> : <Plus className="size-3.5" aria-hidden />}
+                Job context
+              </button>
+              <button
+                type="button"
+                className="resume-auto-accept"
+                onClick={() => setAutoAccept(!autoAccept)}
+                aria-pressed={autoAccept}
+                aria-label="Auto-accept edits"
+                title="Automatically apply other edits. Complete new entries are added directly."
               >
                 <span
-                  className="absolute left-0.5 top-0.5 size-2 rounded-full bg-background transition-transform data-[checked=true]:translate-x-2"
+                  className="relative inline-flex h-3 w-5 shrink-0 rounded-full bg-input transition-colors data-[checked=true]:bg-primary"
                   data-checked={autoAccept}
-                />
-              </span>
-              <span>Auto-accept edits</span>
-            </button>
+                  aria-hidden
+                >
+                  <span
+                    className="absolute left-0.5 top-0.5 size-2 rounded-full bg-background transition-transform data-[checked=true]:translate-x-2"
+                    data-checked={autoAccept}
+                  />
+                </span>
+                <span>Auto-accept</span>
+              </button>
+            </div>
 
             {isStreaming ? (
               <Button
                 type="button"
                 size="icon"
-                className="rounded-full"
+                className="resume-chat-send"
                 variant="secondary"
                 onClick={cancel}
                 aria-label="Stop response"
@@ -556,19 +540,18 @@ export default function ChatPanel({
               </Button>
             ) : (
               <Button
-                type="button"
+                type="submit"
                 size="icon"
-                className="rounded-full"
-                onClick={handleSend}
+                className="resume-chat-send"
                 disabled={!input.trim()}
                 aria-label="Send message"
               >
-                <Send className="size-3.5" />
+                <ArrowUp className="size-4" aria-hidden />
               </Button>
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </form>
+    </section>
   )
 }

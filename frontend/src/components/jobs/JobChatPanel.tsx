@@ -59,7 +59,7 @@ export default function JobChatPanel({ chat, active, saved, onManual }: { chat: 
         <div className="jobs-chat-messages">
           {chat.messages.length === 0 && <div className="assistant-welcome"><h2>{saved ? 'Revisit the roles you saved.' : 'Let’s find your next role.'}</h2><p>{saved ? 'Ask me to narrow your saved jobs by role, work location, or experience level.' : 'Tell me what you want to do and where you can work. We’ll refine the search together.'}</p>{!saved && <div className="assistant-starters">{starters.map(({ label, icon: Icon, prompt }) => <button key={label} type="button" disabled={chat.thinking} onClick={() => send(prompt)}><Icon size={16} aria-hidden /><span>{label}</span><ArrowUpRight size={14} aria-hidden /></button>)}</div>}</div>}
           {chat.messages.map(message => <Message key={message.id} align={message.role === 'user' ? 'end' : 'start'}><MessageContent className={message.role === 'user' ? 'items-end' : 'max-w-full'}>
-            {message.role === 'user' ? <div className="jobs-chat-user">{message.text}</div> : <div className="jobs-chat-answer"><ChatMarkdown text={message.text} /></div>}
+            {message.role === 'user' ? <div className="jobs-chat-user">{message.text}</div> : <div className="jobs-chat-answer"><ChatMarkdown text={message.text} animateWords /></div>}
             {message.applied && <span className="jobs-chat-applied"><Check size={12} />Search criteria updated</span>}
             <CopyButton getText={() => message.text} className={message.role === 'user' ? 'self-end' : 'self-start'} />
           </MessageContent></Message>)}

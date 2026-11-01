@@ -45,3 +45,31 @@
   text-decoration: underline;
   text-decoration-color: currentColor;
 }
+
+.richText :global([data-reveal-word]) {
+  display: inline-block;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.richText[data-streaming='true'] > :last-child::after {
+  content: '';
+  display: inline-block;
+  width: 0.42em;
+  height: 1em;
+  margin-left: 0.12em;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: -0.12em;
+  opacity: 0.55;
+  animation: stream-cursor-pulse 900ms ease-in-out infinite;
+}
+
+@keyframes stream-cursor-pulse {
+  0%, 100% { opacity: 0.2; transform: scaleY(0.72); }
+  50% { opacity: 0.72; transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .richText[data-streaming='true'] > :last-child::after { animation: none; }
+}

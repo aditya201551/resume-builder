@@ -8,6 +8,7 @@ The application uses **Cobalt and ember**, the gradient direction selected by th
 - Signature: cobalt and coral/peach light surrounding a focused, solid AI composer.
 - Composition: fixed, non-scrolling home with a viewport-filling gradient. The compact AI composer, starter tasks and recent resumes form a single group, with a bounded 24–40px gap before the recent-resume strip rather than anchoring it to the viewport bottom. The strip shows up to four resumes, View all and Import existing resume. The home resume picker is a compact pill with a separate menu that accommodates long titles. The full document gallery lives on My resumes; manual creation remains available. Editor controls and PDF preview remain stable; jobs separates search from results.
 - Navigation: slim, translucent glass top bars with backdrop blur, a neutral selected surface, and Home, My resumes and Jobs. The editor retains AI workspace, Content and Design modes in the same glass treatment.
+- The resume assistant has no upper header or scope bar. Its conversation gets the full upper pane, with job context beside auto-accept in a compact bottom composer. Job context expands inside the composer; its fields can scroll on short screens while send/stop remain visible. The composer has a soft neutral surface, no border, a growing message field and a circular up-arrow send button. The job-search assistant retains its own heading and filter controls.
 - Sign-in has no navigation bar or outer frame. Its gradient fills the viewport, with introductory text on the left and Google/GitHub sign-in on the right; the two sections stack on phones. Branding sits within the introduction.
 - The application is light-only, including when the operating system or a previously saved preference requests dark mode. There is no theme switch or dark palette.
 - Geist Variable is bundled locally and supplies app headings, controls and body text.
@@ -26,7 +27,7 @@ The application uses **Cobalt and ember**, the gradient direction selected by th
 
 ## Icons and controls
 
-Lucide is the single interface icon family, normally 16–20px with a consistent 1.8 stroke. The existing file mark gains the brand gradient; selected states use cobalt. Icon-only buttons have accessible names. The compact home composer uses a circular up-arrow send button and examples that rotate every five seconds while empty, with a static example for reduced-motion preferences.
+Lucide is the single interface icon family, normally 16–20px with a consistent 1.8 stroke. The existing file mark gains the brand gradient; selected states use cobalt. Icon-only buttons have accessible names. The compact home composer uses a circular up-arrow send button and examples that rotate every 1.5 seconds while empty. Each example fades upward before the next slides in with a short word stagger, using only opacity and transforms. The hint cannot intercept clicks and disappears immediately on typing or choosing a starter. Reduced-motion preferences show a static example, including when the setting changes while the page is open.
 
 Buttons retain an immediate 2px focus outline. As requested by the owner, text inputs, textareas, rich-text editors and their composer containers do not add a border, outline or ring when focused, including keyboard focus. Their resting surfaces and validation states stay unchanged. Controls use distinct hover, pressed, disabled and error states; touch controls have a 44px hit target. Primary actions use the ink treatment, with the AI entry action using cobalt. Selection indicators do not imply submission.
 
@@ -36,7 +37,7 @@ Use CSS for hover, focus, contextual disclosures and surface transitions. Use `m
 
 - Micro feedback: 120ms; standard state transitions: 180ms; pane transitions: 240ms.
 - Home and sign-in gradients play a single 3000ms wave entrance: cobalt and ember/peach layers drift in from opposing directions, pass gently through their resting positions, and settle. The final colours and layering stay the same. Only background opacity and transform animate; content is immediately available and the gradient stays still afterward. Layers are clipped to prevent temporary scrolling and cannot intercept pointer events. Reduced-motion preferences show the final static gradient immediately.
-- Loading motion follows actual work. Streaming messages are not reanimated for every text chunk.
+- Loading motion follows actual work. New words in resume replies use the same 280ms, 6px upward fade and 35ms stagger as the home examples. Markdown updates retain the reveal progress of incoming words and leave earlier text still; batch stagger is capped at 120ms so the UI never queues behind the network. Job replies use the same effect on arrival (their endpoint returns a complete reply). Markdown, links, code, copying and cancellation retain their behavior. Reduced-motion preferences reveal all text immediately.
 - `MotionConfig reducedMotion="user"` and CSS reduced-motion rules disable spatial motion. Keyboard focus and interactions never wait for an animation.
 - Editor panes stay mounted when their mode is hidden, preserving form, chat and draft state.
 

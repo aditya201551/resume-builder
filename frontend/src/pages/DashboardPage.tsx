@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -46,15 +46,10 @@ import {
 import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
 import ImportResumeDialog from '@/components/dashboard/ImportResumeDialog'
 import RecentResumes from '@/components/dashboard/RecentResumes'
+import PromptExamples from '@/components/dashboard/PromptExamples'
 
 const resumesKey = ['resumes'] as const
 const starterIcons = [WandSparkles, Check, Target]
-const promptExamples = [
-  'Make my experience sound more impactful…',
-  'Review my resume and suggest improvements…',
-  'Tailor my resume to a software engineer role…',
-  'Help me write a compelling summary…',
-]
 
 export default function DashboardPage({
   libraryOnly = false,
@@ -65,22 +60,12 @@ export default function DashboardPage({
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [prompt, setPrompt] = useState('')
-  const [exampleIndex, setExampleIndex] = useState(0)
   const [selection, setSelection] = useState('')
   const [jobOpen, setJobOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState('')
   const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
   const [importOpen, setImportOpen] = useState(false)
-  useEffect(() => {
-    if (libraryOnly || prompt || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
-      return
-    const interval = window.setInterval(() => {
-      if (!document.hidden)
-        setExampleIndex((index) => (index + 1) % promptExamples.length)
-    }, 5000)
-    return () => window.clearInterval(interval)
-  }, [libraryOnly, prompt])
   const resumesQuery = useQuery({
     queryKey: resumesKey,
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
@@ -163,16 +148,18 @@ export default function DashboardPage({
             {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} make your next move.
           </p>
           <form className="home-composer" onSubmit={startAssistant}>
-            <Textarea
-              id="home-prompt"
-              aria-label="Message the resume assistant"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder={promptExamples[exampleIndex]}
-              maxLength={8000}
-              rows={1}
-              className="home-prompt"
-            />
+            <div className="home-prompt-field">
+              <Textarea
+                id="home-prompt"
+                aria-label="Message the resume assistant"
+                value={prompt}
+                onChange={(event) => setPrompt(event.target.value)}
+                maxLength={8000}
+                rows={1}
+                className="home-prompt"
+              />
+              {!prompt && <PromptExamples />}
+            </div>
             {jobOpen && (
               <div className="job-context-field">
                 <div className="flex items-center justify-between gap-2">

@@ -62,7 +62,7 @@ const RewriteComparison = defineComponent({
     if (context.ui.kind !== 'rewrite_comparison' || !context.ui.target) throw new Error('Rewrite target is missing.')
     return <div className="flex flex-col gap-3">
       <div className="rounded-xl bg-background/70 p-3"><p className="mb-1 text-xs font-medium">Current text</p><p className="whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">{context.ui.target.original || 'No text yet.'}</p></div>
-      {props.options.map((option, index) => <div key={index} className="flex min-w-0 flex-col gap-2 rounded-xl border border-border bg-card p-3">
+      {props.options.map((option, index) => <div key={index} className="flex min-w-0 flex-col gap-2 rounded-xl bg-card p-3">
         <label htmlFor={`${id}-${index}`} className="text-xs font-medium">{option.label}</label>
         <Textarea id={`${id}-${index}`} value={String(edits[`option${index}`] ?? option.text)} maxLength={16000} rows={4} disabled={context.disabled} onChange={(event) => {
           const next = { ...edits, [`option${index}`]: event.target.value }; setEdits(next); context.onStateChange(next)
@@ -76,7 +76,7 @@ const RewriteComparison = defineComponent({
 const AssistantPanel = defineComponent({
   name: 'AssistantPanel', description: 'Root resume assistant card. Include one interactive form OR one rewrite comparison, optionally preceded by a TextBlock.',
   props: z.object({ title: z.string().min(1).max(120), children: z.array(z.union([TextBlock.ref, ExperienceForm.ref, RewriteComparison.ref])).min(1).max(3) }),
-  component: ({ props, renderNode }) => <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-primary/15 bg-secondary/30 p-4"><h3 className="text-sm font-semibold">{props.title}</h3>{renderNode(props.children)}</section>,
+  component: ({ props, renderNode }) => <section className="flex min-w-0 flex-col gap-4 rounded-2xl bg-secondary/30 p-4"><h3 className="text-sm font-semibold">{props.title}</h3>{renderNode(props.children)}</section>,
 })
 
 export const assistantLibrary = createLibrary({ root: 'AssistantPanel', components: [AssistantPanel, TextBlock, ExperienceForm, RewriteComparison] })

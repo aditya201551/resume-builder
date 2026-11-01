@@ -1,5 +1,5 @@
 import { Link } from 'react-router'
-import { ArrowRight, FileText, FileUp, Loader2 } from 'lucide-react'
+import { ArrowRight, FileUp, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
 import type { Resume } from '@/types/resume'
@@ -46,16 +46,19 @@ export default function RecentResumes({ resumes, isLoading, isError, onRetry, on
               className="home-recent-card"
               aria-label={`Open ${resume.label || 'Untitled resume'}`}
             >
-              <div className="home-recent-preview" aria-hidden><ResumeThumbnail resumeId={resume.id} /></div>
-              <FileText className="home-recent-icon" aria-hidden />
+              <div className="home-recent-cover" aria-hidden>
+                <div className="home-recent-preview"><ResumeThumbnail resumeId={resume.id} /></div>
+              </div>
               <div className="home-recent-details">
                 <h3 title={resume.label || 'Untitled resume'}>{resume.label || 'Untitled resume'}</h3>
                 <p title={resume.full_name || 'Your next opportunity'}>{resume.full_name || 'Your next opportunity'}</p>
-                <time dateTime={resume.updated_at}>
-                  Updated {new Date(resume.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                </time>
+                <div className="home-recent-footer">
+                  <time dateTime={resume.updated_at}>
+                    Edited {new Date(resume.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  </time>
+                  <span className="home-recent-open">Continue editing <ArrowRight aria-hidden /></span>
+                </div>
               </div>
-              <ArrowRight className="home-recent-open" aria-hidden />
             </Link>
           ))}
         </div>

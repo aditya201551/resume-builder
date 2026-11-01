@@ -141,7 +141,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
   )
 
   return (
-    <div className="relative rounded-md border border-input bg-card">
+    <div className="relative rounded-md bg-secondary">
       <div className="flex items-center gap-1 border-b border-input px-2 py-1">
         {button(editor.isActive('bold'), () => editor.chain().focus().toggleBold().run(), Bold, 'Bold')}
         {button(editor.isActive('italic'), () => editor.chain().focus().toggleItalic().run(), Italic, 'Italic')}
@@ -161,7 +161,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
       </div>
 
       {linkPopoverOpen && (
-        <div className="absolute left-2 top-9 z-10 flex items-center gap-1 rounded-md border border-input bg-popover p-1 shadow-md">
+        <div className="absolute left-2 top-9 z-10 flex items-center gap-1 rounded-md bg-popover p-1 shadow-md">
           <LinkIcon className="ml-1 size-3.5 shrink-0 text-muted-foreground" />
           <input
             autoFocus

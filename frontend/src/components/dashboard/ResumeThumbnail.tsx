@@ -22,7 +22,7 @@ export default function ResumeThumbnail({ resumeId }: { resumeId: string }) {
   return (
     <div
       ref={containerRef}
-      className="relative w-full overflow-hidden rounded-md border border-border bg-white"
+      className="relative w-full overflow-hidden rounded-md bg-white"
       style={{ aspectRatio: '0.773' }}
     >
       {isLoading || !data || scale === 0 ? (

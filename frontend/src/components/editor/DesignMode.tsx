@@ -77,7 +77,7 @@ function NumberField({
             setInputValue(String(next))
             if (next !== value) onChange(next)
           }}
-          className="h-7 w-16 rounded border border-input bg-transparent px-1.5 text-right text-sm tabular-nums"
+          className="h-7 w-16 rounded bg-secondary px-1.5 text-right text-sm tabular-nums"
         />
       </div>
       <div className="flex items-center gap-2">
@@ -96,7 +96,7 @@ function NumberField({
             type="button"
             aria-label={`Decrease ${label}`}
             onClick={() => onChange(stepValue(value, -step, min, max, step))}
-            className="flex size-6 items-center justify-center rounded border border-input text-muted-foreground hover:bg-secondary"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
           >
             −
           </button>
@@ -104,7 +104,7 @@ function NumberField({
             type="button"
             aria-label={`Increase ${label}`}
             onClick={() => onChange(stepValue(value, step, min, max, step))}
-            className="flex size-6 items-center justify-center rounded border border-input text-muted-foreground hover:bg-secondary"
+            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-secondary"
           >
             +
           </button>
@@ -126,7 +126,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
           aria-label={`Pick ${label}`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          className="h-9 w-9 shrink-0 cursor-pointer rounded border border-border bg-transparent p-0.5"
+          className="h-9 w-9 shrink-0 cursor-pointer rounded bg-transparent p-0.5"
         />
         <Input aria-label={`${label} hex color`} value={inputValue} onFocus={() => { focused.current = true }} onChange={(e) => {
           setInputValue(e.target.value)
@@ -139,7 +139,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string; 
 
 function BoolField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2 text-sm">
+    <label className="flex items-center justify-between gap-3 rounded-lg bg-card px-3 py-2 text-sm">
       {label}
       <Switch checked={value} onCheckedChange={onChange} />
     </label>
@@ -162,12 +162,13 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
           key={t.id}
           type="button"
           onClick={() => applyTemplate(t)}
+          aria-pressed={design.templateId === t.id}
           className={cn(
-            'flex flex-col items-center gap-2 rounded-lg border p-3 text-sm transition-colors',
-            design.templateId === t.id ? 'border-accent ring-1 ring-accent' : 'border-border hover:border-foreground/30',
+            'flex flex-col items-center gap-2 rounded-lg p-3 text-sm transition-colors',
+            design.templateId === t.id ? 'bg-secondary text-foreground' : 'bg-card hover:bg-secondary/60',
           )}
         >
-          <div aria-hidden className="flex h-24 w-16 flex-col gap-1 rounded-sm border bg-white p-2 shadow-sm">
+          <div aria-hidden className="flex h-24 w-16 flex-col gap-1 rounded-sm bg-white p-2 shadow-sm">
             <span className="mb-1 h-1.5 w-8 rounded-sm bg-slate-700" />
             {[0, 1, 2].map((row) => <div key={row} className="mt-1 flex flex-col gap-1"><span className="h-1 w-7 rounded-sm bg-violet-300" /><span className="h-0.5 w-full bg-slate-200" /><span className="h-0.5 w-4/5 bg-slate-200" /></div>)}
           </div>
@@ -206,7 +207,7 @@ function SectionRefList({
         const customSection = isCustom ? customSections.find((s) => s.id === ref.customSectionId) : undefined
         const defaultLabel = isCustom ? customSection?.title || 'Untitled section' : (SECTION_LABELS[ref.sectionType] ?? ref.sectionType)
         return (
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg bg-card px-3 py-2">
             {dragHandle}
             <Input
               value={ref.titleOverride ?? ''}
@@ -437,8 +438,8 @@ export default function DesignMode() {
               Restore defaults
             </Button>
             <div className="flex gap-1" role="group" aria-label="Formatting history">
-              <button type="button" onClick={undoDesign} disabled={!canUndoDesign} aria-label="Undo formatting" title="Undo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Undo2 className="size-3.5" /></button>
-              <button type="button" onClick={redoDesign} disabled={!canRedoDesign} aria-label="Redo formatting" title="Redo formatting" className="rounded-lg border p-2 disabled:opacity-30"><Redo2 className="size-3.5" /></button>
+              <button type="button" onClick={undoDesign} disabled={!canUndoDesign} aria-label="Undo formatting" title="Undo formatting" className="rounded-lg p-2 disabled:opacity-30"><Undo2 className="size-3.5" /></button>
+              <button type="button" onClick={redoDesign} disabled={!canRedoDesign} aria-label="Redo formatting" title="Redo formatting" className="rounded-lg p-2 disabled:opacity-30"><Redo2 className="size-3.5" /></button>
             </div>
           </div>
         </div>

@@ -13,10 +13,6 @@ body {
   background: color-mix(in oklab, var(--color-signal) 22%, transparent);
   color: var(--foreground);
 }
-:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
-}
 :where(.app-shell, .workspace-shell, .login-page) :is(h1, h2, h3) {
   min-width: 0;
   overflow-wrap: break-word;

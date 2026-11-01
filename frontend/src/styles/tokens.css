@@ -67,7 +67,6 @@
   --radius-composer: 22px;
   --radius-stage: 28px;
   --color-glass: oklch(100% 0.002 265 / 0.52);
-  --color-glass-rule: oklch(100% 0.002 265 / 0.75);
   --color-glass-selected: oklch(100% 0.002 265 / 0.72);
-  --shadow-glass: 0 2px 12px oklch(23% 0.025 265 / 0.04), inset 0 1px 0 oklch(100% 0.002 265 / 0.8);
+  --shadow-glass: 0 2px 12px oklch(23% 0.025 265 / 0.04);
 }

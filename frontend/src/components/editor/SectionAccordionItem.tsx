@@ -14,7 +14,7 @@ interface SectionAccordionItemProps {
 
 export default function SectionAccordionItem({ value, title, count, icon: Icon, dragHandle, children }: SectionAccordionItemProps) {
   return (
-    <AccordionItem value={value} className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    <AccordionItem value={value} className="overflow-hidden rounded-xl bg-card shadow-sm">
       <div className="flex items-center gap-1 pl-2 pr-4">
         {dragHandle}
         <AccordionTrigger className="cursor-pointer items-center gap-3 rounded-lg py-4 pl-1 pr-3 text-base font-medium hover:no-underline">

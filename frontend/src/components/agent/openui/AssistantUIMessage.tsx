@@ -5,7 +5,7 @@ import { UIInteractionContext } from './context'
 import type { AssistantUI, UIFormState, UIReviewAction } from '@/lib/assistantUI'
 
 function Fallback({ text }: { text: string }) {
-  return <div className="rounded-2xl border border-border bg-secondary/30 p-4 text-sm"><p className="font-medium">This interactive card couldn't be displayed.</p><p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{text}</p><p className="mt-2 text-xs text-muted-foreground">Ask the assistant to try again, or continue in Content.</p></div>
+  return <div className="rounded-2xl bg-secondary/30 p-4 text-sm"><p className="font-medium">This interactive card couldn't be displayed.</p><p className="mt-2 whitespace-pre-wrap break-words text-muted-foreground">{text}</p><p className="mt-2 text-xs text-muted-foreground">Ask the assistant to try again, or continue in Content.</p></div>
 }
 
 class UIErrorBoundary extends Component<{ children: ReactNode; fallback: string }, { failed: boolean }> {

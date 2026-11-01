@@ -103,7 +103,7 @@ function ToolActivity({
   const isError = event.status === 'error'
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-1 flex w-fit items-center gap-2 rounded-full border border-border bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground duration-200">
+    <div className="animate-in fade-in slide-in-from-bottom-1 flex w-fit items-center gap-2 rounded-full bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground duration-200">
       {isRunning ? (
         <Loader2 className="size-3.5 animate-spin text-accent" />
       ) : isError ? (
@@ -415,7 +415,7 @@ export default function ChatPanel({
             type="button"
             size="sm"
             variant="secondary"
-            className="absolute bottom-3 left-1/2 h-7 -translate-x-1/2 gap-1.5 rounded-full border border-border bg-background/95 px-3 shadow-sm backdrop-blur"
+            className="absolute bottom-3 left-1/2 h-7 -translate-x-1/2 gap-1.5 rounded-full bg-background/95 px-3 shadow-sm backdrop-blur"
             onClick={() => scrollToBottom()}
           >
             <ArrowDown className="size-3.5" />

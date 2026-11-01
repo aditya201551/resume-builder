@@ -41,8 +41,8 @@ export default function AddSectionDialog({ open, onOpenChange, options, onSelect
                 onOpenChange(false)
               }}
               className={cn(
-                'flex flex-col items-start gap-2 rounded-lg border border-transparent bg-secondary/60 p-5 text-left transition-colors hover:bg-secondary',
-                emphasized && 'border-dashed border-border bg-transparent hover:bg-secondary/40',
+                'flex flex-col items-start gap-2 rounded-lg bg-secondary/60 p-5 text-left transition-colors hover:bg-secondary',
+                emphasized && 'bg-secondary/40 hover:bg-secondary/40',
               )}
             >
               <span className="flex size-9 items-center justify-center rounded-md bg-background text-foreground">

@@ -35,7 +35,7 @@ export default function ImportResumeDialog({ open, onOpenChange }: { open: boole
         <DialogTitle>Import existing resume</DialogTitle>
         <DialogDescription>Bring your experience into a new, editable resume. Your content will use the Vertical template; the original design isn't copied.</DialogDescription>
       </DialogHeader>
-      <label className="relative flex cursor-pointer flex-col items-center gap-3 rounded-2xl border border-dashed border-primary/30 bg-secondary/30 px-5 py-7 text-center transition-colors hover:bg-secondary/60 focus-within:ring-2 focus-within:ring-ring">
+      <label className="relative flex cursor-pointer flex-col items-center gap-3 rounded-2xl bg-secondary/30 px-5 py-7 text-center transition-colors hover:bg-secondary/60 focus-within:bg-secondary">
         <FileText className="size-7 text-primary" aria-hidden />
         <span className="max-w-full break-all text-sm font-medium">{file ? file.name : 'Choose your resume PDF'}</span>
         <span className="text-xs text-muted-foreground">PDF only · Up to 10 MB · 1–10 pages</span>

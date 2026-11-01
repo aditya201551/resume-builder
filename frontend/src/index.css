@@ -89,7 +89,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border;
     }
   body {
     @apply bg-background text-foreground;
@@ -123,8 +123,21 @@
 }
 
 :focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 3px;
+  outline: none;
+}
+
+:is(button, a[href], summary, [role='button'], [role='tab'], [role='switch'], [role='option']):focus-visible {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+
+:is(a[href], summary):focus-visible {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+label:has(input:is([type='checkbox'], [type='radio']):focus-visible) {
+  background-color: var(--accent);
 }
 
 :is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), textarea, [contenteditable='true']):is(:focus, :focus-visible) {

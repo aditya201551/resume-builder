@@ -127,6 +127,11 @@
   outline-offset: 3px;
 }
 
+:is(input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']), textarea, [contenteditable='true']):is(:focus, :focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
 @keyframes chat-dot {
   0%,
   100% {

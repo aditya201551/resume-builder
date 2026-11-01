@@ -1,9 +1,11 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
+  ArrowUp,
   Check,
+  ChevronDown,
   Copy,
   FileText,
   FileUp,
@@ -28,6 +30,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
@@ -41,9 +45,16 @@ import {
 } from '@/components/ui/alert-dialog'
 import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
 import ImportResumeDialog from '@/components/dashboard/ImportResumeDialog'
+import RecentResumes from '@/components/dashboard/RecentResumes'
 
 const resumesKey = ['resumes'] as const
 const starterIcons = [WandSparkles, Check, Target]
+const promptExamples = [
+  'Make my experience sound more impactful…',
+  'Review my resume and suggest improvements…',
+  'Tailor my resume to a software engineer role…',
+  'Help me write a compelling summary…',
+]
 
 export default function DashboardPage({
   libraryOnly = false,
@@ -54,12 +65,22 @@ export default function DashboardPage({
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [prompt, setPrompt] = useState('')
+  const [exampleIndex, setExampleIndex] = useState(0)
   const [selection, setSelection] = useState('')
   const [jobOpen, setJobOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState('')
   const [search, setSearch] = useState('')
   const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
   const [importOpen, setImportOpen] = useState(false)
+  useEffect(() => {
+    if (libraryOnly || prompt || window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+      return
+    const interval = window.setInterval(() => {
+      if (!document.hidden)
+        setExampleIndex((index) => (index + 1) % promptExamples.length)
+    }, 5000)
+    return () => window.clearInterval(interval)
+  }, [libraryOnly, prompt])
   const resumesQuery = useQuery({
     queryKey: resumesKey,
     queryFn: () => apiGet<Resume[]>('/api/resumes'),
@@ -71,6 +92,9 @@ export default function DashboardPage({
     resumes.some((resume) => resume.id === selection) || selection === 'new'
       ? selection
       : (resumes[0]?.id ?? 'new')
+  const selectedLabel = selectedId === 'new'
+    ? 'New resume'
+    : resumes.find((resume) => resume.id === selectedId)?.label || 'Untitled resume'
 
   const createMutation = useMutation({
     mutationFn: (_task: AssistantTask | undefined) =>
@@ -139,16 +163,14 @@ export default function DashboardPage({
             {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} make your next move.
           </p>
           <form className="home-composer" onSubmit={startAssistant}>
-            <label htmlFor="home-prompt" className="composer-label">
-              What would you like help with?
-            </label>
             <Textarea
               id="home-prompt"
+              aria-label="Message the resume assistant"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder="What are we working toward? Try making your experience more impactful."
+              placeholder={promptExamples[exampleIndex]}
               maxLength={8000}
-              rows={3}
+              rows={1}
               className="home-prompt"
             />
             {jobOpen && (
@@ -180,23 +202,32 @@ export default function DashboardPage({
               </div>
             )}
             <div className="composer-toolbar">
-              <div className="flex min-w-0 flex-wrap items-center gap-2">
-                <label className="resume-context-picker">
-                  <FileText className="size-3.5 shrink-0" aria-hidden />
-                  <span className="sr-only">Resume to work on</span>
-                  <select
-                    value={selectedId}
-                    onChange={(event) => setSelection(event.target.value)}
-                    disabled={resumesQuery.isLoading}
-                  >
-                    <option value="new">New resume</option>
-                    {resumes.map((resume) => (
-                      <option key={resume.id} value={resume.id}>
-                        {resume.label || 'Untitled resume'}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+              <div className="composer-context-actions">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      className="resume-context-picker"
+                      aria-label={`Resume to work on: ${selectedLabel}`}
+                      title={selectedLabel}
+                      disabled={resumesQuery.isLoading}
+                    >
+                      <FileText className="size-3.5 shrink-0" aria-hidden />
+                      <span>{selectedLabel}</span>
+                      <ChevronDown className="size-3 shrink-0" aria-hidden />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="resume-context-menu" align="start">
+                    <DropdownMenuRadioGroup value={selectedId} onValueChange={setSelection} aria-label="Resume to work on">
+                      <DropdownMenuRadioItem value="new">New resume</DropdownMenuRadioItem>
+                      {resumes.map((resume) => (
+                        <DropdownMenuRadioItem key={resume.id} value={resume.id}>
+                          {resume.label || 'Untitled resume'}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <button
                   type="button"
                   className="context-chip"
@@ -216,7 +247,9 @@ export default function DashboardPage({
               </div>
               <Button
                 type="submit"
+                size="icon"
                 className="start-ai-button"
+                aria-label="Send to AI assistant"
                 disabled={
                   !prompt.trim() ||
                   createMutation.isPending ||
@@ -225,11 +258,10 @@ export default function DashboardPage({
                 }
               >
                 {createMutation.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
+                  <Loader2 className="size-5 animate-spin" aria-hidden />
                 ) : (
-                  <Sparkles className="size-4" />
-                )}{' '}
-                Start with AI
+                  <ArrowUp className="size-5" aria-hidden />
+                )}
               </Button>
             </div>
           </form>
@@ -270,17 +302,23 @@ export default function DashboardPage({
             >
               <Plus className="size-4" aria-hidden /> Create manually
             </button>
-            <button type="button" onClick={() => setImportOpen(true)}>
-              <FileUp className="size-4" aria-hidden /> Import existing resume
-            </button>
           </div>
-          {(error || resumesQuery.isError) && (
+          {error && (
             <div role="alert" className="home-notice">
-              <p>{resumesQuery.isError ? 'We couldn’t load your resumes.' : 'That change couldn’t be completed. Please try again.'}</p>
-              {resumesQuery.isError && <Button type="button" variant="outline" size="sm" onClick={() => void resumesQuery.refetch()}>Try again</Button>}
+              <p>That change couldn’t be completed. Please try again.</p>
             </div>
           )}
         </section>
+      )}
+
+      {!libraryOnly && (
+        <RecentResumes
+          resumes={resumes}
+          isLoading={resumesQuery.isLoading}
+          isError={resumesQuery.isError}
+          onRetry={() => void resumesQuery.refetch()}
+          onImport={() => setImportOpen(true)}
+        />
       )}
 
       {libraryOnly && <section className="resume-library" aria-labelledby="library-heading">

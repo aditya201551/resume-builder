@@ -20,12 +20,10 @@ export default function LoginPage() {
 
   return (
     <main className="login-page">
-      <header className="login-header">
-        <Brand />
-      </header>
       <div className="login-layout">
-      <section className="login-intro">
-        <h1>
+      <section className="login-intro" aria-labelledby="login-title">
+        <div className="login-brand"><Brand /></div>
+        <h1 id="login-title">
           Your experience.
           <br />
           Your next chapter.

@@ -51,6 +51,8 @@
   --motion-fast: 120ms;
   --motion-standard: 180ms;
   --motion-panel: 240ms;
+  --motion-gradient-enter: 1500ms;
+  --motion-ease-enter: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-ease: cubic-bezier(0.2, 0, 0.38, 0.9);
 
   --color-ember: oklch(65% 0.19 30);
@@ -64,7 +66,6 @@
   --shadow-composer: 0 4px 8px oklch(23% 0.025 265 / 0.04), 0 20px 60px oklch(23% 0.025 265 / 0.12);
   --radius-composer: 22px;
   --radius-stage: 28px;
-  --color-field-focus: oklch(52% 0.008 265);
   --color-glass: oklch(100% 0.002 265 / 0.52);
   --color-glass-rule: oklch(100% 0.002 265 / 0.75);
   --color-glass-selected: oklch(100% 0.002 265 / 0.72);

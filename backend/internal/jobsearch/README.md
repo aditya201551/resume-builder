@@ -25,6 +25,11 @@ future features.
   bounded conversation validation. No resume mutation tools are provided.
 - `frontend/src/pages/JobsPage.tsx`: Discover/Saved with one inspectable search.
 
+The jobs workspace follows the resume editor: a dedicated AI conversation pane
+and a separate Manual search pane share the results on the right. Mobile uses a
+Search/Results switch. Switching to manual control stops an outstanding assistant
+request; hidden panes preserve their conversation and form state.
+
 `POST /api/jobs/search` accepts `{intent, nextToken?, savedOnly}` and returns
 `{jobs, sources, nextToken?, retry}`. Counts in the UI describe loaded, deduplicated
 results, not a provider's global inventory. One request fetches at most one page
@@ -36,6 +41,11 @@ new continuation. No map viewport is part of this contract.
 `{intent, message, apply}`. The frontend executes an applied intent through the
 same discovery endpoint. Manual edits made during an AI request take precedence
 over its stale response. The production legacy `GET /api/jobs` path is retired.
+
+Internally the model returns only typed `changes`, not an entire `Intent`.
+The application owns version 1 and preserves fields omitted from a change.
+Malformed plans get one repair attempt, then a clarification with unchanged
+criteria. Raw prompts and tool arguments are not logged.
 
 Shared provider pages expire after 24 hours and are capped at 500 entries, with
 up to 100 normalized jobs accepted per upstream page. Eviction removes unreferenced

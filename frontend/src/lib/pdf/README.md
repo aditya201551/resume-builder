@@ -21,6 +21,12 @@ the application retains Fast Refresh.
   Vertical is the current single-column template; shared content parts and the catalog
   live in `src/templates`. Forme handles wrapping and pagination. Design values remain
   CSS pixels and convert to points (72/96); paper dimensions are actual A4/Letter.
+
+List labels are included in their first text paragraph while native list markers
+are suppressed. Forme 0.29 paginates markers separately and can restore a stale
+cursor after a marker crosses a page, producing a page with only a bullet. Keeping
+the label with the text avoids that path and still permits long items to split.
+Empty rich-text items are omitted; ordered starts and nested lists are retained.
 - `PdfPages.tsx`: visible-page rendering, detached-canvas painting before replacement,
   a minimal scoped text layer, and PDF link annotations. Zoom never regenerates a PDF.
 - `designHistory.ts`: bounded formatting history, with consecutive changes to the same

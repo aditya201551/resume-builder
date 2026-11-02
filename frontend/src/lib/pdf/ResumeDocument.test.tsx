@@ -64,6 +64,52 @@ describe('client resume PDF', () => {
     expect(safePdfLink('example.com')).toBe('https://example.com')
     expect(safePdfLink('mailto:alex@example.com')).toBe('mailto:alex@example.com')
   })
+  it('does not create marker-only pages when lists cross page boundaries repeatedly', async () => {
+    const value = input()
+    value.content.header = { fullName: 'Pagination review', headline: null, email: null, phone: null, location: null, links: [] }
+    value.content.sections = [{ key: 'work', type: 'work_experience', title: 'Experience', entries: Array.from({ length: 16 }, (_, i) => ({
+      key: `entry-${i}`, title: `Engineer ${i}`,
+      bodyHtml: '<ul>' + Array.from({ length: 4 }, (_, j) => `<li><p>Bullet ${i}-${j}. ${'Built useful software with clear documentation and careful collaboration. '.repeat(3)}</p></li>`).join('') + '</ul>',
+    })) }]
+    const result = await renderDocumentWithLayout(<ResumeDocument input={value} fonts={fonts} />)
+    const text = result.layout.pages.map(page => allText(page.elements)).join(' ').replace(/\s+/g, ' ')
+    for (const page of result.layout.pages) expect(allText(page.elements)).toMatch(/[a-z]/i)
+    for (let i = 0; i < 16; i++) for (let j = 0; j < 4; j++) expect(text).toContain(`Bullet ${i}-${j}.`)
+    expect(text.match(/•/g)).toHaveLength(64)
+    expect(result.warnings).toEqual([])
+  })
+  it('allows a single long bullet to span pages without losing or clipping its text', async () => {
+    const value = input()
+    value.content.sections = [{ key: 'work', type: 'work_experience', title: 'Experience', entries: [{ key: 'long', title: 'Engineer', bodyHtml: '<ul><li><p>Start marker. ' + 'Built useful software with clear documentation. '.repeat(240) + 'End marker.</p></li></ul>' }] }]
+    const result = await renderDocumentWithLayout(<ResumeDocument input={value} fonts={fonts} />)
+    expect(result.layout.pages.length).toBeGreaterThan(1)
+    const text = result.layout.pages.map(page => allText(page.elements)).join(' ').replace(/\s+/g, ' ')
+    expect(text).toContain('Start marker.')
+    expect(text).toContain('End marker.')
+    expect(text.match(/Built useful software with clear documentation\./g)).toHaveLength(240)
+    expect(text.match(/•/g)).toHaveLength(1)
+    for (const page of result.layout.pages) {
+      const check = (nodes: ElementInfo[]) => nodes.forEach(node => {
+        if (node.nodeType === 'TextLine') {
+          expect(node.y).toBeGreaterThanOrEqual(0)
+          expect(node.y + node.height).toBeLessThanOrEqual(page.height + 1)
+        }
+        check(node.children)
+      })
+      check(page.elements)
+    }
+  })
+  it('retains ordered starts, nested bullets and inline formatting in list content', async () => {
+    const value = input()
+    value.content.sections[1].entries[0].bodyHtml = '<ol start="5"><li><p>First <strong>result</strong>.</p><p>More detail.</p><ul><li><p><br></p></li><li>&nbsp;</li><li><p>Nested <em>detail</em>.</p></li></ul></li><li><p>Second <a href="https://example.com">result</a>.</p></li></ol>'
+    const result = await renderDocumentWithLayout(<ResumeDocument input={value} fonts={fonts} />)
+    const text = allText(result.layout.pages[0].elements).replace(/\s+/g, ' ')
+    expect(text).toContain('5. First result.')
+    expect(text).toContain('• Nested detail.')
+    expect(text).toContain('6. Second result.')
+    expect(text.match(/•/g)).toHaveLength(1)
+    expect(result.warnings).toEqual([])
+  })
   it('keeps duplicate section titles selectable by their own IDs and retains certificate dates', async () => {
     const value = input()
     value.content.sections = [

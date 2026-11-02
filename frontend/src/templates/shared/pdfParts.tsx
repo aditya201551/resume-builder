@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { View, Text, H1, H2, Strong, Em, Link, Fixed, UnorderedList, OrderedList, ListItem, type Style } from '@formepdf/react'
+import { View, Text, H1, H2, Strong, Em, Link, Fixed, UnorderedList, ListItem, type Style } from '@formepdf/react'
 import { parseDocument } from 'htmlparser2'
 import { type ChildNode, Element, Text as HtmlText } from 'domhandler'
 import type { ContentEntry, ContentSection, ResumeContent } from '@/templates/contract'
@@ -23,19 +23,30 @@ function inline(nodes: ChildNode[], linkStyle: Style): ReactNode[] {
   })
 }
 
-function richBlocks(nodes: ChildNode[], gap: number, linkStyle: Style): ReactNode[] {
+function hasVisibleText(nodes: ChildNode[]): boolean {
+  return nodes.some(node => node instanceof HtmlText ? Boolean(node.data.trim())
+    : node instanceof Element && !['script', 'style', 'iframe'].includes(node.name) && hasVisibleText(node.children))
+}
+
+function richBlocks(nodes: ChildNode[], gap: number, linkStyle: Style, prefix = ''): ReactNode[] {
+  const takePrefix = () => { const value = prefix; prefix = ''; return value }
   return nodes.map((node, i) => {
-    if (node instanceof HtmlText) return node.data.trim() ? <Text key={i}>{node.data}</Text> : null
+    if (node instanceof HtmlText) return node.data.trim() ? <Text key={i}>{takePrefix()}{node.data}</Text> : null
     if (!(node instanceof Element) || ['script', 'style', 'iframe'].includes(node.name)) return null
     if (node.name === 'ul' || node.name === 'ol') {
-      const List = node.name === 'ul' ? UnorderedList : OrderedList
-      return <List key={i} style={{ marginBottom: gap, paddingLeft: pt(15) }}>
-        {node.children.filter((n) => n instanceof Element && n.name === 'li').map((n, j) =>
-          <ListItem key={j} style={{ marginBottom: gap }}>{richBlocks((n as Element).children, gap, linkStyle)}</ListItem>)}
-      </List>
+      // Forme 0.29 paginates native markers separately and restores a stale
+      // cursor after a marker crosses a page. Keep the label in its paragraph
+      // so a marker cannot create a page by itself. Long text can still split.
+      return <UnorderedList key={i} marker="none" style={{ marginBottom: gap, paddingLeft: pt(15) }}>
+        {node.children.filter((n) => n instanceof Element && n.name === 'li' && hasVisibleText(n.children)).map((n, j) =>
+          <ListItem key={j} style={{ marginBottom: gap }}>
+            {richBlocks((n as Element).children, gap, linkStyle, node.name === 'ol' ? `${(Number(node.attribs.start) || 1) + j}.  ` : '•  ')}
+          </ListItem>)}
+      </UnorderedList>
     }
-    if (node.name === 'div') return <View key={i}>{richBlocks(node.children, gap, linkStyle)}</View>
-    return <Text key={i} style={{ marginBottom: gap, minOrphanLines: 2, minWidowLines: 2 }}>{inline(node.children, linkStyle)}</Text>
+    if (prefix && !hasVisibleText(node.children)) return null
+    if (node.name === 'div') return <View key={i}>{richBlocks(node.children, gap, linkStyle, takePrefix())}</View>
+    return <Text key={i} style={{ marginBottom: gap, minOrphanLines: 2, minWidowLines: 2 }}>{takePrefix()}{inline(node.children, linkStyle)}</Text>
   })
 }
 
@@ -101,7 +112,7 @@ export function createPdfTemplateParts(content: ResumeContent, d: ResumeDesign) 
   function displayEntries(section: ContentSection) {
     const mode = d.sectionDisplay[section.type as keyof typeof d.sectionDisplay] ?? 'text'
     if (mode === 'text') return <Text>{section.entries.map((e) => textOf(e)).join('  ·  ')}</Text>
-    if (mode === 'bullets') return <UnorderedList style={{ paddingLeft: pt(15) }}>{section.entries.map((entry) => <ListItem key={entry.key} style={{ marginBottom: pt(d.spacing.bulletGap) }}><Text>{textOf(entry)}</Text></ListItem>)}</UnorderedList>
+    if (mode === 'bullets') return <UnorderedList marker="none" style={{ paddingLeft: pt(15) }}>{section.entries.filter(entry => textOf(entry).trim()).map((entry) => <ListItem key={entry.key} style={{ marginBottom: pt(d.spacing.bulletGap) }}><Text style={{ minOrphanLines: 2, minWidowLines: 2 }}>•  {textOf(entry)}</Text></ListItem>)}</UnorderedList>
     return <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: pt(8) }}>{section.entries.map((entry) => <Text key={entry.key} style={{ width: '46%' }}>{textOf(entry)}</Text>)}</View>
   }
   function section(section: ContentSection) {

@@ -68,7 +68,7 @@ export default function JobChatPanel({ chat, active, saved, onManual }: { chat: 
             {message.applied && <span className="jobs-chat-applied"><Check size={12} />Search criteria updated</span>}
             <CopyButton getText={() => message.text} className={message.role === 'user' ? 'self-end' : 'self-start'} />
           </MessageContent></Message>)}
-          {chat.thinking && <div className="jobs-chat-thinking" role="status"><Sparkles size={14} className="animate-pulse" aria-hidden />Refining your search…</div>}
+          {chat.thinking && chat.messages.at(-1)?.role !== 'assistant' && <div className="jobs-chat-thinking" role="status"><Sparkles size={14} className="animate-pulse" aria-hidden />Refining your search…</div>}
         </div>
       </div>
       {showLatest && <Button className="jobs-chat-latest" size="sm" variant="secondary" onClick={scrollToBottom}><ArrowDown size={13} />Latest</Button>}

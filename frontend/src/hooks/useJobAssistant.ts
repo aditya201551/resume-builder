@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { apiPost } from '@/lib/http'
 import { readJobIntent, type JobRefinement, type SearchIntent } from '@/lib/jobSearch'
+import { createTextPlayback } from '@/lib/textPlayback'
 
 export interface JobChatMessage {
   id: number
@@ -15,20 +16,34 @@ export function useJobAssistant(intent: SearchIntent, saved: boolean, onApply: (
   const [error, setError] = useState<string | null>(null)
   const messagesRef = useRef<JobChatMessage[]>([])
   const requestRef = useRef<AbortController | null>(null)
+  const playbackRef = useRef<ReturnType<typeof createTextPlayback> | null>(null)
   const nextId = useRef(0)
   const lastRequest = useRef('')
   const context = useRef({ intent, saved, onApply })
   context.current = { intent, saved, onApply }
 
   const append = useCallback((message: Omit<JobChatMessage, 'id'>) => {
-    const next = [...messagesRef.current, { ...message, id: nextId.current++ }]
+    const id = nextId.current++
+    const next = [...messagesRef.current, { ...message, id }]
+    messagesRef.current = next
+    setMessages(next)
+    return id
+  }, [])
+
+  const updateMessage = useCallback((id: number, update: (message: JobChatMessage) => JobChatMessage) => {
+    const next = messagesRef.current.map((message) => message.id === id ? update(message) : message)
     messagesRef.current = next
     setMessages(next)
   }, [])
 
-  useEffect(() => () => requestRef.current?.abort(), [])
+  useEffect(() => () => {
+    requestRef.current?.abort()
+    playbackRef.current?.cancel()
+  }, [])
   useEffect(() => {
     requestRef.current?.abort()
+    playbackRef.current?.cancel()
+    playbackRef.current = null
     requestRef.current = null
     messagesRef.current = []
     lastRequest.current = ''
@@ -57,13 +72,30 @@ export function useJobAssistant(intent: SearchIntent, saved: boolean, onApply: (
         return
       }
       if (typeof response.message !== 'string' || typeof response.apply !== 'boolean') throw new Error('Invalid assistant response')
+      let nextIntent: SearchIntent | undefined
       if (response.apply) {
-        const next = readJobIntent(JSON.stringify(response.intent))
+        nextIntent = readJobIntent(JSON.stringify(response.intent))
         // Never turn a malformed response into the default, broader search.
-        if (JSON.stringify(next) !== JSON.stringify(response.intent)) throw new Error('Invalid search criteria')
-        context.current.onApply(next)
+        if (JSON.stringify(nextIntent) !== JSON.stringify(response.intent)) throw new Error('Invalid search criteria')
       }
-      append({ role: 'assistant', text: response.message, applied: response.apply })
+      const id = append({ role: 'assistant', text: '' })
+      const playback = createTextPlayback(
+        (chunk) => {
+          if (!controller.signal.aborted && requestRef.current === controller) updateMessage(id, (message) => ({ ...message, text: message.text + chunk }))
+        },
+        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      )
+      playbackRef.current = playback
+      playback.write(response.message)
+      await playback.finish()
+      if (controller.signal.aborted || requestRef.current !== controller) return
+      playbackRef.current = null
+      if (context.current.saved !== start.saved || JSON.stringify(context.current.intent) !== version) {
+        updateMessage(id, (message) => ({ ...message, text: 'Your search criteria changed while I was working. I kept the latest filters. Send your refinement again to use them.' }))
+        return
+      }
+      if (nextIntent) context.current.onApply(nextIntent)
+      updateMessage(id, (message) => ({ ...message, applied: response.apply }))
     } catch {
       if (!controller.signal.aborted && requestRef.current === controller) setError('The assistant could not complete this request. Your search criteria are unchanged. Try again or use Manual search.')
     } finally {
@@ -72,11 +104,13 @@ export function useJobAssistant(intent: SearchIntent, saved: boolean, onApply: (
         setThinking(false)
       }
     }
-  }, [append])
+  }, [append, updateMessage])
 
   const cancel = useCallback(() => {
     if (!requestRef.current) return
     requestRef.current.abort()
+    playbackRef.current?.cancel()
+    playbackRef.current = null
     requestRef.current = null
     setThinking(false)
     setError(null)
@@ -85,6 +119,8 @@ export function useJobAssistant(intent: SearchIntent, saved: boolean, onApply: (
 
   const clear = useCallback(() => {
     requestRef.current?.abort()
+    playbackRef.current?.cancel()
+    playbackRef.current = null
     requestRef.current = null
     messagesRef.current = []
     lastRequest.current = ''

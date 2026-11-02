@@ -153,12 +153,11 @@ function AssistantParts({
 
   return (
     <div className="flex flex-col gap-2">
-      {items.map((item, i) => {
-        const isLast = i === items.length - 1
+      {items.map((item) => {
         const review = item.kind === 'ui' ? parts.find((p) => p.kind === 'proposal' && p.key === item.part.reviewKey) : undefined
         return item.kind === 'text' ? (
           <div key={item.key} className="text-sm leading-6 text-foreground">
-            <ChatMarkdown text={item.text} animateWords={streaming} streaming={streaming && isLast} />
+            <ChatMarkdown text={item.text} animateWords={streaming} />
           </div>
         ) : item.kind === 'tool' ? (
           <ToolActivity key={item.key} event={item.event} />

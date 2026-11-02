@@ -12,6 +12,7 @@ import {
 } from '@/lib/agentProposal'
 import { loadAutoAccept, saveAutoAccept } from '@/lib/agentChatPrefs'
 import { assistantMessage } from '@/lib/assistantTask'
+import { createTextPlayback } from '@/lib/textPlayback'
 import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
 import { tempId } from '@/lib/tempId'
@@ -74,6 +75,7 @@ export function useAgentChat() {
   }, [])
 
   const abortRef = useRef<AbortController | null>(null)
+  const playbackRef = useRef<ReturnType<typeof createTextPlayback> | null>(null)
   const activeRef = useRef(false)
   const generationRef = useRef(0)
   const messagesRef = useRef(messages)
@@ -83,6 +85,7 @@ export function useAgentChat() {
       generationRef.current++
       activeRef.current = false
       abortRef.current?.abort()
+      playbackRef.current?.cancel()
     },
     [],
   )
@@ -227,47 +230,58 @@ export function useAgentChat() {
 
       const controller = new AbortController()
       abortRef.current = controller
+      const playback = createTextPlayback(
+        (text) => { if (current()) appendStreamingText(text) },
+        () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+      )
+      playbackRef.current = playback
+      let terminalReceived = false
 
       await streamAgentChat(
         resumeId,
         { messages: history, draft: draftRef.current },
         {
           onToken: (text) => {
-            if (current()) appendStreamingText(text)
+            if (current() && !terminalReceived) playback.write(text)
           },
           onProposal: (proposal) => {
             if (!current()) return
-            const key = nextProposalKey()
-            const applied = shouldApplyProposalAutomatically(proposal, autoAcceptRef.current) && applyProposal(proposal)
-            pushPart({
-              kind: 'proposal',
-              key,
-              proposal,
-              status: applied ? 'accepted' : 'pending',
+            playback.boundary(() => {
+              if (!current()) return
+              const key = nextProposalKey()
+              const applied = shouldApplyProposalAutomatically(proposal, autoAcceptRef.current) && applyProposal(proposal)
+              pushPart({ kind: 'proposal', key, proposal, status: applied ? 'accepted' : 'pending' })
+              if (applied) retryPendingParts()
             })
-            if (applied) retryPendingParts()
           },
           onTool: (event) => {
-            if (current()) upsertToolEvent(event)
+            if (current()) playback.boundary(() => { if (current()) upsertToolEvent(event) })
           },
           onUI: (ui) => {
-            if (!current() || streamingPartsRef.current.some((p) => p.kind === 'ui' && p.ui.id === ui.id)) return
-            pushPart({ kind: 'ui', key: ui.id, ui, formState: {} })
+            if (!current()) return
+            playback.boundary(() => {
+              if (!current() || streamingPartsRef.current.some((p) => p.kind === 'ui' && p.ui.id === ui.id)) return
+              pushPart({ kind: 'ui', key: ui.id, ui, formState: {} })
+            })
           },
           onDone: () => {
-            if (current()) finishStreaming()
+            terminalReceived = true
           },
           onError: (message) => {
             if (!current()) return
+            terminalReceived = true
             setError(message)
-            finishStreaming()
           },
         },
         controller.signal,
       )
       if (current() && activeRef.current) {
-        setError('The response ended before it was complete. Please try again.')
-        finishStreaming()
+        if (!terminalReceived) setError('The response ended before it was complete. Please try again.')
+        await playback.finish()
+        if (current()) {
+          playbackRef.current = null
+          finishStreaming()
+        }
       }
     },
     [
@@ -284,6 +298,8 @@ export function useAgentChat() {
   const cancel = useCallback(() => {
     generationRef.current++
     abortRef.current?.abort()
+    playbackRef.current?.cancel()
+    playbackRef.current = null
     finishStreaming()
   }, [finishStreaming])
 

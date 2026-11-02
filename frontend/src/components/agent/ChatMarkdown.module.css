@@ -46,14 +46,9 @@
   text-decoration-color: currentColor;
 }
 
-.richText[data-streaming='true'] > :last-child::after {
-  content: '';
+.richText :global([data-reveal-word]) {
+  /* Filters need a box; release the wrapper as soon as the reveal finishes. */
   display: inline-block;
-  width: 0.16em;
-  height: 0.85em;
-  margin-left: 0.12em;
-  border-radius: 999px;
-  background: currentColor;
-  vertical-align: -0.05em;
-  opacity: 0.4;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }

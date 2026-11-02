@@ -22,8 +22,8 @@ export function useWordReveal(rootRef: RefObject<HTMLDivElement | null>, html: s
     const timelineTime = document.timeline.currentTime
     const now = typeof timelineTime === 'number' ? timelineTime : performance.now()
     // Reading a reply needs less movement than the rotating homepage hints.
-    // Fade arrivals together, with no stagger or position changes to track.
-    const duration = 150
+    // Bring arrivals into focus together, without stagger or position changes.
+    const duration = 400
     const active = new Map<number, Reveal>()
     const animations: Animation[] = []
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
@@ -56,8 +56,8 @@ export function useWordReveal(rootRef: RefObject<HTMLDivElement | null>, html: s
         fragment.append(span)
         copied = match.index + word.length
         const animation = span.animate([
-          { opacity: 0.5 },
-          { opacity: 1 },
+          { opacity: 0.65, filter: 'blur(3px)' },
+          { opacity: 1, filter: 'blur(0px)' },
         ], {
           duration,
           easing: 'ease-out',

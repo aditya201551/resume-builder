@@ -21,7 +21,6 @@ import {
 } from 'lucide-react'
 import { apiDelete, apiGet, apiPost } from '@/lib/http'
 import { ASSISTANT_STARTERS, type AssistantTask } from '@/lib/assistantTask'
-import { useAuth } from '@/hooks/useAuth'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { Resume } from '@/types/resume'
 import { Button } from '@/components/ui/button'
@@ -59,7 +58,6 @@ export default function DashboardPage({
 }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const mobile = useMediaQuery('(max-width: 767px)')
   const [prompt, setPrompt] = useState('')
   const [selection, setSelection] = useState('')
@@ -147,9 +145,6 @@ export default function DashboardPage({
           <h1 id="home-heading">
             What are we working toward?
           </h1>
-          <p>
-            {user?.name ? `${user.name.split(' ')[0]}, let's` : "Let's"} make your next move.
-          </p>
           <form className="home-composer" onSubmit={startAssistant}>
             <div className="home-prompt-field">
               <Textarea

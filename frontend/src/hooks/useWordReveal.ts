@@ -1,6 +1,5 @@
 import { useLayoutEffect, useRef, type RefObject } from 'react'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
-import { wordReveal } from '@/lib/textMotion'
 
 type Reveal = { word: string; start: number }
 
@@ -22,14 +21,15 @@ export function useWordReveal(rootRef: RefObject<HTMLDivElement | null>, html: s
 
     const timelineTime = document.timeline.currentTime
     const now = typeof timelineTime === 'number' ? timelineTime : performance.now()
-    const duration = wordReveal.duration * 1000
+    // Reading a reply needs less movement than the rotating homepage hints.
+    // Fade arrivals together, with no stagger or position changes to track.
+    const duration = 150
     const active = new Map<number, Reveal>()
     const animations: Animation[] = []
     const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
     const nodes: Text[] = []
     while (walker.nextNode()) nodes.push(walker.currentNode as Text)
     let offset = 0
-    let added = 0
 
     for (const node of nodes) {
       const value = node.data
@@ -45,8 +45,7 @@ export function useWordReveal(rootRef: RefObject<HTMLDivElement | null>, html: s
         let reveal = seen.current.active.get(position)
         if (reveal && !word.startsWith(reveal.word)) reveal = undefined
         if (!reveal && position >= seen.current.length) {
-          // Cap the stagger so a large response never waits behind an animation queue.
-          reveal = { word, start: now + Math.min(added++ * wordReveal.stagger * 1000, 120) }
+          reveal = { word, start: now }
         }
         if (!reveal || now - reveal.start >= duration) continue
         active.set(position, reveal)
@@ -57,11 +56,11 @@ export function useWordReveal(rootRef: RefObject<HTMLDivElement | null>, html: s
         fragment.append(span)
         copied = match.index + word.length
         const animation = span.animate([
-          { opacity: 0, transform: `translateY(${wordReveal.distance}px)` },
-          { opacity: 1, transform: 'translateY(0)' },
+          { opacity: 0.5 },
+          { opacity: 1 },
         ], {
           duration,
-          easing: `cubic-bezier(${wordReveal.ease.join(',')})`,
+          easing: 'ease-out',
           fill: 'backwards',
         })
         animation.startTime = reveal.start

@@ -6,8 +6,8 @@ The application uses **Cobalt and ember**, the gradient direction selected by th
 
 - Scope: sign-in, home, resume library, editor, assistant and job search.
 - Signature: cobalt and coral/peach light surrounding a focused, solid AI composer.
-- Composition: fixed, non-scrolling home with a viewport-filling gradient. The compact AI composer, starter tasks and recent resumes form a single group, with a bounded 24–40px gap before the recent-resume strip rather than anchoring it to the viewport bottom. The strip shows up to four resumes, View all and Import existing resume. The home resume picker is a compact pill with a separate menu that accommodates long titles. The full document gallery lives on My resumes; manual creation remains available. Editor controls and PDF preview remain stable; jobs separates search from results.
-- Navigation: slim, translucent glass top bars with backdrop blur, a neutral selected surface, and Home, My resumes and Jobs. The editor retains AI workspace, Content and Design modes in the same glass treatment.
+- Composition: fixed, non-scrolling home with a viewport-filling gradient. The heading leads directly into the composer with a 32px gap; the personalised greeting is removed. The composer, starter tasks and recent resumes form one vertically balanced group, with 16px spacing between actions and 32px before recent resumes. The strip shows up to four resumes, View all and Import existing resume. The home resume picker is a compact pill with a separate menu that accommodates long titles. The full document gallery lives on My resumes; manual creation remains available. Editor controls and PDF preview remain stable; jobs separates search from results.
+- Navigation: transparent top bars with no background panel, shadow or backdrop blur. Home, My resumes and Jobs retain neutral selected pills. The editor uses the same transparent bar with its mode controls.
 - The resume assistant has no upper header or scope bar. Its conversation gets the full upper pane, with job context beside auto-accept in a compact bottom composer. Job context expands inside the composer; its fields can scroll on short screens while send/stop remain visible. The composer has a soft neutral surface, no border, a growing message field and a circular up-arrow send button. The job-search assistant retains its own heading and filter controls.
 - Sign-in has no navigation bar or outer frame. Its gradient fills the viewport, with introductory text on the left and Google/GitHub sign-in on the right; the two sections stack on phones. Branding sits within the introduction.
 - The application is light-only, including when the operating system or a previously saved preference requests dark mode. There is no theme switch or dark palette.
@@ -16,7 +16,7 @@ The application uses **Cobalt and ember**, the gradient direction selected by th
 
 ## Tokens and surfaces
 
-`frontend/src/styles/tokens.css` owns colour, type, spacing, radius, shadow and motion tokens. `frontend/src/index.css` maps these onto Tailwind/shadcn roles. Glass uses the `--color-glass*` and `--shadow-glass` tokens, with an opaque fallback when backdrop blur is unavailable.
+`frontend/src/styles/tokens.css` owns colour, type, spacing, radius, shadow and motion tokens. `frontend/src/index.css` maps these onto Tailwind/shadcn roles. Navigation stays transparent; the remaining `--color-glass-selected` token supplies light selected surfaces.
 
 - Grounds: `--color-paper`, `--color-paper-2`, `--color-paper-3`.
 - Opaque reading surfaces: `--color-cotton`; document surround: `--color-desk`.
@@ -38,7 +38,7 @@ Use CSS for hover, focus, contextual disclosures and surface transitions. Use `m
 
 - Micro feedback: 120ms; standard state transitions: 180ms; pane transitions: 240ms.
 - Home and sign-in gradients play a single 3000ms wave entrance: cobalt and ember/peach layers drift in from opposing directions, pass gently through their resting positions, and settle. The final colours and layering stay the same. Only background opacity and transform animate; content is immediately available and the gradient stays still afterward. Layers are clipped to prevent temporary scrolling and cannot intercept pointer events. Reduced-motion preferences show the final static gradient immediately.
-- Loading motion follows actual work. New words in resume replies use the same 280ms, 6px upward fade and 35ms stagger as the home examples. Markdown updates retain the reveal progress of incoming words and leave earlier text still; batch stagger is capped at 120ms so the UI never queues behind the network. Job replies use the same effect on arrival (their endpoint returns a complete reply). Markdown, links, code, copying and cancellation retain their behavior. Reduced-motion preferences reveal all text immediately.
+- Loading motion follows actual work. Resume replies use a quiet 150ms opacity fade from 50% to full opacity, with no movement, blur or stagger. Incoming words appear together and stay in the normal inline text flow. Markdown updates retain reveal progress and leave earlier text still; a small steady caret replaces the pulsing cursor. Job replies use the same fade on arrival (their endpoint returns a complete reply). Homepage examples retain their upward word animation. Markdown, links, code, copying and cancellation retain their behavior. Reduced-motion preferences reveal all text immediately.
 - `MotionConfig reducedMotion="user"` and CSS reduced-motion rules disable spatial motion. Keyboard focus and interactions never wait for an animation.
 - Editor panes stay mounted when their mode is hidden, preserving form, chat and draft state.
 
@@ -52,10 +52,10 @@ Keep PDF canvas, text, link and section-target geometry intact in `workspace.css
 
 ## Files and verification
 
-- `styles/tokens.css`: shared light and glass design tokens.
+- `styles/tokens.css`: shared light palette, surface and motion tokens.
 - `styles/base.css`: accessibility and browser defaults.
 - `styles/workspace.css`: app shell, dashboard, sign-in, editor and assistant surfaces.
 - `styles/jobs.css`: search, results and job details.
 - `main.tsx`: light appearance and reduced-motion-aware animation providers.
 
-Verify frontend build, lint and existing tests. Review mobile/desktop, light appearance under dark system preferences, home viewport fit with expanded context, glass navigation, neutral text-field focus, loading/empty/error/full states, draft preservation, AI review/apply, search/filter/save, keyboard focus and PDF parity. Do not start development servers without the owner's request.
+Verify frontend build, lint and existing tests. Review mobile/desktop, light appearance under dark system preferences, home viewport fit with expanded context, transparent navigation, neutral text-field focus, loading/empty/error/full states, draft preservation, AI review/apply, search/filter/save, keyboard focus and PDF parity. Do not start development servers without the owner's request.

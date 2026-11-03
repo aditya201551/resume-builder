@@ -6,6 +6,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/service"
@@ -81,7 +82,7 @@ func (h *ResumeImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	writeJSON(w, http.StatusCreated, result)
+	httpresponse.JSON(w, http.StatusCreated, result)
 }
 
 func writeImportError(w http.ResponseWriter, code, message string, status int) {
@@ -90,5 +91,5 @@ func writeImportError(w http.ResponseWriter, code, message string, status int) {
 		level = slog.LevelError
 	}
 	slog.Log(context.Background(), level, "resume_import_failed", "code", code, "status", status)
-	writeJSON(w, status, map[string]string{"code": code, "message": message})
+	httpresponse.JSON(w, status, map[string]string{"code": code, "message": message})
 }

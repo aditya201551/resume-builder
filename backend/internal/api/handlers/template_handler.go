@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/service"
 )
@@ -20,5 +21,5 @@ func (h *TemplateHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, templates)
+	httpresponse.JSON(w, http.StatusOK, templates)
 }

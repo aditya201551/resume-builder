@@ -28,7 +28,13 @@ type Handlers struct {
 	ResumeDesign   *handlers.ResumeDesignHandler
 	DesignSchema   *handlers.DesignSchemaHandler
 	Agent          *handlers.AgentHandler
-	Jobs           *handlers.JobHandler
+	Features       *handlers.FeatureHandler
+	Modules        []RouteModule
+}
+
+// RouteModule exposes only route registration; module internals remain private.
+type RouteModule interface {
+	RegisterRoutes(func(string, http.HandlerFunc))
 }
 
 func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc, staticDir string) http.Handler {
@@ -42,6 +48,9 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	mux.HandleFunc("GET /api/auth/{provider}/callback", h.Auth.Callback)
 	mux.HandleFunc("POST /api/auth/logout", h.Auth.Logout)
 	handle("GET /api/auth/me", h.Auth.Me)
+	if h.Features != nil {
+		handle("GET /api/features", h.Features.List)
+	}
 
 	handle("GET /api/resumes", h.Resume.List)
 	handle("POST /api/resumes", h.Resume.Create)
@@ -91,13 +100,8 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 
-	if h.Jobs != nil {
-		handle("POST /api/jobs/search", h.Jobs.Discover)
-		handle("POST /api/jobs/assist", h.Jobs.Refine)
-		handle("GET /api/jobs/countries", h.Jobs.Countries)
-		handle("GET /api/jobs/{jobID}", h.Jobs.Get)
-		handle("PUT /api/jobs/{jobID}/saved", h.Jobs.Save)
-		handle("DELETE /api/jobs/{jobID}/saved", h.Jobs.Unsave)
+	for _, module := range h.Modules {
+		module.RegisterRoutes(handle)
 	}
 
 	if staticDir != "" {

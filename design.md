@@ -55,7 +55,7 @@ Keep PDF canvas, text, link and section-target geometry intact in `workspace.css
 - `styles/tokens.css`: shared light palette, surface and motion tokens.
 - `styles/base.css`: accessibility and browser defaults.
 - `styles/workspace.css`: app shell, dashboard, sign-in, editor and assistant surfaces.
-- `styles/jobs.css`: search, results and job details.
+- `features/jobs/styles/jobs.css`: search, results and job details.
 - `main.tsx`: light appearance and reduced-motion-aware animation providers.
 
 Verify frontend build, lint and existing tests. Review mobile/desktop, light appearance under dark system preferences, home viewport fit with expanded context, transparent navigation, neutral text-field focus, loading/empty/error/full states, draft preservation, AI review/apply, search/filter/save, keyboard focus and PDF parity. Do not start development servers without the owner's request.

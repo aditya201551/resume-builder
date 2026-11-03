@@ -1,9 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router'
 import {
-  BriefcaseBusiness,
   ChevronDown,
-  Files,
-  House,
   LogOut,
 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -15,9 +12,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import Brand from '@/components/layout/Brand'
+import { visibleNavigation } from '@/app/navigation'
+import { useFeatures } from '@/platform/features/useFeatures'
 import { cn } from '@/lib/utils'
 
 export default function AppShell() {
+  const { enabled } = useFeatures()
   const { pathname } = useLocation()
   const { user, logout } = useAuth()
   const name = user?.name || user?.email || 'Your workspace'
@@ -40,15 +40,11 @@ export default function AppShell() {
           <Brand />
         </NavLink>
         <nav aria-label="Main navigation" className="app-navigation">
-          {[
-            { to: '/resumes', label: 'Home', icon: House },
-            { to: '/resumes/library', label: 'My resumes', icon: Files },
-            { to: '/jobs', label: 'Jobs', icon: BriefcaseBusiness },
-          ].map(({ to, label, icon: Icon }) => (
+          {visibleNavigation(enabled).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
-              end={to !== '/jobs'}
+              end={end}
               className={({ isActive }) =>
                 cn('app-nav-link', isActive && 'is-active')
               }

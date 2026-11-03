@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/repository"
@@ -23,7 +24,7 @@ func (h *SkillHandler) ListGroups(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, groups)
+	httpresponse.JSON(w, http.StatusOK, groups)
 }
 
 func (h *SkillHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +38,7 @@ func (h *SkillHandler) CreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, g)
+	httpresponse.JSON(w, http.StatusCreated, g)
 }
 
 func (h *SkillHandler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +52,7 @@ func (h *SkillHandler) UpdateGroup(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, g)
+	httpresponse.JSON(w, http.StatusOK, g)
 }
 
 func (h *SkillHandler) DeleteGroup(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +90,7 @@ func (h *SkillHandler) CreateItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, it)
+	httpresponse.JSON(w, http.StatusCreated, it)
 }
 
 func (h *SkillHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +104,7 @@ func (h *SkillHandler) UpdateItem(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, it)
+	httpresponse.JSON(w, http.StatusOK, it)
 }
 
 func (h *SkillHandler) DeleteItem(w http.ResponseWriter, r *http.Request) {

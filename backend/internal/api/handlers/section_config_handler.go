@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/repository"
@@ -23,7 +24,7 @@ func (h *SectionConfigHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, configs)
+	httpresponse.JSON(w, http.StatusOK, configs)
 }
 
 func (h *SectionConfigHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -43,5 +44,5 @@ func (h *SectionConfigHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, c)
+	httpresponse.JSON(w, http.StatusOK, c)
 }

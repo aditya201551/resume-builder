@@ -4,7 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { RouterProvider } from 'react-router'
 import { LazyMotion, domAnimation, MotionConfig } from 'motion/react'
 import { queryClient } from '@/lib/query-client'
-import { router } from '@/router'
+import { router } from '@/app/router'
 import './index.css'
 
 document.documentElement.classList.remove('dark')

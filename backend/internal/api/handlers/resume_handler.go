@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"resume-builder/backend/internal/platform/httpresponse"
 	"strings"
 	"time"
 
@@ -83,7 +84,7 @@ func (h *ResumeHandler) ExportData(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, full)
+	httpresponse.JSON(w, http.StatusOK, full)
 }
 
 func (h *ResumeHandler) List(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +94,7 @@ func (h *ResumeHandler) List(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resumes)
+	httpresponse.JSON(w, http.StatusOK, resumes)
 }
 
 func (h *ResumeHandler) Create(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +108,7 @@ func (h *ResumeHandler) Create(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, resume)
+	httpresponse.JSON(w, http.StatusCreated, resume)
 }
 
 func (h *ResumeHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -117,7 +118,7 @@ func (h *ResumeHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resume)
+	httpresponse.JSON(w, http.StatusOK, resume)
 }
 
 func (h *ResumeHandler) GetFull(w http.ResponseWriter, r *http.Request) {
@@ -127,7 +128,7 @@ func (h *ResumeHandler) GetFull(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, full)
+	httpresponse.JSON(w, http.StatusOK, full)
 }
 
 func (h *ResumeHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +142,7 @@ func (h *ResumeHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, resume)
+	httpresponse.JSON(w, http.StatusOK, resume)
 }
 
 func (h *ResumeHandler) Delete(w http.ResponseWriter, r *http.Request) {
@@ -160,5 +161,5 @@ func (h *ResumeHandler) Duplicate(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, resume)
+	httpresponse.JSON(w, http.StatusCreated, resume)
 }

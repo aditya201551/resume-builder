@@ -61,7 +61,7 @@ def main():
         "countries": sorted(countries.values(), key=lambda c: c["name"]),
         "places": list(selected.values()),
     }
-    target = Path(__file__).resolve().parents[1] / "backend/internal/jobmap/places.json"
+    target = Path(__file__).resolve().parents[1] / "backend/internal/modules/jobs/internal/jobmap/places.json"
     target.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n", encoding="utf-8")
     print(f"Wrote {len(selected)} cities and {len(countries)} countries to {target}")
 

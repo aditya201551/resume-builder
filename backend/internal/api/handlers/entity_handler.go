@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/service"
@@ -22,7 +23,7 @@ func (h *EntityHandler[TInput, TOutput]) List(w http.ResponseWriter, r *http.Req
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, items)
+	httpresponse.JSON(w, http.StatusOK, items)
 }
 
 func (h *EntityHandler[TInput, TOutput]) Create(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +37,7 @@ func (h *EntityHandler[TInput, TOutput]) Create(w http.ResponseWriter, r *http.R
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, out)
+	httpresponse.JSON(w, http.StatusCreated, out)
 }
 
 func (h *EntityHandler[TInput, TOutput]) Update(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +51,7 @@ func (h *EntityHandler[TInput, TOutput]) Update(w http.ResponseWriter, r *http.R
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, out)
+	httpresponse.JSON(w, http.StatusOK, out)
 }
 
 func (h *EntityHandler[TInput, TOutput]) Delete(w http.ResponseWriter, r *http.Request) {

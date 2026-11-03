@@ -10,18 +10,6 @@ import (
 	"resume-builder/backend/internal/service"
 )
 
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	if err := json.NewEncoder(w).Encode(v); err != nil {
-		if request, ok := w.(interface{ RequestContext() context.Context }); ok && request.RequestContext().Err() != nil {
-			slog.Info("http_response_canceled")
-			return
-		}
-		slog.Error("http_response_encode_failed", "status", status, "error", err)
-	}
-}
-
 func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)

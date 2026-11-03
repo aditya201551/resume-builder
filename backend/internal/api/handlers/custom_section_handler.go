@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/repository"
@@ -23,7 +24,7 @@ func (h *CustomSectionHandler) ListSections(w http.ResponseWriter, r *http.Reque
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, sections)
+	httpresponse.JSON(w, http.StatusOK, sections)
 }
 
 func (h *CustomSectionHandler) CreateSection(w http.ResponseWriter, r *http.Request) {
@@ -37,7 +38,7 @@ func (h *CustomSectionHandler) CreateSection(w http.ResponseWriter, r *http.Requ
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, s)
+	httpresponse.JSON(w, http.StatusCreated, s)
 }
 
 func (h *CustomSectionHandler) UpdateSection(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +52,7 @@ func (h *CustomSectionHandler) UpdateSection(w http.ResponseWriter, r *http.Requ
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, s)
+	httpresponse.JSON(w, http.StatusOK, s)
 }
 
 func (h *CustomSectionHandler) DeleteSection(w http.ResponseWriter, r *http.Request) {
@@ -89,7 +90,7 @@ func (h *CustomSectionHandler) CreateEntry(w http.ResponseWriter, r *http.Reques
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, e)
+	httpresponse.JSON(w, http.StatusCreated, e)
 }
 
 func (h *CustomSectionHandler) UpdateEntry(w http.ResponseWriter, r *http.Request) {
@@ -103,7 +104,7 @@ func (h *CustomSectionHandler) UpdateEntry(w http.ResponseWriter, r *http.Reques
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, e)
+	httpresponse.JSON(w, http.StatusOK, e)
 }
 
 func (h *CustomSectionHandler) DeleteEntry(w http.ResponseWriter, r *http.Request) {

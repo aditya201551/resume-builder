@@ -17,9 +17,10 @@ import (
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/config"
 	"resume-builder/backend/internal/db"
-	"resume-builder/backend/internal/jobagent"
-	"resume-builder/backend/internal/jobmap"
+	"resume-builder/backend/internal/features"
+	flagpostgres "resume-builder/backend/internal/features/postgres"
 	"resume-builder/backend/internal/logging"
+	"resume-builder/backend/internal/modules/jobs"
 	"resume-builder/backend/internal/repository"
 	"resume-builder/backend/internal/service"
 )
@@ -51,15 +52,6 @@ func main() {
 	}
 	defer pool.Close()
 	slog.Info("database_pool_initialized")
-
-	jobConfig, err := jobmap.LoadConfig()
-	if err != nil {
-		slog.Error("startup_failed", "operation", "load job search config", "error", err)
-		os.Exit(1)
-	}
-	jobRepository := repository.NewJobRepository(pool)
-	jobService := service.NewJobService(jobRepository, jobConfig)
-	jobDiscovery := service.NewJobDiscoveryService(jobRepository, jobService)
 
 	providers := auth.NewProviders(cfg.OAuthRedirectBaseURL, cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GithubClientID, cfg.GithubClientSecret)
 	if len(providers) == 0 {
@@ -114,12 +106,7 @@ func main() {
 		os.Exit(1)
 	}
 	resumeImportService := service.NewResumeImportService(ai.NewPDFClient(importAIConfig), repository.NewResumeImportRepository(pool))
-	jobPlanner, err := jobagent.New(ctx, importAIConfig)
-	if err != nil {
-		slog.Error("startup_failed", "operation", "create job assistant", "error", err)
-		os.Exit(1)
-	}
-	jobAssistant := service.NewJobAssistantService(jobPlanner, jobRepository)
+	featureService := features.NewService(flagpostgres.NewStore(pool))
 
 	h := api.Handlers{
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
@@ -138,7 +125,8 @@ func main() {
 		ResumeDesign:   handlers.NewResumeDesignHandler(resumeDesignService),
 		DesignSchema:   handlers.NewDesignSchemaHandler(),
 		Agent:          agentHandler,
-		Jobs:           handlers.NewJobHandler(jobService).WithDiscovery(jobDiscovery, jobAssistant),
+		Features:       handlers.NewFeatureHandler(featureService),
+		Modules:        []api.RouteModule{jobs.New(ctx, pool, importAIConfig, featureService)},
 	}
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {

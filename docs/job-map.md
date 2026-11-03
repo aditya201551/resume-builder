@@ -1,5 +1,11 @@
 # Jobs
 
+> Historical implementation notes. The current discovery contract is documented in
+> `backend/internal/modules/jobs/internal/jobsearch/README.md`; module boundaries
+> and the off-by-default release flag are documented in
+> [README.md](../README.md). The source and
+> worker descriptions below include earlier approaches that have since been removed.
+
 The authenticated Jobs tab has third-party listings and a Direct jobs placeholder. The initial scope is technology roles worldwide. Search operates on the listings actually indexed, not a claim to cover every opening worldwide.
 
 ## Run locally

@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
+    "features": "go run ./cmd/features",
     "build:api": "go build -o bin/api ./cmd/api",
-    "build": "npm run build:api",
+    "build:features": "go build -o bin/features ./cmd/features",
+    "build": "npm run build:api && npm run build:features",
     "dev": "go run ./cmd/api",
     "lint": "go vet ./...",
     "test": "go test ./..."

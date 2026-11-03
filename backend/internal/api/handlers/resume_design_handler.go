@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"resume-builder/backend/internal/platform/httpresponse"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/design"
@@ -23,7 +24,7 @@ func (h *ResumeDesignHandler) Get(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, d)
+	httpresponse.JSON(w, http.StatusOK, d)
 }
 
 func (h *ResumeDesignHandler) Update(w http.ResponseWriter, r *http.Request) {
@@ -37,5 +38,5 @@ func (h *ResumeDesignHandler) Update(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, d)
+	httpresponse.JSON(w, http.StatusOK, d)
 }

@@ -26,8 +26,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Message, MessageContent } from '@/components/ui/message'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ActionItem from '@/components/agent/ActionItem'
-import ChatMarkdown from '@/components/agent/ChatMarkdown'
-import CopyButton from '@/components/agent/CopyButton'
+import ChatMarkdown from '@/components/chat/ChatMarkdown'
+import CopyButton from '@/components/chat/CopyButton'
 import { groupAssistantParts } from '@/lib/agentProposal'
 import {
   type AgentChatController,

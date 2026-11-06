@@ -299,9 +299,11 @@ export default function DashboardPage({
             >
               <Plus className="size-4" aria-hidden /> Create manually
             </button>
-            <button type="button" className="home-mobile-import" onClick={() => setImportOpen(true)}>
-              <FileUp className="size-4" aria-hidden /> Import resume
-            </button>
+            {(mobile || resumes.length === 0) && (
+              <button type="button" onClick={() => setImportOpen(true)}>
+                <FileUp className="size-4" aria-hidden /> Import resume
+              </button>
+            )}
           </div>
           {error && (
             <div role="alert" className="home-notice">

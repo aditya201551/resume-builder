@@ -13,6 +13,8 @@ interface RecentResumesProps {
 }
 
 export default function RecentResumes({ resumes, isLoading, isError, onRetry, onImport }: RecentResumesProps) {
+  if (!isLoading && !isError && resumes.length === 0) return null
+
   return (
     <section className="home-recent" aria-labelledby="recent-resumes-heading">
       <div className="home-recent-heading">
@@ -35,8 +37,6 @@ export default function RecentResumes({ resumes, isLoading, isError, onRetry, on
           <p>We couldn’t load your resumes.</p>
           <Button type="button" size="sm" variant="ghost" onClick={onRetry}>Try again</Button>
         </div>
-      ) : resumes.length === 0 ? (
-        <p className="home-recent-state">Create or import a resume to get started.</p>
       ) : (
         <div className="home-recent-list">
           {resumes.slice(0, 4).map((resume) => (

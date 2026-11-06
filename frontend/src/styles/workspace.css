@@ -103,7 +103,7 @@
 .manual-start { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; flex-shrink: 0; gap: var(--space-lg); margin-top: var(--space-md); font-size: var(--text-sm); }
 .manual-start button { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 40px; padding-inline: var(--space-xs); border-radius: var(--radius-input); color: var(--foreground); }
 .manual-start button:hover { background: var(--card); }
-.home-examples-toggle, .manual-start .home-mobile-import, .home-context-short { display: none; }
+.home-examples-toggle, .home-context-short { display: none; }
 .job-context-field { display: grid; gap: var(--space-xs); margin-top: var(--space-md); padding-top: var(--space-md); border-top: 1px solid var(--border); animation: surface-enter var(--motion-panel) var(--motion-ease); }
 .library-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-lg); margin-bottom: var(--space-lg); }
 .library-title { font-size: var(--text-xl); font-weight: 500; line-height: 1.2; letter-spacing: var(--tracking-display); }
@@ -308,7 +308,6 @@
   .starter-icon { display: inline-flex; }
   .manual-start { width: 100%; gap: var(--space-sm); margin-top: var(--space-md); font-size: 13px; }
   .manual-start button { min-height: 44px; }
-  .manual-start .home-mobile-import { display: inline-flex; }
   .home-notice { flex-wrap: wrap; line-height: 1.5; }
   .library-heading { align-items: flex-start; gap: var(--space-lg); margin-bottom: var(--space-lg); }
   .dashboard-page:not(.dashboard-home) .library-title { font-size: 28px; }
@@ -400,7 +399,8 @@
 .home-recent-state { display: flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 88px; padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-glass-selected); font-size: var(--text-sm); color: var(--muted-foreground); }
 .home-composer:is(:focus, :focus-within, :focus-visible), .assistant-composer:is(:focus, :focus-within, :focus-visible) { outline: none; }
 @media (max-height: 740px) and (min-width: 768px) {
-  .dashboard-home { justify-content: flex-start; padding-block: var(--space-md); }
+  .dashboard-home:has(.home-recent) { justify-content: flex-start; }
+  .dashboard-home { padding-block: var(--space-md); }
   .home-intro > h1 { margin-bottom: var(--space-lg); font-size: 28px; }
   .home-composer { padding: var(--space-sm); }
   .home-composer .job-context-field { margin-top: var(--space-xs); padding-top: var(--space-xs); }

@@ -28,7 +28,7 @@ import { useResumePdf } from '@/hooks/useResumePdf'
 import { downloadPdfBlob } from '@/lib/pdf/download'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
-import Brand from '@/components/layout/Brand'
+import { SidebarTrigger } from '@/components/ui/sidebar'
 import type { Resume } from '@/types/resume'
 
 function EditableResumeName({ resume }: { resume: Resume }) {
@@ -310,14 +310,8 @@ export default function EditorNavbar({
   return (
     <header className="workspace-navbar">
       <div className="workspace-back">
+        <SidebarTrigger className="app-navigation-trigger" />
         <BackButton />
-        <Link
-          to="/resumes"
-          className="brand-link"
-          aria-label="Resume Builder home"
-        >
-          <Brand compact />
-        </Link>
         <div className="workspace-resume-info min-w-0">
           <EditableResumeName resume={resume} />
           <div className="workspace-sync-wrap mt-1">

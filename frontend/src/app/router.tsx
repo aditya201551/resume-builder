@@ -21,10 +21,10 @@ export const router = createBrowserRouter([
           children: [
             { path: '/resumes', element: <DashboardPage /> },
             { path: '/resumes/library', element: <DashboardPage libraryOnly /> },
+            { path: '/resumes/:id/edit', element: <EditorPage /> },
             ...jobsRoutes,
           ],
         },
-        { path: '/resumes/:id/edit', element: <EditorPage /> },
       ],
     }],
   },

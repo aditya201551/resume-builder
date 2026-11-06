@@ -41,7 +41,7 @@
 .jobs-summary-keywords { margin-bottom: var(--space-xs); font-size: var(--text-sm); font-weight: 500; }
 .jobs-discovery-main .jobs-results-heading { position: sticky; top: 0; z-index: 1; background: var(--card); border-bottom: 1px solid var(--border); }
 .jobs-mobile-surface { display: none; }
-@media (max-width: 899px) {
+@container app-content (max-width: 899px) {
   .jobs-workspace { display: block; height: max(440px, calc(100svh - 330px)); }
   .jobs-controls, .jobs-discovery-main { height: 100%; }
 
@@ -51,7 +51,7 @@
   .jobs-mobile-surface button[aria-pressed='true'] { background: var(--card); color: var(--foreground); box-shadow: var(--shadow-control); }
   .jobs-workspace-toolbar .jobs-mode-picker { display: none; }
 }
-@media (max-width: 639px) {
+@container app-content (max-width: 639px) {
   .jobs-workspace-toolbar { align-items: stretch; }
   .jobs-mode-picker { width: 100%; justify-content: center; }
   .jobs-mode-picker > button { flex: 1; }
@@ -129,7 +129,7 @@
 .jobs-detail-actions { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-sm); padding-block: var(--space-lg); margin-top: auto; border-top: 1px solid var(--border); }
 .jobs-notice { padding: var(--space-sm); border: 0; border-radius: var(--radius-input); font-size: var(--text-sm); line-height: 1.7; background: var(--secondary); }
 .jobs-detail-state { padding-block: var(--space-lg); font-size: var(--text-sm); }
-@media (max-width: 1199px) {
+@container app-content (max-width: 1199px) {
 .jobs-page { padding-inline: var(--space-8); }
 .jobs-row { padding-inline: var(--space-md); }
 }

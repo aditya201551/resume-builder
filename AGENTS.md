@@ -85,6 +85,8 @@ React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui (`components/ui/`) + TanS
 
 ## Cross-cutting notes
 
+- Prefer reuse over writing code from scratch. Before implementing a capability, inspect existing project code and look for suitable maintained libraries, modules, or components. Reuse or adapt an established solution when it fits; write custom code only for behavior the available solutions do not cover.
+
 - Create files only when they serve the implementation, required tests, or lasting operational needs. A research request does not imply creating research documents. Keep necessary guidance in existing files and remove temporary research artifacts before finishing.
 
 - Always remove files, code, styles, dependencies, and tests made unused by a change. Trace references and run the relevant checks; do not retain obsolete implementations for hypothetical future use. Preserve applied migrations and user data.

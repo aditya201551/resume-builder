@@ -4,19 +4,21 @@ package features
 
 type Key string
 
-const Jobs Key = "jobs.enabled"
-
 type Definition struct {
 	Key         Key
 	Description string
 }
 
 func Catalog() []Definition {
-	return []Definition{{Jobs, "Job discovery, saved jobs, and the job-search assistant"}}
+	return []Definition{}
 }
 
 func Known(key Key) bool {
-	for _, definition := range Catalog() {
+	return known(key, Catalog())
+}
+
+func known(key Key, catalog []Definition) bool {
+	for _, definition := range catalog {
 		if definition.Key == key {
 			return true
 		}

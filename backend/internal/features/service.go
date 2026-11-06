@@ -23,15 +23,16 @@ type featureStore interface {
 // Service shares one bounded snapshot across module gates and the UI.
 // Expired enabled values are never used when refreshing the registry fails.
 type Service struct {
-	store   featureStore
-	mu      sync.Mutex
-	values  map[Key]bool
-	expires time.Time
-	now     func() time.Time
+	definitions []Definition
+	store       featureStore
+	mu          sync.Mutex
+	values      map[Key]bool
+	expires     time.Time
+	now         func() time.Time
 }
 
 func NewService(store featureStore) *Service {
-	return &Service{store: store, now: time.Now}
+	return &Service{store: store, definitions: Catalog(), now: time.Now}
 }
 
 func (s *Service) Snapshot(ctx context.Context) map[Key]bool {
@@ -41,7 +42,7 @@ func (s *Service) Snapshot(ctx context.Context) map[Key]bool {
 		return maps.Clone(s.values)
 	}
 	values := make(map[Key]bool)
-	for _, definition := range Catalog() {
+	for _, definition := range s.definitions {
 		values[definition.Key] = false
 	}
 	work, cancel := context.WithTimeout(ctx, time.Second)
@@ -63,7 +64,7 @@ func (s *Service) Snapshot(ctx context.Context) map[Key]bool {
 }
 
 func (s *Service) Enabled(ctx context.Context, key Key) bool {
-	if !Known(key) {
+	if !known(key, s.definitions) {
 		return false
 	}
 	return s.Snapshot(ctx)[key]
@@ -71,7 +72,7 @@ func (s *Service) Enabled(ctx context.Context, key Key) bool {
 
 func (s *Service) Set(ctx context.Context, key Key, enabled bool, actor string) error {
 	actor = strings.TrimSpace(actor)
-	if !Known(key) || actor == "" || len(actor) > 200 {
+	if !known(key, s.definitions) || actor == "" || len(actor) > 200 {
 		return fmt.Errorf("known feature and actor of 1–200 bytes required: %w", ErrValidation)
 	}
 	if err := s.store.Set(ctx, string(key), enabled, actor); err != nil {

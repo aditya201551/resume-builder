@@ -15,8 +15,8 @@ func TestFeatureUpdatesRequireExistingFlagAndWriteAuditAtomically(t *testing.T) 
 			t.Fatal(err)
 		}
 		mock.ExpectExec("WITH changed AS .*UPDATE feature_flags.*INSERT INTO feature_flag_audit").
-			WithArgs("jobs.enabled", true, "owner").WillReturnResult(pgxmock.NewResult("INSERT", affected))
-		err = NewStore(mock).Set(context.Background(), "jobs.enabled", true, "owner")
+			WithArgs("test.enabled", true, "owner").WillReturnResult(pgxmock.NewResult("INSERT", affected))
+		err = NewStore(mock).Set(context.Background(), "test.enabled", true, "owner")
 		if affected == 0 && !errors.Is(err, ErrNotFound) {
 			t.Fatal("missing flag was silently created")
 		}

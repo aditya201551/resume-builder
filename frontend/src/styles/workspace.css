@@ -4,7 +4,6 @@
 /* Hallmark · dismissed F4 · Mobile surface switches indicate selection; the up-arrow button submits the form. */
 /* Hallmark · dismissed 29 · The owner requested transparent navigation with no bar background; selected items retain their own surface. */
 /* Hallmark · answered F24 · The preview toolbar floats over document pages; its filled surface and elevation distinguish it from white paper. */
-/* Hallmark · dismissed 49 · The job action uses jobs-view-role with white-space nowrap in jobs.css, verified on phones. */
 .app-shell { position: relative; isolation: isolate; display: flex; min-height: 100dvh; }
 .app-sidebar { border-color: var(--border); }
 .app-sidebar [data-slot='sidebar-inner'] { background: transparent; }
@@ -180,7 +179,6 @@
 .format-preset:hover { background: var(--secondary); }
 .assistant-panel { background: var(--card); color: var(--foreground); }
 .assistant-header { flex-shrink: 0; padding: var(--space-lg); border-bottom: 1px solid var(--border); background: radial-gradient(ellipse at 0% 0%, var(--color-halo-soft), var(--color-clear) 80%); }
-.jobs-chat-mark { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 11px; background: linear-gradient(135deg, var(--color-signal), var(--color-ember)); color: var(--color-on-signal); }
 .assistant-scope { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-sm); }
 .assistant-scope span, .assistant-scope button { display: inline-flex; align-items: center; gap: var(--space-2xs); min-height: 30px; padding: var(--space-2xs) var(--space-xs); border-radius: var(--radius-input); background: var(--secondary); color: var(--muted-foreground); font-size: var(--text-xs); }
 .assistant-scope button:hover { color: var(--foreground); }

@@ -29,12 +29,6 @@ type Handlers struct {
 	DesignSchema   *handlers.DesignSchemaHandler
 	Agent          *handlers.AgentHandler
 	Features       *handlers.FeatureHandler
-	Modules        []RouteModule
-}
-
-// RouteModule exposes only route registration; module internals remain private.
-type RouteModule interface {
-	RegisterRoutes(func(string, http.HandlerFunc))
 }
 
 func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFunc, staticDir string) http.Handler {
@@ -100,9 +94,8 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 
 	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
 
-	for _, module := range h.Modules {
-		module.RegisterRoutes(handle)
-	}
+	// Unknown API routes must not fall through to the frontend's SPA document.
+	mux.HandleFunc("/api/", http.NotFound)
 
 	if staticDir != "" {
 		mux.Handle("/", spaFileServer(staticDir))

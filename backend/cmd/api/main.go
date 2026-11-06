@@ -20,7 +20,6 @@ import (
 	"resume-builder/backend/internal/features"
 	flagpostgres "resume-builder/backend/internal/features/postgres"
 	"resume-builder/backend/internal/logging"
-	"resume-builder/backend/internal/modules/jobs"
 	"resume-builder/backend/internal/repository"
 	"resume-builder/backend/internal/service"
 )
@@ -126,7 +125,6 @@ func main() {
 		DesignSchema:   handlers.NewDesignSchemaHandler(),
 		Agent:          agentHandler,
 		Features:       handlers.NewFeatureHandler(featureService),
-		Modules:        []api.RouteModule{jobs.New(ctx, pool, importAIConfig, featureService)},
 	}
 
 	healthCheck := func(w http.ResponseWriter, r *http.Request) {

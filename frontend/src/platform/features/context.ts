@@ -1,6 +1,7 @@
 import { createContext } from 'react'
 
-export type FeatureKey = 'jobs.enabled'
+// Feature names are owned by the backend catalog.
+export type FeatureKey = string
 export type FeatureFlags = Partial<Record<FeatureKey, boolean>>
 
 interface FeatureState {

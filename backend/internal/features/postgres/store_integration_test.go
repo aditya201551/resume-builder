@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"resume-builder/backend/internal/features"
 	"resume-builder/backend/internal/features/postgres"
 )
 
@@ -55,16 +54,16 @@ func TestFeatureFlagsPostgresIntegration(t *testing.T) {
 		}
 	}
 	apply("up")
-	store := postgres.NewStore(pool)
-	flags := features.NewService(store)
-	if flags.Enabled(ctx, features.Jobs) {
-		t.Fatal("Jobs must start disabled")
-	}
-	if err := flags.Set(ctx, features.Jobs, true, "integration-owner"); err != nil {
+	if _, err := pool.Exec(ctx, `INSERT INTO feature_flags(key, enabled, updated_by) VALUES ('test.enabled', false, 'integration')`); err != nil {
 		t.Fatal(err)
 	}
-	if !flags.Enabled(ctx, features.Jobs) {
-		t.Fatal("live update not visible")
+	store := postgres.NewStore(pool)
+	if err := store.Set(ctx, "test.enabled", true, "integration-owner"); err != nil {
+		t.Fatal(err)
+	}
+	stored, err := store.List(ctx)
+	if err != nil || !stored["test.enabled"] {
+		t.Fatal("update not visible", err)
 	}
 	var actor string
 	if err := pool.QueryRow(ctx, `SELECT actor FROM feature_flag_audit ORDER BY id DESC LIMIT 1`).Scan(&actor); err != nil || actor != "integration-owner" {
@@ -74,21 +73,22 @@ func TestFeatureFlagsPostgresIntegration(t *testing.T) {
 	if _, err := pool.Exec(ctx, `ALTER TABLE feature_flag_audit ADD CONSTRAINT reject_fixture CHECK(actor <> 'reject')`); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.Set(ctx, "jobs.enabled", false, "reject"); err == nil {
+	if err := store.Set(ctx, "test.enabled", false, "reject"); err == nil {
 		t.Fatal("audit failure was ignored")
 	}
-	stored, err := store.List(ctx)
-	if err != nil || !stored["jobs.enabled"] {
+	stored, err = store.List(ctx)
+	if err != nil || !stored["test.enabled"] {
 		t.Fatal("flag update survived an audit failure", err)
 	}
-	if err := flags.Set(ctx, features.Jobs, false, "integration-owner"); err != nil {
+	if err := store.Set(ctx, "test.enabled", false, "integration-owner"); err != nil {
 		t.Fatal(err)
 	}
-	if flags.Enabled(ctx, features.Jobs) {
-		t.Fatal("live disable not visible")
+	stored, err = store.List(ctx)
+	if err != nil || stored["test.enabled"] {
+		t.Fatal("disable not visible", err)
 	}
 	var changes int
-	if err := pool.QueryRow(ctx, `SELECT count(*) FROM feature_flag_audit`).Scan(&changes); err != nil || changes != 3 {
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM feature_flag_audit WHERE feature_key = 'test.enabled'`).Scan(&changes); err != nil || changes != 2 {
 		t.Fatal("unexpected audit history", changes, err)
 	}
 	apply("down")

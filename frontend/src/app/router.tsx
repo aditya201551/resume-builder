@@ -5,7 +5,6 @@ import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import EditorPage from '@/pages/EditorPage'
 import PrintPage from '@/pages/PrintPage'
-import { jobsRoutes } from '@/features/jobs'
 import { FeatureProvider } from '@/platform/features/FeatureProvider'
 
 export const router = createBrowserRouter([
@@ -22,7 +21,6 @@ export const router = createBrowserRouter([
             { path: '/resumes', element: <DashboardPage /> },
             { path: '/resumes/library', element: <DashboardPage libraryOnly /> },
             { path: '/resumes/:id/edit', element: <EditorPage /> },
-            ...jobsRoutes,
           ],
         },
       ],

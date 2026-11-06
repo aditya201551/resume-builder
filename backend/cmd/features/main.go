@@ -83,5 +83,9 @@ func run(args []string, output io.Writer) error {
 	if err != nil {
 		return fmt.Errorf("could not read features; check database migrations")
 	}
-	return json.NewEncoder(output).Encode(values)
+	registered := make(map[string]bool)
+	for _, definition := range features.Catalog() {
+		registered[string(definition.Key)] = values[string(definition.Key)]
+	}
+	return json.NewEncoder(output).Encode(registered)
 }

@@ -19,10 +19,10 @@ function TestRoutes() {
   }])
 }
 
-function render(path = '/resumes', jobs = false) {
+function render(path = '/resumes') {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
-      <FeatureContext value={{ flags: { 'jobs.enabled': jobs }, loading: false, unavailable: false }}>
+      <FeatureContext value={{ flags: {}, loading: false, unavailable: false }}>
         <TestRoutes />
       </FeatureContext>
     </MemoryRouter>,
@@ -43,9 +43,11 @@ describe('application navigation', () => {
     expect(html).toContain('Skip to content')
   })
 
-  it('shows Jobs only when its runtime feature flag is enabled', () => {
-    expect(render()).not.toContain('href="/jobs"')
-    expect(render('/resumes', true)).toContain('href="/jobs"')
+  it('keeps navigation focused on resumes', () => {
+    const html = render()
+    expect(html).toContain('aria-label="Home"')
+    expect(html).toContain('aria-label="My resumes"')
+    expect(html).not.toContain('href="/jobs"')
   })
 
   it('restores the saved compact preference while keeping link names accessible', () => {
@@ -58,10 +60,9 @@ describe('application navigation', () => {
 
   it('starts the editor with a rail even when other pages prefer expanded navigation', () => {
     vi.stubGlobal('localStorage', { getItem: () => 'false' })
-    const html = render('/resumes/example/edit', true)
+    const html = render('/resumes/example/edit')
     expect(html).toContain('aria-label="Expand sidebar"')
     expect(html).toContain('aria-label="My resumes" aria-current="location"')
-    expect(html).toContain('href="/jobs"')
     expect(html).toContain('Editor content')
   })
 })

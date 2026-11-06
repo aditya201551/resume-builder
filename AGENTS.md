@@ -27,35 +27,21 @@ Do not start dev servers unless explicitly asked — the user runs and tests the
 
 Backend needs Postgres reachable at `DATABASE_URL` and applies `backend/internal/db/migrations/*.sql` automatically on boot (see `db.RunMigrations` in `cmd/api/main.go`). Config is loaded from `backend/.env` (see that file for the full list of variables — OAuth client IDs, `JWT_SECRET`, required `AI_PROVIDER`/`AI_API_KEY`/`AI_MODEL` for the AI assistant, optional `CHROME_EXEC_PATH` for PDF export). This app has no config defaults for required settings — a missing required variable fails startup rather than silently falling back.
 
-## Modules and runtime flags
+## Runtime feature flags
 
-See `README.md` for flag-management commands. Jobs is the first vertical module; do not move
-unrelated resume code just to make folder structures uniform.
-
-- `backend/internal/modules/jobs/module.go` is the public backend entry point.
-  Its nested `internal/` packages own Jobs handlers, services, repositories,
-  provider clients, search contracts and AI planning. Go enforces this boundary.
-  Preserve handler → service → repository layering inside the module.
-- `api.Handlers.Modules` registers module routes through a small interface. Jobs
-  routes remain registered while off; shared middleware checks `jobs.enabled`
-  after authentication on every new request. Dependencies initialize lazily and
-  retry safely, so disabled Jobs configuration cannot prevent core startup.
-- `internal/features/catalog.go` owns known keys. `features.Service` owns evaluation
-  and bounded caching; `features/postgres.Store` owns PostgreSQL access and atomic audit
-  writes. Unknown/missing flags and failed refreshes default off. Keep flag checks
-  at module boundaries rather than spreading them through business services.
-- Migration `000010` seeds Jobs off. Preserve applied migrations and saved data.
-  Use `npm run features --workspace=backend -- set jobs.enabled false --actor <name>`
-  with trusted database credentials to change availability without a deploy.
-  There is no browser flag-write endpoint or implicit OAuth administrator role.
-- Frontend Jobs code and its tests live in `frontend/src/features/jobs/`. The app
-  imports only `@/features/jobs`; `app/boundaries.test.ts` enforces the public API.
-  `app/` assembles routes/navigation. `platform/features/` fetches backend decisions
-  and guards routes before lazy feature code mounts. Shared chat presentation lives
-  in `components/chat/`, independent of the resume assistant.
-- Do not add another flag SDK, container framework or global module registry for
-  this boolean use case. New modules should have explicit dependencies and their
-  own tests for off/on behavior, authentication and data ownership.
+- `internal/features/catalog.go` owns registered keys; the catalog is currently empty.
+  Removing a feature removes its key from this catalog. Historical database rows
+  do not grant availability or appear in the feature API or administrative list.
+- `features.Service` owns evaluation and bounded caching; `features/postgres.Store`
+  owns PostgreSQL access and atomic audit writes. Unknown/missing flags and failed
+  refreshes default off. Keep checks at feature boundaries.
+- Manage registered flags with the backend `features` command and trusted database
+  credentials. There is no browser flag-write endpoint or implicit OAuth admin role.
+  Preserve applied migrations, stored data, and audit history.
+- `frontend/src/platform/features/` fetches backend decisions and provides route
+  guards. `app/` assembles routes and navigation. Shared chat presentation lives in
+  `components/chat/`, independent of the resume assistant.
+- Reuse this boolean flag system rather than adding another SDK or module registry.
 
 ## Backend architecture (`backend/internal/`)
 
@@ -66,7 +52,7 @@ Layering is strict: `handlers` (HTTP adapter) → `service` (business logic) →
   - `ownership.go`'s `ensureResumeOwner` is the *only* place resume ownership is checked. Every section-scoped service call goes through it before touching child rows — this is what makes user isolation correct regardless of which adapter (REST today, MCP potentially later) calls in. Don't duplicate ownership checks elsewhere.
   - `EntityService[TInput, TOutput]` (generic interface) is implemented by every simple child-entity service (work experience, education, project, certification, language, misc entry) so they can share one generic HTTP adapter.
 - **`api/handlers/`** — one handler per concern. `EntityHandler[TInput, TOutput]` (`entity_handler.go`) is the single generic HTTP adapter for every `EntityService`-shaped entity — when adding a new simple child entity, wire it through this generic instead of writing a new handler. Non-generic entities (Skill, CustomSection, SectionConfig, ContentBlock, Resume itself, Agent) get bespoke handlers because their shapes diverge (nested items, upserts, etc.).
-- **`api/router.go`** — core routes registered here; feature modules register their own routes; `registerEntityRoutes` wires the CRUD+reorder pattern for each `EntityHandler`. The Agent route is only registered `if h.Agent != nil` (see below).
+- **`api/router.go`** — all routes registered here; `registerEntityRoutes` wires the CRUD+reorder pattern for each `EntityHandler`. The Agent route is only registered `if h.Agent != nil` (see below).
 - **`auth/`** — JWT issuance/validation (`jwt.go`), OAuth provider config for Google/GitHub (`oauth.go`), signed OAuth state (`state.go`), user-ID-from-context helper (`context.go`). `api/middleware/auth.go`'s `RequireAuth` wraps protected routes; login/callback/logout and the PDF export's `/export/data` route are intentionally unprotected (the latter self-validates via a short-lived `export_token` query param since headless Chrome has no session cookie).
 - **`ai/`** — the shared core for every LLM-backed feature (today: `agent`). Owns what all of them need in common: reading `AI_PROVIDER`/`AI_API_KEY`/`AI_MODEL` and constructing an Eino chat model from them. Two providers are supported, selected by `AI_PROVIDER`: `anthropic` (Eino's native Codex component) and `openrouter` (Eino's OpenAI component pointed at OpenRouter's OpenAI-compatible endpoint). `NewChatModel` returns the `model.ToolCallingChatModel` interface, never a concrete client, so consumers stay provider-agnostic. Provider-specific per-call behavior goes in `Config.ChatModelOptions()` (today: Anthropic prompt caching) so no consumer has to import a provider package. `AI_MODEL` is **not portable between providers** — anthropic wants a bare name (`Codex-sonnet-5`), openrouter a prefixed slug (`anthropic/Codex-sonnet-4`). Zero dependency on `cmd/api`, `internal/api`, or `internal/service`. No defaults — all three env vars are required, and an unrecognized `AI_PROVIDER` is an error.
 - **`agent/`** — the AI assistant (content rewrite suggestions), built on Eino via `internal/ai`. Deliberately has zero dependency on `cmd/api` or `internal/api` — only `internal/service`, `internal/auth`, `internal/ai`, and Eino — so it can be split into its own service later without changing this package (see `agent/doc.go` for the exact split plan). Optional per-feature overrides: `AGENT_MODEL` (must be valid for the selected `AI_PROVIDER`) and `AGENT_MAX_TOKENS`. It runs in-process today, called directly from `agent_handler.go`. A required dependency of this app, not optional: if `ai.LoadConfig()` fails, `agent.LoadConfig()` propagates the error and `main.go` treats it as fatal — the server does not start without the AI assistant configured.

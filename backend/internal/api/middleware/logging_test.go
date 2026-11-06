@@ -17,7 +17,7 @@ func TestHTTPErrorLogsUseRoutePatternsAndPreserveStreaming(t *testing.T) {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
 	t.Cleanup(func() { slog.SetDefault(previous) })
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /jobs/{id}", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "failed", 503) })
+	mux.HandleFunc("GET /resumes/{id}", func(w http.ResponseWriter, r *http.Request) { http.Error(w, "failed", 503) })
 	mux.HandleFunc("GET /stream", func(w http.ResponseWriter, r *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		if !ok {
@@ -28,12 +28,12 @@ func TestHTTPErrorLogsUseRoutePatternsAndPreserveStreaming(t *testing.T) {
 	})
 	handler := LogErrors(mux)
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, httptest.NewRequest("GET", "/jobs/private-id?token=private-token", nil))
+	handler.ServeHTTP(w, httptest.NewRequest("GET", "/resumes/private-id?token=private-token", nil))
 	var event map[string]any
 	if err := json.Unmarshal(logs.Bytes(), &event); err != nil {
 		t.Fatal(err)
 	}
-	if event["level"] != "ERROR" || event["route"] != "GET /jobs/{id}" || event["status"] != float64(503) {
+	if event["level"] != "ERROR" || event["route"] != "GET /resumes/{id}" || event["status"] != float64(503) {
 		t.Fatal(event)
 	}
 	if strings.Contains(logs.String(), "private-") {
@@ -54,7 +54,7 @@ func TestCanceledRequestLogsCancellationInsteadOfServerFailure(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(previous) })
 	ctx, cancel := context.WithCancel(context.Background())
 	handler := LogErrors(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { cancel() }))
-	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/jobs", nil).WithContext(ctx))
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("GET", "/api/resumes", nil).WithContext(ctx))
 	var event map[string]any
 	if err := json.Unmarshal(logs.Bytes(), &event); err != nil {
 		t.Fatal(err)

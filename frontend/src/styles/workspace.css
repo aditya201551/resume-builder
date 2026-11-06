@@ -108,7 +108,11 @@
 .library-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--space-lg); margin-bottom: var(--space-lg); }
 .library-title { font-size: var(--text-xl); font-weight: 500; line-height: 1.2; letter-spacing: var(--tracking-display); }
 .dashboard-page:not(.dashboard-home) .library-title { font-size: var(--text-3xl); }
-.library-search { display: flex; align-items: center; gap: var(--space-sm); max-width: 440px; margin-bottom: var(--space-lg); }
+.library-search { position: relative; max-width: 440px; margin-bottom: var(--space-lg); border-radius: var(--radius-input); }
+.library-search > svg { position: absolute; inset-inline-start: 12px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.library-search > [data-slot='input'] { padding-inline-start: 40px; }
+.library-search input::-webkit-search-cancel-button { filter: grayscale(1); }
+.library-search:focus-within { outline: 2px solid var(--ring); outline-offset: 2px; }
 .resume-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-lg); }
 .resume-card { min-width: 0; }
 .resume-card-preview { position: relative; display: flex; justify-content: center; align-items: flex-start; height: 280px; overflow: hidden; padding: var(--space-lg) var(--space-5) 0; border: 0; border-radius: var(--radius-card); background: var(--color-desk); color: var(--foreground); transition: background-color var(--motion-standard), transform var(--motion-standard); }

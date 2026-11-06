@@ -353,6 +353,7 @@ export default function DashboardPage({
           <div className="library-search">
             <Search className="size-4 text-muted-foreground" aria-hidden />
             <Input
+              type="search"
               aria-label="Search resumes"
               value={search}
               onChange={(event) => setSearch(event.target.value)}

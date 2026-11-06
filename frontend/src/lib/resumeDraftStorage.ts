@@ -46,3 +46,12 @@ export function clearDraft(resumeId: string) {
   } catch {
   }
 }
+
+export function updateDraftLabel(resumeId: string, label: string) {
+  const draft = loadDraft(resumeId)
+  if (!draft) return
+  saveDraft(resumeId, {
+    data: { ...draft.data, resume: { ...draft.data.resume, label } },
+    lastSynced: { ...draft.lastSynced, resume: { ...draft.lastSynced.resume, label } },
+  })
+}

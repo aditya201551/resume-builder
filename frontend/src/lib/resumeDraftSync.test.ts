@@ -5,6 +5,7 @@ import type { FullResume } from '@/types/resume'
 import { flushDraft, isDraftDirty } from './resumeDraftSync'
 import { createDraftAutosync } from './resumeDraftAutosync'
 import { createEntryIdentity, resolveEntryReferences } from './resumeDraftIds'
+import { loadDraft, saveDraft, updateDraftLabel } from './resumeDraftStorage'
 
 function emptyResume(): FullResume {
   return {
@@ -246,5 +247,25 @@ describe('entry identities', () => {
       .toEqual({ type: 'skill_item_update', groupId: 'group', id: 'item' })
     expect(resolveEntryReferences({ orderedIds: ['temp-item'], patch: { name: 'temp-item' } }, identity.resolveId))
       .toEqual({ orderedIds: ['item'], patch: { name: 'temp-item' } })
+  })
+})
+
+describe('library rename with an unsynced draft', () => {
+  it('acknowledges only the renamed label while retaining unsynced content', () => {
+    const storage = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+    })
+    const previous = emptyResume()
+    const data = { ...previous, resume: { ...previous.resume, summary: 'Unsynced writing' } }
+    saveDraft('r1', { data, lastSynced: previous })
+    updateDraftLabel('r1', 'Renamed in library')
+    const draft = loadDraft('r1')!
+    expect(draft.data.resume.label).toBe('Renamed in library')
+    expect(draft.lastSynced.resume.label).toBe('Renamed in library')
+    expect(draft.data.resume.summary).toBe('Unsynced writing')
+    expect(draft.lastSynced.resume.summary).toBeNull()
+    expect(isDraftDirty(draft.data, draft.lastSynced)).toBe(true)
   })
 })

@@ -1,24 +1,21 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { useNavigate } from 'react-router'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRight,
   ArrowUp,
   Check,
   ChevronDown,
-  Copy,
   FileText,
   FileUp,
   Loader2,
-  MoreHorizontal,
   Plus,
   Search,
   Target,
-  Trash2,
   WandSparkles,
   X,
 } from 'lucide-react'
-import { apiDelete, apiGet, apiPost } from '@/lib/http'
+import { apiGet, apiPost } from '@/lib/http'
 import { ASSISTANT_STARTERS, type AssistantTask } from '@/lib/assistantTask'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { Resume } from '@/types/resume'
@@ -28,21 +25,11 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from '@/components/ui/alert-dialog'
-import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
+import ResumeCard from '@/components/dashboard/ResumeCard'
 import ImportResumeDialog from '@/components/dashboard/ImportResumeDialog'
 import RecentResumes from '@/components/dashboard/RecentResumes'
 import PromptExamples from '@/components/dashboard/PromptExamples'
@@ -63,7 +50,6 @@ export default function DashboardPage({
   const [jobOpen, setJobOpen] = useState(false)
   const [jobDescription, setJobDescription] = useState('')
   const [search, setSearch] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<Resume | null>(null)
   const [importOpen, setImportOpen] = useState(false)
   const [examplesOpen, setExamplesOpen] = useState(false)
   const resumesQuery = useQuery({
@@ -94,20 +80,6 @@ export default function DashboardPage({
       })
     },
   })
-  const duplicateMutation = useMutation({
-    mutationFn: (id: string) => apiPost<Resume>(`/api/resumes/${id}/duplicate`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: resumesKey })
-    },
-  })
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => apiDelete(`/api/resumes/${id}`),
-    onSuccess: () => {
-      setDeleteTarget(null)
-      void queryClient.invalidateQueries({ queryKey: resumesKey })
-    },
-  })
-
   function startAssistant(event: FormEvent) {
     event.preventDefault()
     if (
@@ -132,10 +104,7 @@ export default function DashboardPage({
       .toLowerCase()
       .includes(search.toLowerCase()),
   )
-  const error =
-    createMutation.isError ||
-    duplicateMutation.isError ||
-    deleteMutation.isError
+  const error = createMutation.isError
 
   return (
     <div className={`dashboard-page${libraryOnly ? '' : ' dashboard-home'}`}>
@@ -392,117 +361,12 @@ export default function DashboardPage({
         ) : (
           <div className="resume-grid">
             {shownResumes.map((resume) => (
-              <article key={resume.id} className="resume-card">
-                <Link
-                  to={`/resumes/${resume.id}/edit`}
-                  className="resume-card-preview"
-                  aria-label={`Open ${resume.label || 'Untitled resume'}`}
-                >
-                  <div className="resume-miniature">
-                    <ResumeThumbnail resumeId={resume.id} />
-                  </div>
-                  <span className="open-resume-hint">
-                    Open workspace <ArrowRight className="size-3.5" />
-                  </span>
-                </Link>
-                <div className="resume-card-details">
-                  <div className="min-w-0">
-                    <Link
-                      to={`/resumes/${resume.id}/edit`}
-                      className="block truncate text-sm font-semibold"
-                    >
-                      {resume.label || 'Untitled resume'}
-                    </Link>
-                    {resume.full_name && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        {resume.full_name}
-                      </p>
-                    )}
-                    <p className="mt-3 text-[11px] text-muted-foreground">
-                      Updated{' '}
-                      {new Date(resume.updated_at).toLocaleDateString(
-                        undefined,
-                        { month: 'short', day: 'numeric' },
-                      )}
-                    </p>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        aria-label={`Options for ${resume.label || 'Untitled resume'}`}
-                      >
-                        <MoreHorizontal className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="rounded-2xl p-1.5"
-                    >
-                      <DropdownMenuItem
-                        disabled={duplicateMutation.isPending}
-                        onSelect={() => duplicateMutation.mutate(resume.id)}
-                      >
-                        <Copy className="size-4" /> Duplicate
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        variant="destructive"
-                        onSelect={() => {
-                          deleteMutation.reset()
-                          setDeleteTarget(resume)
-                        }}
-                      >
-                        <Trash2 className="size-4" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </article>
+              <ResumeCard key={resume.id} resume={resume} />
             ))}
           </div>
         )}
       </section>}
       <ImportResumeDialog open={importOpen} onOpenChange={setImportOpen} />
-      <AlertDialog
-        open={deleteTarget !== null}
-        onOpenChange={(open) => {
-          if (!open && !deleteMutation.isPending) setDeleteTarget(null)
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete {deleteTarget?.label || 'this resume'}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes the resume and all its sections.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {deleteMutation.isError && (
-            <p role="alert" className="text-sm text-destructive">
-              Couldn’t delete this resume. Please try again.
-            </p>
-          )}
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Keep resume
-            </AlertDialogCancel>
-            <Button
-              variant="destructive"
-              disabled={deleteMutation.isPending}
-              onClick={() => {
-                if (deleteTarget) deleteMutation.mutate(deleteTarget.id)
-              }}
-            >
-              {deleteMutation.isPending && (
-                <Loader2 className="size-4 animate-spin" />
-              )}{' '}
-              Delete resume
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 import { Link } from 'react-router'
 import { ArrowRight, FileUp, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import ResumeThumbnail from '@/components/dashboard/ResumeThumbnail'
+import ResumeCard from './ResumeCard'
 import type { Resume } from '@/types/resume'
 
 interface RecentResumesProps {
@@ -40,26 +40,7 @@ export default function RecentResumes({ resumes, isLoading, isError, onRetry, on
       ) : (
         <div className="home-recent-list">
           {resumes.slice(0, 4).map((resume) => (
-            <Link
-              key={resume.id}
-              to={`/resumes/${resume.id}/edit`}
-              className="home-recent-card"
-              aria-label={`Open ${resume.label || 'Untitled resume'}`}
-            >
-              <div className="home-recent-cover" aria-hidden>
-                <div className="home-recent-preview"><ResumeThumbnail resumeId={resume.id} /></div>
-              </div>
-              <div className="home-recent-details">
-                <h3 title={resume.label || 'Untitled resume'}>{resume.label || 'Untitled resume'}</h3>
-                {resume.full_name && <p title={resume.full_name}>{resume.full_name}</p>}
-                <div className="home-recent-footer">
-                  <time dateTime={resume.updated_at}>
-                    Edited {new Date(resume.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-                  </time>
-                  <span className="home-recent-open">Continue editing <ArrowRight aria-hidden /></span>
-                </div>
-              </div>
-            </Link>
+            <ResumeCard key={resume.id} resume={resume} />
           ))}
         </div>
       )}

@@ -1,4 +1,14 @@
 import type { User } from '../types/user'
+import type { Resume } from '@/types/resume'
+import { apiGet, apiPatch } from './http'
+
+export async function renameResume(resumeId: string, label: string): Promise<Resume> {
+  // The metadata endpoint replaces all fields, so preserve the latest server values.
+  const { full_name, headline, email, phone, location, photo_url, summary, links } = await apiGet<Resume>(`/api/resumes/${resumeId}`)
+  return apiPatch<Resume>(`/api/resumes/${resumeId}`, {
+    label, full_name, headline, email, phone, location, photo_url, summary, links,
+  })
+}
 
 export async function getMe(): Promise<User | null> {
   const res = await fetch('/api/auth/me', { credentials: 'include' })

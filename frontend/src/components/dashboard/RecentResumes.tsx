@@ -51,7 +51,7 @@ export default function RecentResumes({ resumes, isLoading, isError, onRetry, on
               </div>
               <div className="home-recent-details">
                 <h3 title={resume.label || 'Untitled resume'}>{resume.label || 'Untitled resume'}</h3>
-                <p title={resume.full_name || 'Your next opportunity'}>{resume.full_name || 'Your next opportunity'}</p>
+                {resume.full_name && <p title={resume.full_name}>{resume.full_name}</p>}
                 <div className="home-recent-footer">
                   <time dateTime={resume.updated_at}>
                     Edited {new Date(resume.updated_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}

@@ -13,7 +13,6 @@ import {
   MoreHorizontal,
   Plus,
   Search,
-  Sparkles,
   Target,
   Trash2,
   WandSparkles,
@@ -331,12 +330,7 @@ export default function DashboardPage({
 
       {libraryOnly && <section className="resume-library" aria-labelledby="library-heading">
         <div className="library-heading">
-          <div>
-            <h1 id="library-heading" className="library-title">My resumes</h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                A version for every opportunity. Your original is always yours.
-              </p>
-          </div>
+          <h1 id="library-heading" className="library-title">My resumes</h1>
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp className="size-4" /> <span>Import<span className="library-import-extra"> existing</span> resume</span>
@@ -419,9 +413,11 @@ export default function DashboardPage({
                     >
                       {resume.label || 'Untitled resume'}
                     </Link>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {resume.full_name || 'Your next opportunity'}
-                    </p>
+                    {resume.full_name && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {resume.full_name}
+                      </p>
+                    )}
                     <p className="mt-3 text-[11px] text-muted-foreground">
                       Updated{' '}
                       {new Date(resume.updated_at).toLocaleDateString(
@@ -467,12 +463,6 @@ export default function DashboardPage({
           </div>
         )}
       </section>}
-      {libraryOnly && <footer className="dashboard-footer">
-        <span className="inline-flex items-center gap-1.5">
-          <Sparkles className="size-3" aria-hidden /> Your experience. Your
-          words. You’re in control.
-        </span>
-      </footer>}
       <ImportResumeDialog open={importOpen} onOpenChange={setImportOpen} />
       <AlertDialog
         open={deleteTarget !== null}

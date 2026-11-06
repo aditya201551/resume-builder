@@ -2,22 +2,16 @@ package features
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"log/slog"
 	"maps"
-	"strings"
 	"sync"
 	"time"
 )
-
-var ErrValidation = errors.New("feature validation error")
 
 const featureCacheTTL = 10 * time.Second
 
 type featureStore interface {
 	List(context.Context) (map[string]bool, error)
-	Set(context.Context, string, bool, string) error
 }
 
 // Service shares one bounded snapshot across module gates and the UI.
@@ -68,18 +62,4 @@ func (s *Service) Enabled(ctx context.Context, key Key) bool {
 		return false
 	}
 	return s.Snapshot(ctx)[key]
-}
-
-func (s *Service) Set(ctx context.Context, key Key, enabled bool, actor string) error {
-	actor = strings.TrimSpace(actor)
-	if !known(key, s.definitions) || actor == "" || len(actor) > 200 {
-		return fmt.Errorf("known feature and actor of 1–200 bytes required: %w", ErrValidation)
-	}
-	if err := s.store.Set(ctx, string(key), enabled, actor); err != nil {
-		return err
-	}
-	s.mu.Lock()
-	s.expires = time.Time{}
-	s.mu.Unlock()
-	return nil
 }

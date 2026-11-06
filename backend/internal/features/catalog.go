@@ -13,10 +13,6 @@ func Catalog() []Definition {
 	return []Definition{}
 }
 
-func Known(key Key) bool {
-	return known(key, Catalog())
-}
-
 func known(key Key, catalog []Definition) bool {
 	for _, definition := range catalog {
 		if definition.Key == key {

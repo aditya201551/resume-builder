@@ -19,21 +19,16 @@ npm run build
 
 ## Runtime feature flags
 
-The shared PostgreSQL feature-flag system is retained, with no features currently
-registered. Register keys in `backend/internal/features/catalog.go` before using
-flags to control availability. The API and CLI list expose only registered keys;
-historical database records do not reactivate removed features.
+The PostgreSQL feature-flag system has no features currently registered. Register
+keys in `backend/internal/features/catalog.go` and manage their database rows with
+your existing database tools. The API exposes only registered keys; historical
+records do not reactivate removed features.
 
-```sh
-npm run features --workspace=backend -- list
-npm run features --workspace=backend -- set <registered-key> true --actor your-name
-```
-
-Flag updates are audited atomically. The API caches decisions for ten seconds,
+The application only reads flag values. The API caches decisions for ten seconds,
 and the frontend polls every ten seconds and refreshes on window focus. Unknown
-flags and failed registry refreshes default off. Database credentials control
-write access; no browser-accessible flag-write endpoint exists. The production
-container includes a `features` binary for service exec.
+flags and failed refreshes default off. Direct database edits are not automatically
+written to the historical audit table. No feature-management CLI or browser write
+endpoint is included.
 
 Applied migrations, historical Jobs data, and flag audit records are preserved.
 The Jobs application module and its flag registration have been removed.

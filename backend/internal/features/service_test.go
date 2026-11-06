@@ -13,7 +13,6 @@ type featureTestStore struct {
 	values map[string]bool
 	err    error
 	reads  int
-	actor  string
 }
 
 func (s *featureTestStore) List(context.Context) (map[string]bool, error) {
@@ -21,12 +20,6 @@ func (s *featureTestStore) List(context.Context) (map[string]bool, error) {
 	defer s.mu.Unlock()
 	s.reads++
 	return s.values, s.err
-}
-
-func (s *featureTestStore) Set(_ context.Context, key string, enabled bool, actor string) error {
-	s.values[key] = enabled
-	s.actor = actor
-	return s.err
 }
 
 const testFeature Key = "test.enabled"
@@ -75,27 +68,6 @@ func TestFeatureSnapshotRefreshesAndFailsClosed(t *testing.T) {
 	}
 }
 
-func TestFeatureUpdatesValidateAndInvalidateCache(t *testing.T) {
-	store := &featureTestStore{values: map[string]bool{"test.enabled": false}}
-	svc := newFeatureTestService(store)
-	ctx := context.Background()
-	_ = svc.Snapshot(ctx)
-	for _, test := range []struct {
-		key   Key
-		actor string
-	}{{"invented", "owner"}, {testFeature, " "}} {
-		if !errors.Is(svc.Set(ctx, test.key, true, test.actor), ErrValidation) {
-			t.Fatal("invalid administrative update accepted")
-		}
-	}
-	if err := svc.Set(ctx, testFeature, true, " owner "); err != nil {
-		t.Fatal(err)
-	}
-	if !svc.Enabled(ctx, testFeature) || store.actor != "owner" {
-		t.Fatal("update was not visible or attributable")
-	}
-}
-
 func TestConcurrentFeatureReadsShareOneRefresh(t *testing.T) {
 	store := &featureTestStore{values: map[string]bool{"test.enabled": true}}
 	svc := newFeatureTestService(store)
@@ -118,8 +90,5 @@ func TestEmptyCatalogIgnoresRetiredDatabaseFlags(t *testing.T) {
 	service := NewService(store)
 	if len(Catalog()) != 0 || len(service.Snapshot(context.Background())) != 0 || service.Enabled(context.Background(), "retired.enabled") {
 		t.Fatal("unregistered database flags must not be exposed")
-	}
-	if !errors.Is(service.Set(context.Background(), "retired.enabled", true, "owner"), ErrValidation) {
-		t.Fatal("retired flags must not accept administrative updates")
 	}
 }

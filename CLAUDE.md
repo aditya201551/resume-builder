@@ -31,13 +31,13 @@ Backend needs Postgres reachable at `DATABASE_URL` and applies `backend/internal
 
 - `internal/features/catalog.go` owns registered keys; the catalog is currently empty.
   Removing a feature removes its key from this catalog. Historical database rows
-  do not grant availability or appear in the feature API or administrative list.
+  do not grant availability or appear in the feature API.
 - `features.Service` owns evaluation and bounded caching; `features/postgres.Store`
-  owns PostgreSQL access and atomic audit writes. Unknown/missing flags and failed
+  owns read-only PostgreSQL access. Unknown/missing flags and failed
   refreshes default off. Keep checks at feature boundaries.
-- Manage registered flags with the backend `features` command and trusted database
-  credentials. There is no browser flag-write endpoint or implicit OAuth admin role.
-  Preserve applied migrations, stored data, and audit history.
+- Manage registered flags directly in PostgreSQL using existing database tools.
+  There is no feature-management CLI, browser flag-write endpoint, or implicit OAuth
+  admin role. Preserve applied migrations, stored data, and historical audit records.
 - `frontend/src/platform/features/` fetches backend decisions and provides route
   guards. `app/` assembles routes and navigation. Shared chat presentation lives in
   `components/chat/`, independent of the resume assistant.
@@ -71,7 +71,7 @@ React 19 + TypeScript + Vite + Tailwind v4 + shadcn/ui (`components/ui/`) + TanS
 
 ## Cross-cutting notes
 
-- Create files only when they serve the implementation, required tests, or lasting operational needs. A research request does not imply creating research documents. Keep necessary guidance in existing files and remove temporary research artifacts before finishing.
+- Keep the repository minimal. Add files, folders, abstractions, helper commands, dependencies, or documentation only when necessary for current functionality, meaningful tests, or lasting operations. Prefer editing existing files and using established tools. Do not add convenience CLIs or speculative scaffolding for tasks already covered by direct database access or existing tools unless explicitly requested. A research request does not imply creating research documents; remove temporary artifacts before finishing.
 
 - Go workspace (`go.work`) currently has one module (`backend`); `frontend` and any future `shared/*` npm workspace packages are separate from the Go module graph.
 - Migrations are forward-and-back paired (`*.up.sql` / `*.down.sql`) under `backend/internal/db/migrations/`, applied automatically at API boot — don't hand-edit an already-applied migration; add a new one.

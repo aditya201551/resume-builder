@@ -26,14 +26,13 @@ ARG TARGETOS
 ARG TARGETARCH
 RUN --mount=type=cache,id=s/a6496064-610c-4d15-94c7-294f595f1575-/go/pkg/mod,target=/go/pkg/mod \
     --mount=type=cache,id=s/a6496064-610c-4d15-94c7-294f595f1575-/root/.cache/go-build,target=/root/.cache/go-build \
-    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/ ./cmd/api ./cmd/features
+    GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -buildvcs=false -ldflags="-s -w" -o /out/api ./cmd/api
 
 # PDF preview/download run in the client. The legacy Chrome export endpoint is
 # not supported by this image. Distroless includes TLS roots and timezone data.
 FROM gcr.io/distroless/static-debian13:nonroot AS runtime
 WORKDIR /app
 COPY --from=backend-builder /out/api /usr/local/bin/server
-COPY --from=backend-builder /out/features /usr/local/bin/features
 COPY --from=frontend-builder /src/frontend/dist /app/dist
 ENV STATIC_DIR=/app/dist
 USER 65532:65532

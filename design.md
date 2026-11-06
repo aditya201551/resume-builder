@@ -1,13 +1,13 @@
 # Design: Resume Builder
 
-The application uses **white surfaces with black accents**, as requested by the owner. App backgrounds, controls, branding and selection states use neutral grays; error and success indicators retain their functional colors. Resume templates and generated PDFs retain independent user-controlled typography, colours and geometry.
+The application uses **white surfaces with black accents**, as requested by the owner. Home retains its smooth decorative cobalt, ember and peach gradient; controls, branding and selection states remain neutral. Error and success indicators retain their functional colors. Resume templates and generated PDFs retain independent user-controlled typography, colours and geometry.
 
 ## System
 
 - Scope: sign-in, home, resume library, editor and assistant.
 - Signature: a focused white workspace with black actions and restrained gray surfaces.
-- Composition: fixed, non-scrolling home with a white background. The heading leads directly into the composer with a 32px gap; the personalised greeting is removed. The composer, starter tasks and recent resumes form one vertically balanced group, with 16px spacing between actions and 32px before recent resumes. The strip shows up to four resumes, View all and Import existing resume. The home resume picker is a compact pill with a separate menu that accommodates long titles. The full document gallery lives on My resumes; manual creation remains available. Editor controls and PDF preview remain stable.
-- Navigation: a collapsible left sidebar for Home and My resumes, with the account menu at the bottom. The editor keeps a compact rail and expands navigation as an overlay. Below 1024px, navigation opens in a drawer. Resume mode controls remain in the contextual toolbar.
+- Composition: fixed, non-scrolling home with a smooth gradient background that fades and sweeps into place over 1.5 seconds on entry, respecting reduced-motion preferences. The heading leads directly into the composer with a 32px gap; the personalised greeting is removed. The composer, starter tasks and recent resumes form one vertically balanced group, with 16px spacing between actions and 32px before recent resumes. The strip shows up to four resumes, View all and Import existing resume. The home resume picker is a compact pill with a separate menu that accommodates long titles. The full document gallery lives on My resumes; manual creation remains available. Editor controls and PDF preview remain stable.
+- Navigation: a collapsible left sidebar for Home and My resumes, with the account menu at the bottom. Home uses a transparent sidebar without a divider over the shared page gradient, black navigation icons and a white active-item surface. Its mobile header shares the gradient; overlay drawers remain opaque. Library and editor navigation retain neutral surfaces. The editor keeps a compact rail and expands navigation as an overlay. Below 1024px, navigation opens in a drawer. Resume mode controls remain in the contextual toolbar.
 - The resume assistant has no upper header or scope bar. Its conversation gets the full upper pane, with job context beside auto-accept in a compact bottom composer. Job context expands inside the composer; its fields can scroll on short screens while send/stop remain visible. The composer has a soft neutral surface, no border, a growing message field and a circular up-arrow send button.
 - Sign-in has no navigation bar or outer frame. Its white background fills the viewport, with introductory text on the left and Google/GitHub sign-in on the right; the two sections stack on phones. Branding sits within the introduction.
 - The application is light-only, including when the operating system or a previously saved preference requests dark mode. There is no theme switch or dark palette.
@@ -23,7 +23,7 @@ The application uses **white surfaces with black accents**, as requested by the 
 - Text and boundaries: `--color-ink*`, `--color-rule*`.
 - Interaction: `--color-signal`, `--color-focus`, `--color-signal-soft`.
 - Geometry: 9px controls, 16px work surfaces, 22px composers, 28px atmospheric stages. Spacing follows the declared 4px scale.
-- Home, sign-in and editor backgrounds are white. Forms and preview surrounds use neutral gray fills; colored decorative gradients are removed.
+- Home keeps its original smooth cobalt, ember and peach background. A single animated background spans the full Home shell behind the sidebar and main content; only the composer and recent-resume content have width limits. Black accents apply to UI controls independently of decorative background colours. Sign-in and editor backgrounds stay white; forms and preview surrounds retain neutral fills.
 
 ## Icons and controls
 

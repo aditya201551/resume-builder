@@ -44,7 +44,32 @@
 .profile-button [data-slot='avatar'] { width: 28px; height: 28px; border-radius: 50%; }
 .profile-button [data-slot='avatar-fallback'] { border-radius: inherit; }
 .dashboard-page { width: 100%; max-width: var(--container); margin-inline: auto; padding: var(--space-12) var(--space-12) var(--space-lg); }
-.dashboard-home { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: var(--space-8); min-height: 0; height: 100%; padding: var(--space-8) var(--space-8) var(--space-12); }
+.dashboard-home { display: flex; flex: 1; flex-direction: column; justify-content: center; gap: var(--space-8); max-width: none; min-height: 0; height: 100%; padding: var(--space-8) var(--space-8) var(--space-12); }
+/* One Home background spans navigation and content, including the mobile header. */
+.app-shell-home .app-sidebar { border: 0; }
+.app-shell-home :is(.app-nav-link, .sidebar-toggle[data-slot]) { color: var(--foreground); }
+.app-shell-home .app-nav-link[data-active='true'] { background: var(--card); }
+.app-shell-home :is(.app-nav-link, .sidebar-toggle[data-slot], .profile-button):hover { background: color-mix(in srgb, var(--card) 75%, transparent); }
+.app-shell-home::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse at 0% 80%, oklch(65% .19 263 / .62), transparent 63%),
+    radial-gradient(ellipse at 100% 95%, oklch(75% .17 28 / .60), transparent 62%),
+    radial-gradient(ellipse at 80% 5%, oklch(88% .11 65 / .72), transparent 60%),
+    var(--background);
+}
+@keyframes home-gradient-enter {
+  from { opacity: .25; transform: translate3d(-4%, 3%, 0) scale(1.14); }
+  70% { opacity: 1; transform: translate3d(.6%, -.3%, 0) scale(1.025); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .app-shell-home::before { animation: home-gradient-enter 1500ms cubic-bezier(.4, 0, .2, 1) backwards; }
+}
 .home-intro { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; flex: 0 1 auto; min-height: 0; width: min(100%, 740px); margin: 0 auto; padding: 0; }
 .home-intro > h1 { flex-shrink: 0; margin: 0 0 var(--space-8); max-width: 20ch; text-align: center; font-size: clamp(28px, 3.7vw, 46px); font-weight: 500; line-height: 1.12; letter-spacing: -0.05em; }
 .home-composer { display: flex; flex-direction: column; flex: 0 1 auto; width: 100%; min-width: 0; min-height: 0; overflow-y: auto; padding: var(--space-sm) var(--space-md); border: 0; border-radius: var(--radius-composer); background: var(--card); box-shadow: var(--shadow-composer); }

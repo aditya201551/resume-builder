@@ -1,4 +1,4 @@
-/* Hallmark · shape: app screen · genre: atmospheric · theme: Cobalt and ember (by request) · redesign: full · v2.0.0 */
+/* Hallmark · shape: app screen · genre: minimal · theme: Monochrome (by request) · redesign: full · v2.0.0 */
 /* Hallmark · critique: expressive AI entry surfaces, opaque reading panes, independent PDF styling. */
 @import "tailwindcss";
 @import "tw-animate-css";
@@ -59,7 +59,7 @@
     --card-foreground: var(--color-ink);
     --popover: var(--color-cotton);
     --popover-foreground: var(--color-ink);
-    --primary: var(--color-ink);
+    --primary: var(--color-signal);
     --primary-foreground: var(--color-paper);
     --secondary: var(--color-paper-2);
     --secondary-foreground: var(--color-ink-2);
@@ -79,7 +79,7 @@
     --radius: 0.5rem;
     --sidebar: var(--color-paper);
     --sidebar-foreground: var(--color-ink);
-    --sidebar-primary: var(--color-ink);
+    --sidebar-primary: var(--color-signal);
     --sidebar-primary-foreground: var(--color-paper);
     --sidebar-accent: var(--color-paper-2);
     --sidebar-accent-foreground: var(--color-ink);

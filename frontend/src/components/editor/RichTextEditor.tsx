@@ -40,7 +40,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
           '[&_ul]:my-1 [&_ul]:list-disc [&_ul]:pl-5 ' +
           '[&_ol]:my-1 [&_ol]:list-decimal [&_ol]:pl-5 ' +
           '[&_li]:my-0.5 [&_li]:pl-0.5 ' +
-          '[&_a]:text-accent [&_a]:underline',
+          '[&_a]:text-primary [&_a]:underline',
       },
       handleDOMEvents: {
         click: (_view, event) => {
@@ -184,7 +184,7 @@ export default function RichTextEditor({ value, onChange, placeholder }: RichTex
             type="button"
             aria-label="Apply link"
             onClick={confirmLink}
-            className="flex size-6 shrink-0 items-center justify-center rounded text-accent hover:bg-secondary"
+            className="flex size-6 shrink-0 items-center justify-center rounded text-primary hover:bg-secondary"
           >
             <Check className="size-3.5" />
           </button>

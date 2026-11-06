@@ -89,7 +89,7 @@ function NumberField({
           step={step}
           value={Math.min(max, Math.max(min, value))}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="h-1.5 flex-1 cursor-pointer accent-accent"
+          className="h-1.5 flex-1 cursor-pointer accent-primary"
         />
         <div className="flex shrink-0 gap-1">
           <button
@@ -169,8 +169,8 @@ function TemplatePicker({ design, onChange }: { design: ResumeDesign; onChange: 
           )}
         >
           <div aria-hidden className="flex h-24 w-16 flex-col gap-1 rounded-sm bg-white p-2 shadow-sm">
-            <span className="mb-1 h-1.5 w-8 rounded-sm bg-slate-700" />
-            {[0, 1, 2].map((row) => <div key={row} className="mt-1 flex flex-col gap-1"><span className="h-1 w-7 rounded-sm bg-violet-300" /><span className="h-0.5 w-full bg-slate-200" /><span className="h-0.5 w-4/5 bg-slate-200" /></div>)}
+            <span className="mb-1 h-1.5 w-8 rounded-sm bg-foreground" />
+            {[0, 1, 2].map((row) => <div key={row} className="mt-1 flex flex-col gap-1"><span className="h-1 w-7 rounded-sm bg-muted-foreground" /><span className="h-0.5 w-full bg-secondary" /><span className="h-0.5 w-4/5 bg-secondary" /></div>)}
           </div>
           {t.name}
           <span className="text-[10px] text-muted-foreground">{t.description}</span>

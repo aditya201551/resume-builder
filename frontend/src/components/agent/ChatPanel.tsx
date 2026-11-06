@@ -107,7 +107,7 @@ function ToolActivity({
   return (
     <div className="animate-in fade-in slide-in-from-bottom-1 flex w-fit items-center gap-2 rounded-full bg-secondary/50 px-2.5 py-1.5 text-xs text-muted-foreground duration-200">
       {isRunning ? (
-        <Loader2 className="size-3.5 animate-spin text-accent" />
+        <Loader2 className="size-3.5 animate-spin text-primary" />
       ) : isError ? (
         <X className="size-3.5 text-destructive" />
       ) : (

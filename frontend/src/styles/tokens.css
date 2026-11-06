@@ -1,4 +1,4 @@
-/* Hallmark · shape: app screen · genre: atmospheric · theme: Cobalt and ember (by request) · redesign: full · surface: absolute (PDF paper) · v2.0.0 */
+/* Hallmark · shape: app screen · genre: minimal · theme: Monochrome (by request) · redesign: full · surface: absolute (PDF paper) · v2.0.0 */
 /* Hallmark · critique: expressive AI entry surfaces, opaque reading panes, independent PDF styling. */
 :root {
   color-scheme: light;
@@ -26,45 +26,38 @@
   --font-body: "Geist Variable", sans-serif;
   --display-weight: 550;
   --tracking-display: -0.04em;
-  --color-paper: oklch(99.7% 0.002 265);
-  --color-paper-2: oklch(95% 0.012 265);
-  --color-paper-3: oklch(91.8% 0.021 265);
-  --color-cotton: oklch(99.8% 0.002 265);
-  --color-desk: oklch(93% 0.016 265);
-  --color-ink: oklch(23% 0.025 265);
-  --color-ink-2: oklch(34% 0.027 265);
-  --color-ink-muted: oklch(47% 0.025 265);
-  --color-rule: oklch(88% 0.018 265);
-  --color-rule-2: oklch(70% 0.027 265);
-  --color-signal: oklch(49% 0.22 263);
-  --color-focus: oklch(49% 0.22 263);
+  --color-paper: #fff;
+  --color-paper-2: oklch(95% 0 0);
+  --color-paper-3: oklch(91.8% 0 0);
+  --color-cotton: #fff;
+  --color-desk: oklch(93% 0 0);
+  --color-ink: oklch(23% 0 0);
+  --color-ink-2: oklch(34% 0 0);
+  --color-ink-muted: oklch(47% 0 0);
+  --color-rule: oklch(88% 0 0);
+  --color-rule-2: oklch(70% 0 0);
+  --color-signal: #000;
+  --color-focus: var(--color-signal);
   --color-error: oklch(49% 0.18 27);
   --color-success: oklch(43% 0.1 150);
   --color-pdf-paper: #fff;
-  --color-disabled-fill: oklch(93% 0.008 265);
-  --color-disabled-ink: oklch(51% 0.018 265);
-  --shadow-paper: 0 2px 4px oklch(23% 0.025 265 / 0.05), 0 12px 28px oklch(23% 0.025 265 / 0.07);
-  --shadow-control: 0 1px 2px oklch(23% 0.025 265 / 0.05);
+  --color-disabled-fill: oklch(93% 0 0);
+  --color-disabled-ink: oklch(51% 0 0);
+  --shadow-paper: 0 2px 4px oklch(23% 0 0 / 0.05), 0 12px 28px oklch(23% 0 0 / 0.07);
+  --shadow-control: 0 1px 2px oklch(23% 0 0 / 0.05);
   --radius-card: 16px;
   --radius-input: 9px;
   --container: 1440px;
   --motion-fast: 120ms;
   --motion-standard: 180ms;
   --motion-panel: 240ms;
-  --motion-gradient-enter: 1500ms;
-  --motion-ease-enter: cubic-bezier(0.4, 0, 0.2, 1);
   --motion-ease: cubic-bezier(0.2, 0, 0.38, 0.9);
 
-  --color-ember: oklch(65% 0.19 30);
-  --color-on-signal: oklch(99% 0.006 265);
-  --color-signal-soft: oklch(94% 0.03 263);
-  --color-halo-cobalt: oklch(65% 0.19 263 / 0.62);
-  --color-halo-ember: oklch(75% 0.17 28 / 0.60);
-  --color-halo-peach: oklch(88% 0.11 65 / 0.72);
-  --color-halo-soft: oklch(66% 0.15 263 / 0.10);
+  --color-on-signal: #fff;
+  --color-signal-soft: oklch(94% 0 0);
   --color-clear: transparent;
-  --shadow-composer: 0 4px 8px oklch(23% 0.025 265 / 0.04), 0 20px 60px oklch(23% 0.025 265 / 0.12);
+  --shadow-composer: 0 4px 8px oklch(23% 0 0 / 0.04), 0 20px 60px oklch(23% 0 0 / 0.12);
   --radius-composer: 22px;
   --radius-stage: 28px;
-  --color-glass-selected: oklch(100% 0.002 265 / 0.72);
+  --color-glass-selected: oklch(94% 0 0);
 }

@@ -61,7 +61,7 @@ function EditableResumeName({ resume }: { resume: Resume }) {
         <Button
           variant="ghost"
           size="icon"
-          className="size-8 shrink-0 text-accent"
+          className="size-8 shrink-0 text-primary"
           onClick={() => setEditing(false)}
         >
           <Check className="size-4" />

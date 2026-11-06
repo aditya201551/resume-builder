@@ -29,4 +29,4 @@
   transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
 }
 .pdf-page .textLayer .markedContent { display: contents; }
-.pdf-page .textLayer ::selection { background: #6752b340; color: transparent; }
+.pdf-page .textLayer ::selection { background: color-mix(in oklab, var(--color-signal) 25%, transparent); color: transparent; }

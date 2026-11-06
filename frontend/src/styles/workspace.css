@@ -125,7 +125,16 @@
 .workspace-mode-button { position: relative; z-index: 1; display: inline-flex; align-items: center; justify-content: center; gap: var(--space-xs); min-height: 32px; padding: var(--space-2xs) var(--space-sm); border-radius: var(--radius-input); font-size: var(--text-sm); color: var(--muted-foreground); white-space: nowrap; transition: color var(--motion-fast); }
 .workspace-mode-button[aria-pressed='true'] { color: var(--color-signal); }
 .workspace-content { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(370px, .85fr) minmax(0, 1.15fr); padding: var(--space-md); gap: var(--space-md); }
-.workspace-controls { min-width: 0; min-height: 0; overflow: hidden; background: var(--card); border: 0; border-radius: var(--radius-card); }
+.workspace-controls { min-width: 0; min-height: 0; overflow: hidden; background: var(--card); border: 0; border-radius: var(--radius-card); container: editor-controls / inline-size; }
+.design-category-picker { display: none; }
+@container editor-controls (max-width: 599px) {
+  .design-mode { flex-direction: column; }
+  .design-category-nav { display: none; }
+  .design-category-picker { position: sticky; top: 0; z-index: 10; display: block; padding-bottom: var(--space-xs); background: var(--card); }
+  .design-category-picker [data-slot='select-trigger'] { width: 100%; min-height: 44px; }
+  .design-mode [data-nav-key] { scroll-margin-top: 80px; }
+  .design-field-grid, .design-presets { grid-template-columns: minmax(0, 1fr); }
+}
 .workspace-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 .workspace-pane[hidden] { display: none; }
 .workspace-pane:not([hidden]) { animation: surface-enter var(--motion-panel) var(--motion-ease); }
@@ -237,7 +246,6 @@
 .login-note { margin-top: var(--space-lg); color: var(--muted-foreground); font-size: var(--text-xs); line-height: 1.7; text-align: center; }
 @keyframes surface-enter { from { opacity: .55; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes entry-enter { from { opacity: .6; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
-@media (min-width: 1800px) { .workspace-shell { max-width: 1800px; margin-inline: auto; border-inline: 1px solid var(--border); } }
 @media (max-width: 1199px) {
   .dashboard-page { padding-inline: var(--space-8); }
   .workspace-navbar { gap: var(--space-md); padding-inline: var(--space-md); }

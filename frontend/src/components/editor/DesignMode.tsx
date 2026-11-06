@@ -327,7 +327,7 @@ function SchemaGroupPanel({
   return (
     <div className="flex flex-col gap-4">
       {otherFields.length > 0 && (
-        <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+        <div className="design-field-grid grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
           {otherFields.map((field) => (
             <SchemaField
               key={field.key}
@@ -406,8 +406,16 @@ export default function DesignMode() {
   }
 
   return (
-    <div className="flex gap-6">
-      <nav className="sticky top-0 flex max-h-svh w-36 shrink-0 flex-col gap-0.5 self-start overflow-y-auto">
+    <div className="design-mode flex gap-6">
+      <div className="design-category-picker">
+        <Select value={activeCategory} onValueChange={goToSection}>
+          <SelectTrigger aria-label="Design category"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {navItems.map((item) => <SelectItem key={item.key} value={item.key}>{item.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <nav aria-label="Design categories" className="design-category-nav sticky top-0 flex max-h-svh w-36 shrink-0 flex-col gap-0.5 self-start overflow-y-auto">
         {navItems.map((item) => (
           <button
             key={item.key}
@@ -456,7 +464,7 @@ export default function DesignMode() {
               <SelectContent><SelectItem value="Letter">US Letter · 8.5 × 11 in</SelectItem><SelectItem value="A4">A4 · 210 × 297 mm</SelectItem></SelectContent>
             </Select>
           </Field>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <div className="design-presets grid grid-cols-1 gap-2 sm:grid-cols-3">
             {[
               { label: 'Compact', description: 'More room for experience', lineHeight: 1.3, sectionGap: 12, entryGap: 7, bulletGap: 2 },
               { label: 'Balanced', description: 'Comfortable and clear', lineHeight: 1.5, sectionGap: 18, entryGap: 10, bulletGap: 4 },

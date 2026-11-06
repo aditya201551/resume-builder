@@ -12,7 +12,7 @@ import (
 )
 
 func TestPDFClientInlineDocuments(t *testing.T) {
-	for _, provider := range []Provider{ProviderAnthropic, ProviderOpenRouter} {
+	for _, provider := range []Provider{ProviderAnthropic, ProviderOpenRouter, ProviderOpenAI, ProviderVercel} {
 		t.Run(string(provider), func(t *testing.T) {
 			pdf := []byte("%PDF-1.7\nprivate resume")
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -51,8 +51,14 @@ func TestPDFClientInlineDocuments(t *testing.T) {
 					}
 					blocks := messages[1].(map[string]any)["content"].([]any)
 					source = strings.TrimPrefix(blocks[0].(map[string]any)["file"].(map[string]any)["file_data"].(string), "data:application/pdf;base64,")
-					if body["plugins"] == nil {
+					if provider == ProviderOpenRouter && body["plugins"] == nil {
 						t.Error("native PDF engine must be explicit")
+					}
+					if provider != ProviderOpenRouter && body["plugins"] != nil {
+						t.Error("OpenRouter plugin leaked to another provider")
+					}
+					if provider == ProviderOpenAI && (body["max_tokens"] != nil || body["max_completion_tokens"] == nil || body["store"] != false) {
+						t.Error("incorrect OpenAI PDF options")
 					}
 					json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"finish_reason": "stop", "message": map[string]string{"content": "{\"document_type\":\"resume\"}"}}}})
 				}

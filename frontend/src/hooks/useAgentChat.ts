@@ -14,6 +14,7 @@ import { loadAutoAccept, saveAutoAccept } from '@/lib/agentChatPrefs'
 import { assistantMessage } from '@/lib/assistantTask'
 import { resolveEntryReferences } from '@/lib/resumeDraftIds'
 import { useResumeDraftContext } from '@/hooks/useResumeDraft'
+import { useAISettings } from '@/hooks/useAISettings'
 import { tempId } from '@/lib/tempId'
 import { uiReviewProposal, rewriteSource, type AssistantUI, type UIFormState, type UIReviewAction } from '@/lib/assistantUI'
 
@@ -55,6 +56,7 @@ function assistantToPlain(m: Extract<ChatMessage, { role: 'assistant' }>): {
 }
 
 export function useAgentChat() {
+  const ai = useAISettings()
   const { resumeId, state, dispatch, resolveEntryId } = useResumeDraftContext()
 
   const [messages, setMessages] = useState<ChatMessage[]>([])
@@ -200,6 +202,7 @@ export function useAgentChat() {
   const sendMessage = useCallback(
     async (content: string, jobDescription = '') => {
       if (!content.trim() || activeRef.current) return
+      if (!ai.ready) { setError('Choose an available AI connection before sending.'); return }
       activeRef.current = true
       const generation = ++generationRef.current
       const current = () => generation === generationRef.current
@@ -266,6 +269,7 @@ export function useAgentChat() {
       }
     },
     [
+      ai.ready,
       resumeId,
       appendStreamingText,
       applyProposal,

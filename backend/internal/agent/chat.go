@@ -281,10 +281,11 @@ func newChatAgent(ctx context.Context, chatModel model.BaseModel[*schema.Message
 	}
 
 	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "resume_chat",
-		Description: "Multi-turn assistant that can read the resume draft and make structured edits to it.",
-		Instruction: chatInstruction,
-		Model:       chatModel,
+		MaxIterations: 12,
+		Name:          "resume_chat",
+		Description:   "Multi-turn assistant that can read the resume draft and make structured edits to it.",
+		Instruction:   chatInstruction,
+		Model:         chatModel,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{Tools: tools},
 		},

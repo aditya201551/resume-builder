@@ -99,7 +99,7 @@ func TestResumeImportCreatesOnlyAcceptedContent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			parser := &fakeImportParser{result: tc.output}
 			writer := &fakeImportWriter{}
-			result, err := NewResumeImportService(parser, writer).Import(context.Background(), "signed-in-user", "My CV.PDF", testPDF(1))
+			result, err := NewResumeImportService(writer).Import(context.Background(), "signed-in-user", "My CV.PDF", testPDF(1), parser)
 			if tc.code != "" {
 				requireImportCode(t, err, tc.code)
 				if writer.calls != 0 {
@@ -134,7 +134,7 @@ func TestResumeImportValidatesPDFBeforeAI(t *testing.T) {
 	} {
 		parser := &fakeImportParser{}
 		writer := &fakeImportWriter{}
-		_, err := NewResumeImportService(parser, writer).Import(context.Background(), "user", tc.name, tc.pdf)
+		_, err := NewResumeImportService(writer).Import(context.Background(), "user", tc.name, tc.pdf, parser)
 		requireImportCode(t, err, tc.code)
 		if parser.calls.Load() != 0 || writer.calls != 0 {
 			t.Fatal("invalid file reached AI or DB")
@@ -155,11 +155,14 @@ func TestResumeImportValidatesPDFBeforeAI(t *testing.T) {
 func TestResumeImportRejectsConcurrentUserRequest(t *testing.T) {
 	parser := &fakeImportParser{result: validExtraction, entered: make(chan struct{}), release: make(chan struct{})}
 	writer := &fakeImportWriter{}
-	svc := NewResumeImportService(parser, writer)
+	svc := NewResumeImportService(writer)
 	done := make(chan error, 1)
-	go func() { _, err := svc.Import(context.Background(), "user", "resume.pdf", testPDF(1)); done <- err }()
+	go func() {
+		_, err := svc.Import(context.Background(), "user", "resume.pdf", testPDF(1), parser)
+		done <- err
+	}()
 	<-parser.entered
-	_, err := svc.Import(context.Background(), "user", "resume.pdf", testPDF(1))
+	_, err := svc.Import(context.Background(), "user", "resume.pdf", testPDF(1), parser)
 	requireImportCode(t, err, "import_busy")
 	close(parser.release)
 	if err = <-done; err != nil {
@@ -173,7 +176,7 @@ func TestResumeImportRejectsConcurrentUserRequest(t *testing.T) {
 func TestResumeImportProviderFailureDoesNotStore(t *testing.T) {
 	parser := &fakeImportParser{err: &ai.PDFProviderError{Status: 429}}
 	writer := &fakeImportWriter{}
-	_, err := NewResumeImportService(parser, writer).Import(context.Background(), "user", "resume.pdf", testPDF(1))
+	_, err := NewResumeImportService(writer).Import(context.Background(), "user", "resume.pdf", testPDF(1), parser)
 	requireImportCode(t, err, "provider_busy")
 	if writer.calls != 0 {
 		t.Fatal("failed extraction wrote to DB")

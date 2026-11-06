@@ -54,6 +54,8 @@ import { useAgentChat } from '@/hooks/useAgentChat'
 import { type AssistantTask } from '@/lib/assistantTask'
 import EditorNavbar, { type EditorMode } from '@/components/editor/EditorNavbar'
 import ChatPanel from '@/components/agent/ChatPanel'
+import { AIConnectionDialog, AIConnectionSelector } from '@/components/agent/AIConnections'
+import { useAISettings } from '@/hooks/useAISettings'
 import type { FullResume } from '@/types/resume'
 
 const DEFAULT_SLOT_ORDER = [
@@ -430,6 +432,10 @@ function EditPane({
 }
 
 function EditorPageContent() {
+  const ai = useAISettings()
+  const [setupOpen, setSetupOpen] = useState(false)
+  const [setupOffered, setSetupOffered] = useState(false)
+  const [continueRequested, setContinueRequested] = useState(false)
   const { data, isLoading } = useResumeDraftData()
   const { flushNow } = useResumeDraftContext()
   const location = useLocation()
@@ -443,9 +449,10 @@ function EditorPageContent() {
   )
   const started = useRef(false)
   const [importWarnings, setImportWarnings] = useState(launch.current?.importWarnings ?? [])
-  const [mode, setMode] = useState<EditorMode>(
+  const [selectedMode, setMode] = useState<EditorMode>(
     launch.current?.mode === 'content' ? 'content' : 'chat',
   )
+  const mode = selectedMode === 'chat' && !ai.available ? 'content' : selectedMode
   const [mobilePreview, setMobilePreview] = useState(false)
   const [selectedSection, setSelectedSection] = useState<string>()
   const [selectionVersion, setSelectionVersion] = useState(0)
@@ -457,8 +464,15 @@ function EditorPageContent() {
 
   useEffect(() => {
     const task = launch.current?.assistantTask
+    if (task?.prompt && !ai.loading && !ai.available) setSetupOffered(true)
+    if (task?.prompt && ai.available && !ai.ready && !setupOffered) {
+      setSetupOffered(true)
+      if (ai.byokEnabled) setSetupOpen(true)
+    }
     if (
       !data ||
+      !ai.ready ||
+      (setupOffered && !continueRequested) ||
       started.current ||
       typeof task?.prompt !== 'string' ||
       !task.prompt.trim()
@@ -472,7 +486,9 @@ function EditorPageContent() {
       void navigate(location.pathname, { replace: true, state: null })
     }, 0)
     return () => clearTimeout(timer)
-  }, [data, sendMessage, navigate, location.pathname])
+  }, [data, sendMessage, navigate, location.pathname, ai.ready, ai.available, ai.loading, ai.byokEnabled, continueRequested, setupOffered])
+
+  useEffect(() => { if (ai.ready && continueRequested) setSetupOpen(false) }, [ai.ready, continueRequested])
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -504,6 +520,8 @@ function EditorPageContent() {
   return (
     <ResumePdfProvider data={data}>
     <div className="workspace-shell">
+      <AIConnectionDialog open={setupOpen} onOpenChange={setSetupOpen} onConnected={() => setContinueRequested(true)} />
+      {setupOffered && !started.current && (!setupOpen || !ai.byokEnabled) && <div className="mx-4 flex flex-wrap items-center gap-3 rounded-xl bg-secondary p-3 text-sm"><span>Your question is waiting for AI.</span>{ai.ready || ai.byokEnabled ? <Button size="sm" onClick={() => { if (ai.ready) setContinueRequested(true); else setSetupOpen(true) }}>Continue question</Button> : <AIConnectionSelector onConnected={() => setContinueRequested(true)} />}</div>}
       <EditorNavbar
         resume={data.resume}
         mode={mode}
@@ -532,13 +550,13 @@ function EditorPageContent() {
         data-mobile-preview={mobilePreview}
       >
         <div className="workspace-controls">
-          <div className="workspace-pane" hidden={mode !== 'chat'}>
+          {ai.available && <div className="workspace-pane" hidden={mode !== 'chat'}>
             <ChatPanel
               chat={chat}
               jobDescription={jobDescription}
               onJobDescriptionChange={setJobDescription}
             />
-          </div>
+          </div>}
           <div className="workspace-pane" hidden={mode !== 'content'}>
             <div className="workspace-pane-heading">
               <div>
@@ -548,13 +566,13 @@ function EditorPageContent() {
                   automatically.
                 </p>
               </div>
-              <button
+              {ai.available && <button
                 type="button"
                 className="context-chip"
                 onClick={() => changeMode('chat')}
               >
                 <Sparkles className="size-3.5" /> Ask AI
-              </button>
+              </button>}
             </div>
             <div className="workspace-form">
               <EditPane

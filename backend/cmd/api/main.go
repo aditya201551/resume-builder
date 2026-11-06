@@ -88,29 +88,36 @@ func main() {
 	resumeDesignService := service.NewResumeDesignService(resumes, resumeDesigns)
 	exportService := service.NewExportService(cfg.ChromeExecPath)
 
-	agentCfg, err := agent.LoadConfig()
-	if err != nil {
-		slog.Error("startup_failed", "operation", "load agent config", "error", err)
-		os.Exit(1)
-	}
-	aiAgent, err := agent.New(ctx, agentCfg)
-	if err != nil {
-		slog.Error("startup_failed", "operation", "create agent", "error", err)
-		os.Exit(1)
-	}
-	agentHandler := handlers.NewAgentHandler(aiAgent, resumeService, templateService)
-	importAIConfig, err := ai.LoadConfig()
-	if err != nil {
-		slog.Error("startup_failed", "operation", "load resume import AI config", "error", err)
-		os.Exit(1)
-	}
-	resumeImportService := service.NewResumeImportService(ai.NewPDFClient(importAIConfig), repository.NewResumeImportRepository(pool))
 	featureService := features.NewService(flagpostgres.NewStore(pool))
+	platformConfig, err := ai.LoadConfig()
+	if err != nil {
+		platformConfig = nil
+		slog.Warn("platform_ai_not_configured")
+	}
+	if platformConfig != nil && platformConfig.Provider == ai.ProviderOpenAI && os.Getenv("AGENT_MODEL") != "" && !ai.CompatibleOpenAI(os.Getenv("AGENT_MODEL")) {
+		platformConfig = nil
+		slog.Warn("platform_agent_model_unsupported")
+	}
+	vault, err := ai.LoadVault()
+	if err != nil {
+		vault = nil
+		slog.Error("byok_encryption_not_configured")
+	}
+	maxTokens, err := agent.LoadMaxTokens()
+	if err != nil {
+		slog.Error("startup_failed", "operation", "load agent token limit", "error", err)
+		os.Exit(1)
+	}
+	aiSettingsService := service.NewAISettingsService(repository.NewAISettingsRepository(pool), vault, platformConfig, os.Getenv("AGENT_MODEL"))
+	aiHandler := handlers.NewAIHandler(aiSettingsService, featureService, cfg.FrontendURL)
+	agentHandler := handlers.NewAgentHandler(aiHandler, maxTokens, resumeService, templateService)
+	resumeImportService := service.NewResumeImportService(repository.NewResumeImportRepository(pool))
 
 	h := api.Handlers{
+		AI:             aiHandler,
 		Auth:           handlers.NewAuthHandler(providers, stateSigner, jwtIssuer, authService, users, cfg.FrontendURL, cfg.CookieSecure(), cfg.JWTTTL),
 		Resume:         handlers.NewResumeHandler(resumeService, exportService, jwtIssuer, cfg.InternalBaseURL),
-		ResumeImport:   handlers.NewResumeImportHandler(resumeImportService),
+		ResumeImport:   handlers.NewResumeImportHandler(resumeImportService, aiHandler),
 		WorkExperience: handlers.NewEntityHandler(workExperienceService),
 		Education:      handlers.NewEntityHandler(educationService),
 		Project:        handlers.NewEntityHandler(projectService),

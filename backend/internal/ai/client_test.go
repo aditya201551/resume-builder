@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewChatModel(t *testing.T) {
-	for _, provider := range []Provider{ProviderAnthropic, ProviderOpenRouter} {
+	for _, provider := range []Provider{ProviderAnthropic, ProviderOpenRouter, ProviderOpenAI, ProviderVercel} {
 		t.Run(string(provider), func(t *testing.T) {
 			cfg := &Config{Provider: provider, APIKey: "test-key", Model: "test-model"}
 			chatModel, err := NewChatModel(context.Background(), cfg, 1024)
@@ -21,7 +21,7 @@ func TestNewChatModel(t *testing.T) {
 }
 
 func TestNewChatModel_UnsupportedProvider(t *testing.T) {
-	cfg := &Config{Provider: Provider("openai"), APIKey: "test-key", Model: "test-model"}
+	cfg := &Config{Provider: Provider("unknown"), APIKey: "test-key", Model: "test-model"}
 	if _, err := NewChatModel(context.Background(), cfg, 1024); err == nil {
 		t.Error("expected an error for an unsupported provider, got nil")
 	}

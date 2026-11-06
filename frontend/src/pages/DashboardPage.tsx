@@ -33,6 +33,7 @@ import ResumeCard from '@/components/dashboard/ResumeCard'
 import ImportResumeDialog from '@/components/dashboard/ImportResumeDialog'
 import RecentResumes from '@/components/dashboard/RecentResumes'
 import PromptExamples from '@/components/dashboard/PromptExamples'
+import { useAISettings } from '@/hooks/useAISettings'
 
 const resumesKey = ['resumes'] as const
 const starterIcons = [WandSparkles, Check, Target]
@@ -43,6 +44,7 @@ export default function DashboardPage({
   libraryOnly?: boolean
 }) {
   const navigate = useNavigate()
+  const ai = useAISettings()
   const queryClient = useQueryClient()
   const mobile = useMediaQuery('(max-width: 767px)')
   const [prompt, setPrompt] = useState('')
@@ -111,9 +113,9 @@ export default function DashboardPage({
       {!libraryOnly && (
         <section className="home-intro" aria-labelledby="home-heading">
           <h1 id="home-heading">
-            What are we working toward?
+            {ai.available ? 'What are we working toward?' : 'Build your next resume.'}
           </h1>
-          <form className="home-composer" onSubmit={startAssistant}>
+          {ai.available && <><form className="home-composer" onSubmit={startAssistant}>
             <div className="home-prompt-field">
               <Textarea
                 id="home-prompt"
@@ -259,6 +261,7 @@ export default function DashboardPage({
               )
             })}
           </div>
+          </>}
           <div className="manual-start">
             <button
               type="button"
@@ -267,7 +270,7 @@ export default function DashboardPage({
             >
               <Plus className="size-4" aria-hidden /> Create manually
             </button>
-            {(mobile || resumes.length === 0) && (
+            {ai.available && (mobile || resumes.length === 0) && (
               <button type="button" onClick={() => setImportOpen(true)}>
                 <FileUp className="size-4" aria-hidden /> Import resume
               </button>
@@ -293,7 +296,7 @@ export default function DashboardPage({
           isLoading={resumesQuery.isLoading}
           isError={resumesQuery.isError}
           onRetry={() => void resumesQuery.refetch()}
-          onImport={() => setImportOpen(true)}
+          onImport={ai.available ? () => setImportOpen(true) : undefined}
         />
       )}
 
@@ -301,9 +304,9 @@ export default function DashboardPage({
         <div className="library-heading">
           <h1 id="library-heading" className="library-title">My resumes</h1>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={() => setImportOpen(true)}>
+            {ai.available && <Button variant="outline" onClick={() => setImportOpen(true)}>
               <FileUp className="size-4" /> <span>Import<span className="library-import-extra"> existing</span> resume</span>
-            </Button>
+            </Button>}
             <Button
               variant="outline"
               onClick={() => createMutation.mutate(undefined)}

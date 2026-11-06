@@ -5,7 +5,9 @@ import LoginPage from '@/pages/LoginPage'
 import DashboardPage from '@/pages/DashboardPage'
 import EditorPage from '@/pages/EditorPage'
 import PrintPage from '@/pages/PrintPage'
+import AISettingsPage from '@/components/agent/AIConnections'
 import { FeatureProvider } from '@/platform/features/FeatureProvider'
+import { FeatureGate } from '@/platform/features/FeatureGate'
 
 export const router = createBrowserRouter([
   { path: '/login', element: <LoginPage /> },
@@ -20,6 +22,9 @@ export const router = createBrowserRouter([
           children: [
             { path: '/resumes', element: <DashboardPage /> },
             { path: '/resumes/library', element: <DashboardPage libraryOnly /> },
+            { element: <FeatureGate feature="byok_ai" />, children: [
+              { path: '/settings/ai', element: <AISettingsPage /> },
+            ] },
             { path: '/resumes/:id/edit', element: <EditorPage /> },
           ],
         },

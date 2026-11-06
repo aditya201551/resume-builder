@@ -6,28 +6,46 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"resume-builder/backend/internal/ai"
 	"resume-builder/backend/internal/platform/httpresponse"
+	"time"
 
 	"resume-builder/backend/internal/auth"
 	"resume-builder/backend/internal/service"
 )
 
 type resumeImporter interface {
-	Import(context.Context, string, string, []byte) (*service.ResumeImportResult, error)
+	Import(context.Context, string, string, []byte, service.PDFParser) (*service.ResumeImportResult, error)
 }
 
-type ResumeImportHandler struct{ svc resumeImporter }
+type ResumeImportHandler struct {
+	svc    resumeImporter
+	access *AIHandler
+}
 
-func NewResumeImportHandler(svc resumeImporter) *ResumeImportHandler {
-	return &ResumeImportHandler{svc: svc}
+func NewResumeImportHandler(svc resumeImporter, access *AIHandler) *ResumeImportHandler {
+	return &ResumeImportHandler{svc: svc, access: access}
 }
 
 func (h *ResumeImportHandler) Import(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	r = r.WithContext(ctx)
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(30 * time.Second))
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+	cfg, ok := h.access.Resolve(w, r, true)
+	if !ok {
+		return
+	}
+	release, ok := h.access.Begin(w, r)
+	if !ok {
+		return
+	}
+	defer release()
 	r.Body = http.MaxBytesReader(w, r.Body, service.MaxResumePDFBytes+128*1024)
 	reader, err := r.MultipartReader()
 	if err != nil {
@@ -55,7 +73,7 @@ func (h *ResumeImportHandler) Import(w http.ResponseWriter, r *http.Request) {
 		writeImportError(w, "invalid_upload", "Upload one PDF at a time.", http.StatusBadRequest)
 		return
 	}
-	result, err := h.svc.Import(r.Context(), userID, filename, pdf)
+	result, err := h.svc.Import(r.Context(), userID, filename, pdf, ai.NewPDFClient(cfg))
 	if err != nil {
 		var failure *service.ImportError
 		if errors.As(err, &failure) {

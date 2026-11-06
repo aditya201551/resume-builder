@@ -12,6 +12,7 @@ import (
 )
 
 type Handlers struct {
+	AI             *handlers.AIHandler
 	Auth           *handlers.AuthHandler
 	Resume         *handlers.ResumeHandler
 	ResumeImport   *handlers.ResumeImportHandler
@@ -45,10 +46,20 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	if h.Features != nil {
 		handle("GET /api/features", h.Features.List)
 	}
+	if h.AI != nil {
+		handle("GET /api/ai/settings", h.AI.Protect(h.AI.Settings))
+		handle("PUT /api/ai/connections/{provider}", h.AI.Protect(h.AI.Save))
+		handle("DELETE /api/ai/connections/{provider}", h.AI.Protect(h.AI.Delete))
+		handle("GET /api/ai/connections/{provider}/models", h.AI.Protect(h.AI.Models))
+		handle("POST /api/ai/connections/{provider}/test", h.AI.Protect(h.AI.Test))
+		handle("PUT /api/ai/preferences", h.AI.Protect(h.AI.Select))
+	}
 
 	handle("GET /api/resumes", h.Resume.List)
 	handle("POST /api/resumes", h.Resume.Create)
-	handle("POST /api/resumes/import", h.ResumeImport.Import)
+	if h.ResumeImport != nil && h.AI != nil {
+		handle("POST /api/resumes/import", h.AI.Protect(h.ResumeImport.Import))
+	}
 	handle("GET /api/resumes/{resumeID}", h.Resume.Get)
 	handle("PATCH /api/resumes/{resumeID}", h.Resume.Update)
 	handle("DELETE /api/resumes/{resumeID}", h.Resume.Delete)
@@ -92,7 +103,9 @@ func NewRouter(jwtIssuer *auth.JWTIssuer, h Handlers, healthCheck http.HandlerFu
 	handle("GET /api/resumes/{resumeID}/design", h.ResumeDesign.Get)
 	handle("PUT /api/resumes/{resumeID}/design", h.ResumeDesign.Update)
 
-	handle("POST /api/resumes/{resumeID}/agent/chat", h.Agent.Chat)
+	if h.Agent != nil && h.AI != nil {
+		handle("POST /api/resumes/{resumeID}/agent/chat", h.AI.Protect(h.Agent.Chat))
+	}
 
 	// Unknown API routes must not fall through to the frontend's SPA document.
 	mux.HandleFunc("/api/", http.NotFound)

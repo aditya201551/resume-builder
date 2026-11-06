@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"time"
 
 	"resume-builder/backend/internal/agent"
 	"resume-builder/backend/internal/auth"
@@ -17,13 +18,14 @@ import (
 const chatHistoryLimit = 40
 
 type AgentHandler struct {
-	agent     *agent.Agent
+	access    *AIHandler
+	maxTokens int
 	resumes   *service.ResumeService
 	templates *service.TemplateService
 }
 
-func NewAgentHandler(a *agent.Agent, resumes *service.ResumeService, templates *service.TemplateService) *AgentHandler {
-	return &AgentHandler{agent: a, resumes: resumes, templates: templates}
+func NewAgentHandler(access *AIHandler, maxTokens int, resumes *service.ResumeService, templates *service.TemplateService) *AgentHandler {
+	return &AgentHandler{access: access, maxTokens: maxTokens, resumes: resumes, templates: templates}
 }
 
 type chatMessageDTO struct {
@@ -54,6 +56,19 @@ func toolEventFromCall(tc schema.ToolCall, status string) toolEventDTO {
 }
 
 func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
+	defer cancel()
+	r = r.WithContext(ctx)
+	cfg, ok := h.access.Resolve(w, r, false)
+	if !ok {
+		return
+	}
+	release, ok := h.access.Begin(w, r)
+	if !ok {
+		return
+	}
+	defer release()
+	r.Body = http.MaxBytesReader(w, r.Body, 2*1024*1024)
 	userID, _ := auth.UserIDFromContext(r.Context())
 	resumeID := r.PathValue("resumeID")
 
@@ -65,9 +80,20 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "messages must not be empty", http.StatusBadRequest)
 		return
 	}
+	for _, m := range body.Messages {
+		if (m.Role != "user" && m.Role != "assistant") || len(m.Content) > 64000 {
+			http.Error(w, "invalid chat message", 400)
+			return
+		}
+	}
 
 	if _, err := h.resumes.Get(r.Context(), userID, resumeID); err != nil {
 		writeError(w, err)
+		return
+	}
+	runtime, err := agent.New(r.Context(), &agent.Config{AI: cfg, MaxTokens: h.maxTokens})
+	if err != nil {
+		writeAIError(w, err)
 		return
 	}
 
@@ -114,10 +140,10 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		return string(data), nil
 	}
 
-	iter, sink, err := h.agent.Chat(r.Context(), messages, string(body.Draft), fetchTemplates)
+	iter, sink, err := runtime.Chat(r.Context(), messages, string(body.Draft), fetchTemplates)
 	if err != nil {
 		logAgentFailure(r.Context(), "agent_chat_failed", err)
-		send("error", map[string]string{"message": err.Error()})
+		send("error", map[string]string{"message": "The AI request failed. Check your connection, model access and provider balance."})
 		return
 	}
 
@@ -128,7 +154,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		}
 		if event.Err != nil {
 			logAgentFailure(r.Context(), "agent_iteration_failed", event.Err)
-			send("error", map[string]string{"message": event.Err.Error()})
+			send("error", map[string]string{"message": "The AI request failed. Check your connection, model access and provider balance."})
 			return
 		}
 
@@ -164,7 +190,7 @@ func (h *AgentHandler) Chat(w http.ResponseWriter, r *http.Request) {
 			})
 			if streamErr != nil {
 				logAgentFailure(r.Context(), "agent_stream_failed", streamErr)
-				send("error", map[string]string{"message": streamErr.Error()})
+				send("error", map[string]string{"message": "The AI response was interrupted. Please try again."})
 				return
 			}
 		}

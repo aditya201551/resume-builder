@@ -26,6 +26,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Message, MessageContent } from '@/components/ui/message'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import ActionItem from '@/components/agent/ActionItem'
+import { AIConnectionDialog, AIConnectionSelector } from '@/components/agent/AIConnections'
+import { useAISettings } from '@/hooks/useAISettings'
 import ChatMarkdown from '@/components/chat/ChatMarkdown'
 import CopyButton from '@/components/chat/CopyButton'
 import { groupAssistantParts } from '@/lib/agentProposal'
@@ -287,6 +289,18 @@ export default function ChatPanel({
     reviewUI,
   } = chat
   const [input, setInput] = useState('')
+  const ai = useAISettings()
+  const [setupOpen, setSetupOpen] = useState(false)
+  const pending = useRef<string | null>(null)
+  const [continueRequested, setContinueRequested] = useState(false)
+  useEffect(() => {
+    if (!setupOpen || !continueRequested || !ai.ready || !pending.current || isStreaming) return
+    const prompt = pending.current
+    pending.current = null
+    setSetupOpen(false)
+    setInput('')
+    void sendMessage(prompt, jobDescription)
+  }, [setupOpen, continueRequested, ai.ready, isStreaming, sendMessage, jobDescription])
   const [jobOpen, setJobOpen] = useState(false)
   const [showJumpToLatest, setShowJumpToLatest] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -333,6 +347,7 @@ export default function ChatPanel({
   function handleSend() {
     const content = input.trim()
     if (!content || isStreaming) return
+    if (!ai.ready) { if (ai.byokEnabled) { pending.current = content; setContinueRequested(false); setSetupOpen(true) }; return }
     setInput('')
     shouldStickRef.current = true
     void sendMessage(content, jobDescription)
@@ -340,6 +355,7 @@ export default function ChatPanel({
 
   function runQuickAction(prompt: string) {
     if (isStreaming) return
+    if (!ai.ready) { setInput(prompt); if (ai.byokEnabled) { pending.current = prompt; setContinueRequested(false); setSetupOpen(true) }; return }
     shouldStickRef.current = true
     void sendMessage(prompt, jobDescription)
   }
@@ -353,6 +369,8 @@ export default function ChatPanel({
 
   return (
     <section className="assistant-panel resume-assistant-panel flex h-full min-h-0 w-full flex-col" aria-label="Resume assistant">
+      {(ai.byokEnabled || (!ai.ready && ai.platformAvailable)) && <div className="px-4 pt-2"><AIConnectionSelector /></div>}
+      <AIConnectionDialog open={setupOpen} onConnected={() => setContinueRequested(true)} onOpenChange={open => { setSetupOpen(open); if (!open) pending.current = null }} />
       <span role="status" className="sr-only">
         {isStreaming ? 'Working on it...' : 'Here to help'}
       </span>

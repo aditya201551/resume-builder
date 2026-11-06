@@ -30,7 +30,7 @@ func TestLoadConfig(t *testing.T) {
 func TestLoadConfig_Errors(t *testing.T) {
 	cases := map[string]struct{ provider, apiKey, model string }{
 		"missing provider": {"", "key", "model"},
-		"unknown provider": {"openai", "key", "model"},
+		"unknown provider": {"unknown", "key", "model"},
 		"missing api key":  {"anthropic", "", "model"},
 		"missing model":    {"anthropic", "key", ""},
 	}

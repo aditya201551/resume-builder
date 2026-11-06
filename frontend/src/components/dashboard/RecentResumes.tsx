@@ -9,7 +9,7 @@ interface RecentResumesProps {
   isLoading: boolean
   isError: boolean
   onRetry: () => void
-  onImport: () => void
+  onImport?: () => void
 }
 
 export default function RecentResumes({ resumes, isLoading, isError, onRetry, onImport }: RecentResumesProps) {
@@ -23,9 +23,9 @@ export default function RecentResumes({ resumes, isLoading, isError, onRetry, on
           <Button asChild variant="ghost" size="sm">
             <Link to="/resumes/library">View all <ArrowRight className="size-3.5" aria-hidden /></Link>
           </Button>
-          <Button type="button" variant="outline" size="sm" onClick={onImport}>
+          {onImport && <Button type="button" variant="outline" size="sm" onClick={onImport}>
             <FileUp className="size-3.5" aria-hidden /> Import existing resume
-          </Button>
+          </Button>}
         </div>
       </div>
       {isLoading ? (

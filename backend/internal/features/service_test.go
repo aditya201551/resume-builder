@@ -85,10 +85,11 @@ func TestConcurrentFeatureReadsShareOneRefresh(t *testing.T) {
 	}
 }
 
-func TestEmptyCatalogIgnoresRetiredDatabaseFlags(t *testing.T) {
+func TestCatalogIgnoresRetiredDatabaseFlags(t *testing.T) {
 	store := &featureTestStore{values: map[string]bool{"retired.enabled": true}}
 	service := NewService(store)
-	if len(Catalog()) != 0 || len(service.Snapshot(context.Background())) != 0 || service.Enabled(context.Background(), "retired.enabled") {
+	snapshot := service.Snapshot(context.Background())
+	if len(snapshot) != len(Catalog()) || snapshot[PlatformAI] || snapshot[PlatformAIPublic] || snapshot[BYOKAI] || service.Enabled(context.Background(), "retired.enabled") {
 		t.Fatal("unregistered database flags must not be exposed")
 	}
 }

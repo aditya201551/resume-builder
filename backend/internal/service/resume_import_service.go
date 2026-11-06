@@ -35,15 +35,14 @@ type ImportedResumeWriter interface {
 }
 
 type ResumeImportService struct {
-	parser PDFParser
 	writer ImportedResumeWriter
 	slots  chan struct{}
 	mu     sync.Mutex
 	active map[string]bool
 }
 
-func NewResumeImportService(parser PDFParser, writer ImportedResumeWriter) *ResumeImportService {
-	return &ResumeImportService{parser: parser, writer: writer, slots: make(chan struct{}, 2), active: map[string]bool{}}
+func NewResumeImportService(writer ImportedResumeWriter) *ResumeImportService {
+	return &ResumeImportService{writer: writer, slots: make(chan struct{}, 2), active: map[string]bool{}}
 }
 
 type ResumeImportResult struct {
@@ -51,7 +50,8 @@ type ResumeImportResult struct {
 	Warnings []string           `json:"warnings"`
 }
 
-func (s *ResumeImportService) Import(ctx context.Context, userID, filename string, pdf []byte) (*ResumeImportResult, error) {
+// The parser is request-scoped; concurrency limits remain shared by all users.
+func (s *ResumeImportService) Import(ctx context.Context, userID, filename string, pdf []byte, parser PDFParser) (*ResumeImportResult, error) {
 	if userID == "" {
 		return nil, importError("unauthorized", "Sign in to import a resume.")
 	}
@@ -80,7 +80,10 @@ func (s *ResumeImportService) Import(ctx context.Context, userID, filename strin
 	if err := validateResumePDF(ctx, pdf); err != nil {
 		return nil, err
 	}
-	raw, err := s.parser.ParsePDF(ctx, importInstructions, pdf)
+	if parser == nil {
+		return nil, importError("parse_failed", "Choose an available AI connection.")
+	}
+	raw, err := parser.ParsePDF(ctx, importInstructions, pdf)
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, importError("import_timeout", "Import took too long. Please try again with a smaller PDF.")

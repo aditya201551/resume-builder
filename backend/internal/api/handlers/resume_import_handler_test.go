@@ -20,7 +20,7 @@ type fakeResumeImporter struct {
 	err            error
 }
 
-func (s *fakeResumeImporter) Import(_ context.Context, user, name string, pdf []byte) (*service.ResumeImportResult, error) {
+func (s *fakeResumeImporter) Import(_ context.Context, user, name string, pdf []byte, _ service.PDFParser) (*service.ResumeImportResult, error) {
 	s.calls++
 	s.user = user
 	s.filename = name
@@ -74,7 +74,7 @@ func TestResumeImportHTTP(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			svc := &fakeResumeImporter{err: tc.failure}
 			response := httptest.NewRecorder()
-			NewResumeImportHandler(svc).Import(response, tc.request(t))
+			NewResumeImportHandler(svc, testAIAccess(true, false, true)).Import(response, tc.request(t))
 			if response.Code != tc.status || svc.calls != tc.calls {
 				t.Fatalf("HTTP %d, calls %d, body %s", response.Code, svc.calls, response.Body.String())
 			}

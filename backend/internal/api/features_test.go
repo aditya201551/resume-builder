@@ -34,6 +34,7 @@ func TestFeatureAPIAndRemovedRoutesWithSPA(t *testing.T) {
 	}
 	router := api.NewRouter(issuer, api.Handlers{
 		Features: handlers.NewFeatureHandler(flags),
+		AI:       handlers.NewAIHandler(nil, flags, "http://localhost:5173"),
 	}, func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(204) }, staticDir)
 	request := func(method, path string, authenticated bool) *httptest.ResponseRecorder {
 		r := httptest.NewRequest(method, path, nil)
@@ -48,8 +49,11 @@ func TestFeatureAPIAndRemovedRoutesWithSPA(t *testing.T) {
 	if request("GET", "/api/features", false).Code != 401 {
 		t.Fatal("feature API bypassed auth")
 	}
+	if request("GET", "/api/ai/settings", false).Code != 401 {
+		t.Fatal("public Platform AI must still require authentication")
+	}
 	w := request("GET", "/api/features", true)
-	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{}` || w.Header().Get("Cache-Control") != "private, no-store" {
+	if w.Code != 200 || strings.TrimSpace(w.Body.String()) != `{"byok_ai":false,"platform_ai":false,"platform_ai_public":false}` || w.Header().Get("Cache-Control") != "private, no-store" {
 		t.Fatalf("unexpected feature snapshot: %d %s", w.Code, w.Body.String())
 	}
 	for _, route := range []struct{ method, path string }{

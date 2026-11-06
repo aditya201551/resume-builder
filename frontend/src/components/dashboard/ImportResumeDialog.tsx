@@ -5,8 +5,11 @@ import { FileUp, FileText, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { importResume, resumeFileError } from '@/lib/importResume'
+import { useAISettings } from '@/hooks/useAISettings'
+import { AIConnectionSelector } from '@/components/agent/AIConnections'
 
 export default function ImportResumeDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const ai = useAISettings()
   const [file, setFile] = useState<File | null>(null)
   const [fileError, setFileError] = useState<string | null>(null)
   const navigate = useNavigate()
@@ -35,11 +38,13 @@ export default function ImportResumeDialog({ open, onOpenChange }: { open: boole
         <DialogTitle>Import existing resume</DialogTitle>
         <DialogDescription>Bring your experience into a new, editable resume. Your content will use the Vertical template; the original design isn't copied.</DialogDescription>
       </DialogHeader>
+      <AIConnectionSelector />
+      {!ai.pdfReady && <p role="status" className="text-sm text-muted-foreground">{ai.ready ? ai.settings?.source === 'platform' ? 'PDF import is currently unavailable with Platform AI.' : 'This model supports chat only. Choose a model with native PDF input to import.' : ai.byokEnabled ? 'Choose an available AI connection before selecting a PDF.' : 'Use Platform AI before selecting a PDF.'}</p>}
       <label className="relative flex cursor-pointer flex-col items-center gap-3 rounded-2xl bg-secondary/30 px-5 py-7 text-center transition-colors hover:bg-secondary/60 focus-within:bg-secondary">
         <FileText className="size-7 text-primary" aria-hidden />
         <span className="max-w-full break-all text-sm font-medium">{file ? file.name : 'Choose your resume PDF'}</span>
         <span className="text-xs text-muted-foreground">PDF only · Up to 10 MB · 1–10 pages</span>
-        <input type="file" accept="application/pdf,.pdf" aria-label="Resume PDF" className="sr-only" disabled={mutation.isPending} onChange={(event) => {
+        <input type="file" accept="application/pdf,.pdf" aria-label="Resume PDF" className="sr-only" disabled={mutation.isPending || !ai.pdfReady} onChange={(event) => {
           const selected = event.target.files?.[0] ?? null
           mutation.reset()
           setFileError(selected ? resumeFileError(selected) : null)
@@ -47,12 +52,12 @@ export default function ImportResumeDialog({ open, onOpenChange }: { open: boole
           event.target.value = ''
         }} />
       </label>
-      <p className="text-xs leading-relaxed text-muted-foreground">We'll check that the PDF contains a resume or CV. It is sent to our AI provider for import. We save the extracted resume content, not the original file.</p>
+      <p className="text-xs leading-relaxed text-muted-foreground">We'll check that the PDF contains a resume or CV. It is sent through your selected AI connection for import. We save the extracted resume content, not the original file.</p>
       {error && <p role="alert" className="rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
       {mutation.isPending && <div role="status" className="flex items-start gap-2 rounded-xl bg-secondary p-3 text-sm"><Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden /><span>Checking and importing your resume…<span className="mt-1 block text-xs text-muted-foreground">This can take about a minute. Keep this window open.</span></span></div>}
       <DialogFooter>
         <Button variant="ghost" disabled={mutation.isPending} onClick={() => changeOpen(false)}>Cancel</Button>
-        <Button disabled={!file || mutation.isPending} onClick={() => { if (file) mutation.mutate(file) }}>
+        <Button disabled={!file || mutation.isPending || !ai.pdfReady} onClick={() => { if (file && ai.pdfReady) mutation.mutate(file) }}>
           {mutation.isPending ? <Loader2 className="size-4 animate-spin" /> : <FileUp className="size-4" />} {mutation.isPending ? 'Importing…' : 'Import resume'}
         </Button>
       </DialogFooter>

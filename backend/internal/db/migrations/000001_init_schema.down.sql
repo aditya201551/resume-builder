@@ -1,3 +1,10 @@
+DROP TABLE platform_ai_allowlist;
+DROP TABLE ai_preferences;
+DROP TABLE ai_connections;
+DROP TABLE feature_flag_audit;
+DROP TABLE feature_flags;
+DROP TABLE resume_designs;
+
 DROP TABLE IF EXISTS resume_section_configs;
 DROP TYPE IF EXISTS section_type;
 

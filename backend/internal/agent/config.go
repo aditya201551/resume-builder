@@ -13,24 +13,18 @@ type Config struct {
 	MaxTokens int
 }
 
-func LoadConfig() (*Config, error) {
-	aiCfg, err := ai.LoadConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	if model := os.Getenv("AGENT_MODEL"); model != "" {
-		aiCfg.Model = model
-	}
-
+func LoadMaxTokens() (int, error) {
 	maxTokens := 16384
 	if v := os.Getenv("AGENT_MAX_TOKENS"); v != "" {
 		parsed, err := strconv.Atoi(v)
 		if err != nil {
-			return nil, fmt.Errorf("AGENT_MAX_TOKENS must be an integer: %w", err)
+			return 0, fmt.Errorf("AGENT_MAX_TOKENS must be an integer: %w", err)
 		}
 		maxTokens = parsed
 	}
 
-	return &Config{AI: aiCfg, MaxTokens: maxTokens}, nil
+	if maxTokens < 512 || maxTokens > 32768 {
+		return 0, fmt.Errorf("AGENT_MAX_TOKENS must be between 512 and 32768")
+	}
+	return maxTokens, nil
 }

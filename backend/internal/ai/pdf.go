@@ -27,9 +27,9 @@ func (e *PDFProviderError) Error() string {
 }
 
 func NewPDFClient(cfg *Config) *PDFClient {
-	endpoint := "https://api.anthropic.com/v1/messages"
-	if cfg.Provider == ProviderOpenRouter {
-		endpoint = OpenRouterBaseURL + "/chat/completions"
+	endpoint := BaseURL(cfg.Provider) + "/chat/completions"
+	if cfg.Provider == ProviderAnthropic {
+		endpoint = BaseURL(cfg.Provider) + "/messages"
 	}
 	return &PDFClient{config: *cfg, client: &http.Client{Timeout: 110 * time.Second}, endpoint: endpoint}
 }
@@ -44,7 +44,7 @@ func (c *PDFClient) ParsePDF(ctx context.Context, instructions string, pdf []byt
 				map[string]string{"type": "text", "text": "Classify this PDF and extract its resume content according to the supplied JSON contract."},
 			}},
 		}}
-	} else if c.config.Provider == ProviderOpenRouter {
+	} else if c.config.Provider == ProviderOpenRouter || c.config.Provider == ProviderOpenAI || c.config.Provider == ProviderVercel {
 		body = map[string]any{"model": c.config.Model, "max_tokens": 12000, "messages": []any{
 			map[string]any{"role": "system", "content": instructions},
 			map[string]any{"role": "user", "content": []any{
@@ -52,6 +52,17 @@ func (c *PDFClient) ParsePDF(ctx context.Context, instructions string, pdf []byt
 				map[string]string{"type": "text", "text": "Classify this PDF and extract its resume content according to the supplied JSON contract."},
 			}},
 		}, "plugins": []any{map[string]any{"id": "file-parser", "pdf": map[string]string{"engine": "native"}}}}
+		body["store"] = false
+		if c.config.Provider != ProviderOpenRouter {
+			delete(body, "plugins")
+		}
+		if c.config.Provider == ProviderOpenAI {
+			delete(body, "max_tokens")
+			body["max_completion_tokens"] = 12000
+			if strings.HasPrefix(c.config.Model, "gpt-5.") {
+				body["reasoning_effort"] = "none"
+			}
+		}
 	} else {
 		return "", fmt.Errorf("unsupported PDF provider %q", c.config.Provider)
 	}

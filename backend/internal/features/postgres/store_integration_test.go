@@ -45,7 +45,7 @@ func TestFeatureFlagsPostgresIntegration(t *testing.T) {
 	defer pool.Close()
 	apply := func(name string) {
 		t.Helper()
-		sql, err := os.ReadFile("../../db/migrations/000010_feature_flags." + name + ".sql")
+		sql, err := os.ReadFile("../../db/migrations/000001_init_schema." + name + ".sql")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,6 +54,14 @@ func TestFeatureFlagsPostgresIntegration(t *testing.T) {
 		}
 	}
 	apply("up")
+	var retiredTables int
+	if err := pool.QueryRow(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_schema=$1 AND (table_name='templates' OR table_name LIKE 'job_%' OR table_name='saved_jobs')`, schema).Scan(&retiredTables); err != nil || retiredTables != 0 {
+		t.Fatal("baseline retained retired tables", err)
+	}
+	initial, err := postgres.NewStore(pool).List(ctx)
+	if err != nil || len(initial) != 3 || initial["platform_ai"] || initial["platform_ai_public"] || initial["byok_ai"] {
+		t.Fatal("unexpected baseline feature defaults", err)
+	}
 	if _, err := pool.Exec(ctx, `INSERT INTO feature_flags(key, enabled, updated_by) VALUES ('test.enabled', false, 'integration')`); err != nil {
 		t.Fatal(err)
 	}
@@ -79,5 +87,9 @@ func TestFeatureFlagsPostgresIntegration(t *testing.T) {
 	apply("down")
 	if _, err := store.List(ctx); err == nil {
 		t.Fatal("down migration did not remove registry")
+	}
+	apply("up")
+	if _, err := store.List(ctx); err != nil {
+		t.Fatal("baseline could not be reapplied", err)
 	}
 }

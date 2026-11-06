@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { Link, matchPath, Outlet, useLocation } from 'react-router'
-import { ChevronUp, LogOut, X } from 'lucide-react'
+import { ChevronUp, KeyRound, LogOut, X } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,7 @@ function AppSidebarContent({ overlay = false, close }: { overlay?: boolean; clos
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" side={compact ? 'right' : 'top'} sideOffset={12} className="max-w-72 rounded-lg p-2">
                 {user && <div className="truncate px-2 py-2 text-xs text-muted-foreground">{user.email}</div>}
+                {enabled('byok_ai') && <DropdownMenuItem asChild><Link to="/settings/ai" onClick={close}><KeyRound className="size-4" /> AI connections</Link></DropdownMenuItem>}
                 <DropdownMenuItem onSelect={() => logout()}><LogOut className="size-4" /> Log out</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

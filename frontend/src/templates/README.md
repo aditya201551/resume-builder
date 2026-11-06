@@ -61,9 +61,9 @@ database migration or local-storage version change is needed: the persisted desi
 JSON retains the same flat structure. Defaults affect new resumes, missing settings,
 and deliberate switches to a different template.
 
-There is no active template repository/database lookup. Historical migrations and the
-legacy `templates` table are retained for compatibility; catalog edits there have no
-effect. Resume content and shared formatting still persist in Postgres.
+There is no template repository/database lookup. The consolidated pre-release
+baseline omits the retired `templates` table; the code catalog is authoritative.
+Resume content and shared formatting still persist in Postgres.
 
 The old Chrome export endpoint has a separate HTML renderer in `registry.ts`. It
 supports Vertical as a compatibility path and is not used by client PDF preview or

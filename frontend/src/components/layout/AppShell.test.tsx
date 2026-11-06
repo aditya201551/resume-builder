@@ -3,6 +3,16 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { MemoryRouter, useRoutes } from 'react-router'
 import { FeatureContext } from '@/platform/features/context'
 import AppShell from './AppShell'
+import type { ReactNode } from 'react'
+import type { FeatureFlags } from '@/platform/features/context'
+
+// Render menu contents in SSR so tests can verify gated account links.
+vi.mock('@/components/ui/dropdown-menu', () => ({
+  DropdownMenu: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenuTrigger: ({ children }: { children: ReactNode }) => <>{children}</>,
+  DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  DropdownMenuItem: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+}))
 
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: { name: 'Test User', email: 'test@example.com' }, logout: vi.fn() }),
@@ -19,10 +29,10 @@ function TestRoutes() {
   }])
 }
 
-function render(path = '/resumes') {
+function render(path = '/resumes', flags: FeatureFlags = {}) {
   return renderToStaticMarkup(
     <MemoryRouter initialEntries={[path]}>
-      <FeatureContext value={{ flags: {}, loading: false, unavailable: false }}>
+      <FeatureContext value={{ flags, loading: false, unavailable: false }}>
         <TestRoutes />
       </FeatureContext>
     </MemoryRouter>,
@@ -33,6 +43,11 @@ beforeEach(() => vi.stubGlobal('localStorage', { getItem: () => null }))
 afterEach(() => vi.unstubAllGlobals())
 
 describe('application navigation', () => {
+  it('only shows the AI connections account link when BYOK is enabled', () => {
+    expect(render('/resumes', { platform_ai: true })).not.toContain('href="/settings/ai"')
+    expect(render('/resumes', { platform_ai: true, byok_ai: true })).toContain('href="/settings/ai"')
+    expect(render('/resumes', { byok_ai: true })).toContain('href="/settings/ai"')
+  })
   it('keeps the page and accessible navigation available when storage is blocked', () => {
     vi.stubGlobal('localStorage', { getItem: () => { throw new Error('Storage blocked') } })
     const html = render()

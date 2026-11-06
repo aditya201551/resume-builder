@@ -28,6 +28,7 @@ import { useResumePdf } from '@/hooks/useResumePdf'
 import { downloadPdfBlob } from '@/lib/pdf/download'
 import { cn } from '@/lib/utils'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { useAISettings } from '@/hooks/useAISettings'
 import { SidebarTrigger } from '@/components/ui/sidebar'
 import type { Resume } from '@/types/resume'
 
@@ -258,17 +259,20 @@ function EditorNavItems({
   onMobilePreviewChange: (preview: boolean) => void
 }) {
   const mobile = useMediaQuery('(max-width: 899px)')
-  const index = NAV_ITEMS.findIndex((item) => item.key === mode)
+  const { available } = useAISettings()
+  const items = NAV_ITEMS.filter(item => item.key !== 'chat' || available)
+  const index = Math.max(0, items.findIndex((item) => item.key === mode))
   return (
-    <nav className="workspace-mode-picker" aria-label="Editor mode">
+    <nav className="workspace-mode-picker" aria-label="Editor mode" style={{ gridTemplateColumns: `repeat(${items.length + (mobile ? 1 : 0)}, minmax(0, 1fr))` }}>
       <m.span
         className="workspace-mode-indicator"
+        style={{ width: `calc((100% - 8px) / ${items.length})` }}
         initial={false}
         animate={{ x: `${index * 100}%` }}
         transition={{ duration: 0.22, ease: [0.2, 0, 0.38, 0.9] }}
         aria-hidden
       />
-      {NAV_ITEMS.map(({ key, label, icon: Icon }) => (
+      {items.map(({ key, label, icon: Icon }) => (
         <button
           key={key}
           type="button"
